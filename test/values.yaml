@@ -1,0 +1,314 @@
+# Default values for spartan.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 3
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+containerPort: 8080
+
+imagePullSecrets: []
+nameOverride: "run-helm-check"
+fullnameOverride: ""
+containerName: ""
+appNameLabel: ""
+
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations:
+  test: "hehe"
+
+podSecurityContext: {}
+# fsGroup: 2000
+
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+service:
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+  type: ClusterIP
+  port: 80
+  protocol: TCP
+  name: http
+
+gcp:
+  enabled: true
+  frontendConfig:
+    redirectToHttps:
+      responseCodeName: MOVED_PERMANENTLY_DEFAULT
+  backendConfig:
+    sessionAffinity:
+      affinityType: GENERATED_COOKIE
+      affinityCookieTtlSec: 60
+    securityPolicyName: example-policy
+  managedCertificate:
+    domains:
+      - chart-example.local
+
+ingress:
+  enabled: true
+  className: ""
+  annotations:
+    kubernetes.io/ingress.class: gce
+  hosts:
+  - host: chart-example.local
+    paths:
+    - path: /
+      pathType: ImplementationSpecific
+
+gatewayApi:
+  enabled: true
+  gatewayName: external-gateway
+  namespace: gateway-api
+  httpRoute:
+    hostnames:
+    - chart-example.com
+    rules:
+    - matches:
+      - path:
+          value: /
+  healthCheckPolicy:
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /api/v1/health
+
+livenessProbe:
+ httpGet:
+   path: /health
+   port: 80
+ initialDelaySeconds: 3
+ timeoutSeconds: 3
+ failureThreshold: 6
+startupProbe:
+ httpGet:
+   path: /health
+   port: 80
+ initialDelaySeconds: 3
+ timeoutSeconds: 3
+ failureThreshold: 6
+readinessProbe:
+ httpGet:
+   path: /health
+   port: 80
+ initialDelaySeconds: 3
+ timeoutSeconds: 3
+ failureThreshold: 6
+
+resources:
+# We usually recommend not to specify default resources and to leave this as a conscious
+# choice for the user. This also increases chances charts run on environments with little
+# resources, such as Minikube. If you do want to specify resources, uncomment the following
+# lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+ limits:
+   cpu: 100m
+   memory: 128Mi
+ requests:
+   cpu: 100m
+   memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 100
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+testConnection:
+  enabled: true
+
+secret:
+  asFile:
+    enabled: true
+    mountPath: "/data/config"
+    data:
+     secret.txt: SECRET_FILE_AS_BASE64
+  asEnv:
+    enabled: true
+    data:
+     SECRET_NAME: SECRET_NAME_AS_BASE64
+  externalSecretEnv:
+    enabled: true
+    name: external-secret-env
+  externalSecretFile:
+    enabled: true
+    name: external-secret-file
+    mountPath: "/data/config"
+
+configMap:
+  asFile:
+    enabled: true
+    mountPath: "/data/config"
+    data:
+     nginx.conf: |
+       server {
+           location / {
+               root /data/www;
+           }
+           location /images/ {
+               root /data;
+           }
+       }
+  asEnv:
+    enabled: true
+    data:
+     SERVICE_NAME: nginx
+  externalConfigMapEnv:
+    enabled: true
+    name: external-config-map-env
+  externalConfigMapFile:
+    enabled: true
+    name: external-config-map-file
+    mountPath: "/data/config"
+
+extraEnvs:
+ - name: SERVICE
+   value: nginx
+ - name: VERSION
+   value: "1.0.0"
+
+workers:
+  - name: worker-1
+    shell: /bin/bash
+    command: "echo worker-1"
+    customImage:
+      enabled: true
+      image: busybox
+    replicaCount: 1
+    terminationGracePeriodSeconds: 180
+    resources: {}
+    podAnnotations: {}
+    extraEnvs:
+      - name: SERVICE
+        value: worker
+
+hooks:
+  - name: "ls"
+    hookTypes: "post-install,post-upgrade"
+    hookWeight: 0
+    shell: /bin/bash
+    commands:
+      - ls -la
+    resources: {}
+    customImage:
+      enabled: false
+      image: busybox
+    podAnnotations: {}
+    restartPolicy: Never
+    backoffLimit: 0
+    extraEnvs:
+      - name: SERVICE
+        value: hook
+
+cronjobs:
+  - name: "cleanup"
+    schedule: "0 * * * *"
+    shell: /bin/bash
+    commands:
+      - ls -la
+    resources: {}
+    customImage:
+      enabled: true
+      image: busybox
+    podAnnotations: {}
+    restartPolicy: Never
+    extraEnvs:
+      - name: SERVICE
+        value: cronjob
+
+sidecars:
+  - name: datadog-agent
+    image: datadog/agent
+    ports:
+      - containerPort: 8125
+        name: dogstatsdport
+        protocol: UDP
+      - containerPort: 8126
+        name: traceport
+        protocol: TCP
+    sharedVolume:
+      mountPath: /var/log/application/
+    extraEnvs:
+      - name: SERVICE
+        value: sidecar
+
+  - name: busybox
+    image: busybox
+    ports:
+      - containerPort: 80
+        name: http
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 10m
+      limits:
+        memory: 100Mi
+        cpu: 10m
+    shell: /bin/bash
+    command: "echo $(date) INFO hello >> /tmp/data/myapp.log && sleep 3"
+
+# This field supports the datadog agent as sidecar pattern
+# It will add additional environment variables for datadog
+# It will also add stop condition for datadog agent container
+datadog:
+  enabled: true
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 25%
+
+pdb:
+  enabled: true
+  minAvailable: 1
+  maxUnavailable: ""

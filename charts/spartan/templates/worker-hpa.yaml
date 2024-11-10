@@ -1,0 +1,7 @@
+{{- range .Values.workers }}
+{{- if (dig "autoscaling" false .) }}
+{{- if .autoscaling.enabled }}
+  {{- include "spartan.workerHpa" (dict "worker" . "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+{{- end }}
+{{- end }}
+{{- end }}
