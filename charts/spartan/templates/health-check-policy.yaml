@@ -1,0 +1,25 @@
+{{- if .Values.gatewayApi.enabled -}}
+{{- $fullName := include "spartan.fullname" . -}}
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "spartan.labels" . | nindent 4 }}
+spec:
+{{- with .Values.gatewayApi.healthCheckPolicy }}
+  default:
+    logConfig:
+      enabled: true
+    checkIntervalSec: {{ default "10" .checkIntervalSec }}
+    healthyThreshold: {{ default "1" .healthyThreshold }}
+    unhealthyThreshold: {{ default "3" .unhealthyThreshold }}
+    timeoutSec: {{ default "6" .timeoutSec }}
+    config:
+      {{- toYaml .config | nindent 6 }}
+  targetRef:
+    group: ""
+    kind: Service
+    name: {{ $fullName }}
+{{ end }}
+{{ end }}

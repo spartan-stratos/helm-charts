@@ -1,0 +1,12 @@
+{{- if .Values.gcp.enabled }}
+{{- if .Values.gcp.frontendConfig }}
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ include "spartan.fullname" $ }}-frontend-config
+spec:
+  {{- with .Values.gcp.frontendConfig }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end }}
+{{- end }}

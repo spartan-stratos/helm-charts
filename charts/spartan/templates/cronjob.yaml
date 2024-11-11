@@ -1,0 +1,3 @@
+{{- range .Values.cronjobs }}
+  {{- include "spartan.cronjob" (dict "cronjob" . "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+{{- end }}

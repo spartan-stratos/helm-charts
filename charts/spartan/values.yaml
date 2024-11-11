@@ -1,0 +1,377 @@
+## Default values for spartan.
+## This is a YAML-formatted file.
+## Declare variables to be passed into your templates.
+## For more details: https://github.com/spartan-stratos/helm-charts/blob/master/charts/spartan/README.md
+
+## replicaCount specifies the number of replicas
+replicaCount: 1
+
+image:
+  ## repository is the container image repository
+  repository: nginx
+  ## pullPolicy is the container image pull policy
+  pullPolicy: IfNotPresent
+  ## tag is the container image tag, overriding the image tag whose default is the chart appVersion
+  tag: ""
+
+## imagePullSecrets is the Global Docker registry secret names as an array
+imagePullSecrets: []
+## containerPort is the service target port
+containerPort: 8080
+## containerName is the service container name
+containerName: ""
+
+## nameOverride is the string to partially override common.names.fullname template (will maintain the release name)
+nameOverride: ""
+## fullnameOverride is the string to fully override spartan.fullname template
+fullnameOverride: ""
+## appNameLabel is used for app.kubernetes.io/name k8s resources label
+appNameLabel: ""
+
+serviceAccount:
+  ## create specifies whether a service account should be created
+  create: false
+  ## annotations are annotations to add to the service account
+  annotations: {}
+  ## The name of the service account to use.
+  ## If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+## podAnnocations specify pods annotation
+podAnnotations: {}
+
+## podSecurityContext is custom pod security context for spartan pod
+podSecurityContext: {}
+  # fsGroup: 2000
+
+## securityContext is custom security context for spartan container
+securityContext: {}
+#  capabilities:
+#    drop:
+#    - ALL
+#  readOnlyRootFilesystem: true
+#  runAsNonRoot: true
+#  runAsUser: 1000
+
+service:
+  ## annotations specifies service annotations
+  annotations: {}
+  ## type specifies the service type
+  type: ClusterIP
+  ## port specifies the service port
+  port: 80
+  ## protocol specifies the service protocol
+  protocol: TCP
+  ## name specifies the service name
+  name: http
+
+gcp:
+  ## enabled specifies whether gcp configurations should be created
+  enabled: false
+  ## frontendConfig specifies the configuration for frontend configuration of ALB of GKE ingress
+  frontendConfig: {}
+  #  redirectToHttps:
+  #    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+  ## backendConfig specifies the configuration for backend configuration of ALB of GKE ingress
+  backendConfig: {}
+  #  sessionAffinity:
+  #    affinityType: GENERATED_COOKIE
+  #    affinityCookieTtlSec: 60
+  #  securityPolicyName: example-policy
+  ## managedCertificate enable the managed certificate for TLS/SSL for GKE ingress ALB
+  managedCertificate: {}
+  # domains:
+  #  - chart-example.local
+
+ingress:
+  ## enabled specifies whether ingress controller resource should be created
+  enabled: false
+  ## className is the ingress class name (Kubernetes 1.18+)
+  className: ""
+  ## annotations specifies ingress annotations configuration
+  annotations: {}
+  #  kubernetes.io/ingress.class: gce
+  #  kubernetes.io/ingress.global-static-ip-name: example-gcp-ip-address
+  ## hosts specifies ingress resource hostnames
+  hosts: {}
+  #  - host: chart-example.local
+  #    paths:
+  #    - path: /
+  #      pathType: ImplementationSpecific
+
+gatewayApi:
+  ## enabled specifies whether to enable or disable the Gateway API integration
+  enabled: false
+  #  gatewayName: external-gateway
+  #  namespace: gateway-api
+  #  httpRoute:
+  #    hostnames:
+  #    - chart-example.com
+  #    rules:
+  #    - matches:
+  #      - path:
+  #          value: /
+  #  healthCheckPolicy:
+  #    config:
+  #      type: HTTP
+  #      httpHealthCheck:
+  #        requestPath: /api/v1/health
+
+## livenessProbe specifies pod initial delay and timeout
+livenessProbe: {}
+#  httpGet:
+#    path: /health
+#    port: 80
+#  initialDelaySeconds: 3
+#  timeoutSeconds: 3
+#  failureThreshold: 6
+## startupProbe specifies pod initial delay and timeout
+startupProbe: {}
+#  httpGet:
+#    path: /health
+#    port: 80
+#  initialDelaySeconds: 3
+#  timeoutSeconds: 3
+#  failureThreshold: 6
+## readinessProbe specifies pod initial delay and timeout
+readinessProbe: {}
+#  httpGet:
+#    path: /health
+#    port: 80
+#  initialDelaySeconds: 3
+#  timeoutSeconds: 3
+#  failureThreshold: 6
+
+resources: {}
+## We usually recommend not to specify default resources and to leave this as a conscious
+## choice for the user. This also increases chances charts run on environments with little
+## resources, such as Minikube. If you do want to specify resources, uncomment the following
+## lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+#  limits:
+#    cpu: 100m
+#    memory: 128Mi
+#  requests:
+#    cpu: 100m
+#    memory: 128Mi
+
+autoscaling:
+  ## enabled specifies whether autoscaling
+  enabled: false
+  ## minReplicas specifies minimum amount of Replicas
+  minReplicas: 1
+  ## maxReplicas specifies maximum amount of Replicas
+  maxReplicas: 100
+  ## metrics specifies resource metrics utilization threshold
+  metrics: []
+  ## behaviour specifies separate scaling policies upon scale-up and scale-down
+  behavior: {}
+
+vpa:
+  ## enabled specifies whether a vertical pod autoscaling should be created
+  enabled: false
+  ## updateMode specifies whether recommended updates are applied when a Pod is started and whether
+  updateMode: "Auto"
+
+## nodeSelector is node labels for pod assignment
+nodeSelector: {}
+
+## tolerations specifies toleration labels for pod assignment
+tolerations: []
+
+## affinity specifies affinity settings for pod assignment
+affinity: {}
+
+testConnection:
+  ## testConnection enables test connection
+  enabled: false
+
+secret:
+  asFile:
+    ## enabled determines if the Secret should be created from files
+    enabled: false
+    ## mountPath enables creating a Secret from environment variables
+    mountPath: "/data/config"
+    ## data specifies the data for the Secret created from files
+    data: {}
+    #  secret.txt: SECRET_FILE_AS_BASE64
+  asEnv:
+    ## enabled determines if the Secret should be created from environment variables
+    enabled: false
+    ## data specifies the data for the Secret created from environment variables
+    data: {}
+    #  SECRET_NAME: SECRET_NAME_AS_BASE64
+  externalSecretEnv:
+    ## enabled specifies whether to map an existing Secret to environment variables
+    enabled: false
+    ## name specifies the name of the existing Secret
+    name: external-secret-env
+  externalSecretFile:
+    ## enabled determines if the files can be used from an existing Secret
+    enabled: false
+    ## name specifies the name for the existing Secret containing from files
+    name: external-secret-file
+    ## mountPath specifies the path to mount files for the existing Secret
+    mountPath: "/data/config"
+
+configMap:
+  asFile:
+    ## enabled determines if the ConfigMap should be created from files
+    enabled: false
+    ## mountPath specifies the path to mount files for the ConfigMap
+    mountPath: "/data/config"
+    ## data specifies the data for the ConfigMap created from files
+    data: {}
+    #  nginx.conf: |
+    #    server {
+    #        location / {
+    #            root /data/www;
+    #        }
+    #        location /images/ {
+    #            root /data;
+    #        }
+    #    }
+  asEnv:
+    ## enabled determines if the ConfigMap should be created from environment variables
+    enabled: false
+    ## data specifies the data for the ConfigMap created from environment variables
+    data: {}
+  externalConfigMapEnv:
+    ## enable determines whether to map an existing ConfigMap to environment variables
+    enabled: false
+    ## name specifies the name for the existing ConfigMap
+    name: external-config-map-env
+  externalConfigMapFile:
+    ## enabled determines if the files can be used from an existing ConfigMap
+    enabled: false
+    ## name specifies the name for the existing ConfigMap containing from files
+    name: external-config-map-file
+    ## mountPath specifies the path to mount files for the existing ConfigMap
+    mountPath: "/data/config"
+
+## extraEnvs allows mapping of additional raw environment variables
+extraEnvs: []
+#  - name: SERVICE
+#    value: spartan
+#  - name: VERSION
+#    value: 1.0.0
+
+## workers enable users to deploy scalable and customizable worker components
+workers: []
+#  - name: worker-1
+#    shell: /bin/bash
+#    command: "echo worker-1"
+#    replicaCount: 1
+#    terminationGracePeriodSeconds: 180
+#    resources: {}
+#    customImage:
+#      enabled: false
+#      image: busybox
+#    podAnnotations: {}
+#    autoscaling:
+#      enabled: true
+#      minReplicas: 2
+#      maxReplicas: 10
+#      targetCPUUtilizationPercentage: 80
+#      targetMemoryUtilizationPercentage: 80
+#    extraEnvs:
+#      - name: SERVICE
+#        value: worker
+
+## hooks allows customization of various aspects of the Job
+hooks:
+#  - name: "ls"
+#    hookTypes: "post-install,post-upgrade"
+#    hookWeight: 0
+#    shell: /bin/bash
+#    commands:
+#      - ls -la
+#    resources: {}
+#    customImage:
+#      enabled: false
+#      image: busybox
+#    podAnnotations: {}
+#    restartPolicy: Never
+#    backoffLimit: 0
+#    extraEnvs:
+#    - name: SERVICE
+#      value: hook
+
+## cronjobs specifies list of cronjobs
+cronjobs: []
+#  - name: "cleanup"
+#    schedule: "0 * * * *"
+#    shell: /bin/bash
+#    commands:
+#      - ls -la
+#    resources: {}
+#    customImage:
+#      enabled: true
+#      image: busybox
+#    podAnnotations: {}
+#    restartPolicy: Never
+#    extraEnvs:
+#    - name: SERVICE
+#      value: cronjob
+
+## sidecars enables sidecars containers to run specific tasks and mounting shared volumes
+sidecars: []
+#  - name: datadog-agent
+#    image: datadog/agent
+#    ports:
+#      - containerPort: 8125
+#        name: dogstatsdport
+#        protocol: UDP
+#      - containerPort: 8126
+#        name: traceport
+#        protocol: TCP
+#    sharedVolume:
+#      mountPath: /var/log/application/
+#    extraEnvs:
+#      - name: SERVICE
+#        value: sidecar
+#  - name: busybox
+#    image: busybox
+#    ports:
+#      - containerPort: 80
+#        name: http
+#    resources:
+#      requests:
+#        memory: 100Mi
+#        cpu: 10m
+#      limits:
+#        memory: 100Mi
+#        cpu: 10m
+#    shell: /bin/bash
+#    command: "echo $(date) INFO hello >> /tmp/data/myapp.log && sleep 3"
+
+## This field supports the datadog agent as sidecar pattern
+## It will add additional environment variables for datadog
+## It will also add stop condition for datadog agent container
+datadog:
+  enabled: false
+
+## StrategyType configuration
+## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+## Can be set to RollingUpdate or OnDelete
+##
+## type: RollingUpdate
+## rollingUpdate:
+##   maxSurge: 25%
+##   maxUnavailable: 25%
+## updateStrategy specifies the configuration for deployment strategy
+updateStrategy: {}
+
+## Pod Disruption Budget configuration
+## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb
+## @param pdb.enabled Enable/disable a Pod Disruption Budget creation
+## @param pdb.minAvailable Minimum number/percentage of pods that should remain scheduled
+## @param pdb.maxUnavailable Maximum number/percentage of pods that may be made unavailable
+##
+pdb:
+  ## enabled specifies whether a pod disruption budget should be created
+  enabled: false
+  ## ONLY 1 between minAvailable or maxUnavailable should be defined at the same time
+  ## minAvailable specifies the minimum number/percentage of pods that should remain scheduled
+  minAvailable: 1
+  ## maxUnavailable specifies the maximum number/percentage of pods that may be made unavailable
+  maxUnavailable: ""

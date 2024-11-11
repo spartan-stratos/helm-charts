@@ -1,0 +1,39 @@
+name: Helm Check
+
+on: pull_request
+
+env:
+  HELM_CHARTS: "spartan"
+
+jobs:
+  helm-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: helm-check-default
+        uses: igabaydulin/helm-check-action@0.1.4
+        env:
+          CHART_LOCATION: ./charts/spartan
+          CHART_VALUES: ./charts/spartan/values.yaml
+
+      - name: helm-check-enabled-all
+        uses: igabaydulin/helm-check-action@0.1.4
+        env:
+          CHART_LOCATION: ./charts/spartan
+          CHART_VALUES: ./test/values.yaml
+
+      - name: Install helm-unittest plugin
+        run: |
+          helm plugin install https://github.com/quintush/helm-unittest
+
+      - name: Run helm-unittest
+        run: |
+          for chart in $HELM_CHARTS
+          do
+            echo "Running unittest for ${chart} chart"
+            helm unittest "charts/${chart}"
+          done
