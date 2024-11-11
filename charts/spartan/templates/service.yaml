@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "spartan.fullname" . }}
+  annotations:
+  {{- if .Values.service.annotations }}
+  {{- toYaml .Values.service.annotations | nindent 4 }}
+  {{- end }}
+  {{- if .Values.gcp.enabled }}
+  {{- if .Values.gcp.backendConfig }}
+    cloud.google.com/backend-config: '{"default": "{{ include "spartan.fullname" $ }}-backend-config"}'
+  {{- end }}
+  {{- end }}
+  labels:
+    {{- include "spartan.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port | default 80 }}
+      targetPort: {{ .Values.containerPort | default 80 }}
+      protocol: {{ .Values.service.protocol | default "TCP" }}
+      name: {{ .Values.service.name | default "http" }}
+  selector:
+    {{- include "spartan.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,83 @@
+suite: "HorizontalPodAutoscaler template tests"
+
+templates:
+  - "templates/hpa.yaml"
+
+tests:
+  - it: "should have correct minReplicas and maxReplicas values"
+    set:
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 1
+      autoscaling.maxReplicas: 5
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: "spec.minReplicas"
+          value: 1
+      - equal:
+          path: "spec.maxReplicas"
+          value: 5
+
+  - it: "should render metrics section when targetCPUUtilizationPercentage is set"
+    set:
+      autoscaling.enabled: true
+      autoscaling.targetCPUUtilizationPercentage: 80
+    asserts:
+      - equal:
+          path: "spec.metrics[0].resource.name"
+          value: "cpu"
+      - lengthEqual:
+          path: "spec.metrics"
+          count: 1
+      - equal:
+          path: "spec.metrics[0].resource.target.averageUtilization"
+          value: 80
+
+  - it: "should render metrics section when targetMemoryUtilizationPercentage is set"
+    set:
+      autoscaling.enabled: true
+      autoscaling.targetMemoryUtilizationPercentage: 70
+    asserts:
+      - equal:
+          path: "spec.metrics[0].resource.name"
+          value: "memory"
+      - lengthEqual:
+          path: "spec.metrics"
+          count: 1
+      - equal:
+          path: "spec.metrics[0].resource.target.averageUtilization"
+          value: 70
+
+  - it: "should include behavior section if configured"
+    set:
+      autoscaling.enabled: true
+      autoscaling.behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 60
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: "spec.behavior.scaleUp.stabilizationWindowSeconds"
+          value: 60
+
+  - it: "should render correct metrics configuration with both CPU and Memory utilization"
+    set:
+      autoscaling.enabled: true
+      autoscaling.metrics:
+        - type: Resource
+          resource:
+            name: custom-metric
+            target:
+              type: Value
+              averageValue: 100
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - lengthEqual:
+          path: "spec.metrics"
+          count: 1
+      - equal:
+          path: "spec.metrics[0].resource.target.averageValue"
+          value: 100

@@ -1,0 +1,42 @@
+{{- if and .Values.vpa.enabled .Values.resources }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ include "spartan.fullname" . }}
+  labels:
+    {{- include "spartan.labels" . | nindent 4 }}
+    tier: "vpa"
+spec:
+  resourcePolicy:
+    containerPolicies:
+      - containerName: {{ include "spartan.containerName" . }}
+        controlledResources:
+          {{- $controlledResources := (split "," (include "spartan.resources" .)) }}
+          {{- range $item := $controlledResources }}
+          - {{ $item }}
+          {{- end }}
+        {{- if .Values.resources.limits }}
+        maxAllowed:
+          {{- if .Values.resources.limits.cpu }}
+          cpu: {{ .Values.resources.limits.cpu }}
+          {{- end }}
+          {{- if .Values.resources.limits.memory }}
+          memory: {{ .Values.resources.limits.memory }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.resources.requests }}
+        minAllowed:
+          {{- if .Values.resources.requests.cpu }}
+          cpu: {{ .Values.resources.requests.cpu }}
+          {{- end }}
+          {{- if .Values.resources.requests.memory }}
+          memory: {{ .Values.resources.requests.memory }}
+          {{- end }}
+        {{- end }}
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "spartan.fullname" . }}
+  updatePolicy:
+    updateMode: {{ .Values.vpa.updateMode }}
+{{- end }}
