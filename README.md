@@ -103,8 +103,8 @@ Custom charts will follow the Helm official File Structure as below: (For exampl
 - For YAML:
 
 ```
-*# This is a comment*
-**type**: sprocket
+# This is a comment
+type: sprocket
 ```
 
 - For Templates:
@@ -113,7 +113,7 @@ Custom charts will follow the Helm official File Structure as below: (For exampl
 {{- /*
 This is a comment.
 */}}
-**type**: frobnitz
+type: frobnitz
 ```
 
 ### Arguments and Values
@@ -124,7 +124,7 @@ This is a comment.
 [CORRECT]   chicken: true
 [CORRECT]   chickenNoodleSoup: true
 [INCORRECT] Chicken: true                # initial caps may conflict with built-ins
-**[INCORRECT] chicken-noodle-soup: true    # do not use hyphens in the name
+[INCORRECT] chicken-noodle-soup: true    # do not use hyphens in the name
 ```
 
 Note that all of Helm's built-in variables begin with an uppercase letter to easily distinguish them from user-defined values: `.Release.Name`, `.Capabilities.KubeVersion`.
@@ -181,12 +181,12 @@ Labels that are recommended, and *should* be placed onto a chart for global cons
 
 The label list below is non-exhaustive and only includes recommended, not optional ones.
 
-| Name | Description                                                                                                                                                                      |
-| --- |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `app.kubernetes.io/name` | This should be the app name, reflecting the entire app. Usually `{{ template "name" . }}` is used for this. This is used by many Kubernetes manifests, and is not Helm-specific. |
-| `helm.sh/chart` | This should be the chart name and version: `{{ .Chart.Name }}-{{ .Chart.Version \| replace "+" "_" }}`.                                                                          |
-| `app.kubernetes.io/managed-by` | This should always be set to `{{ .Release.Service }}`. It is for finding all things managed by Helm.                                                                             |
-| `app.kubernetes.io/instance` | This should be the `{{ .Release.Name }}`. It aids in differentiating between different instances of the same application.                                                        |
+| Name                           | Description                                                                                                                                                                      |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `app.kubernetes.io/name`       | This should be the app name, reflecting the entire app. Usually `{{ template "name" . }}` is used for this. This is used by many Kubernetes manifests, and is not Helm-specific. |
+| `helm.sh/chart`                | This should be the chart name and version: `{{ .Chart.Name }}-{{ .Chart.Version ｜ replace "+" "_" }}`.                                                                          |
+| `app.kubernetes.io/managed-by` | This should always be set to `{{ .Release.Service }}`. It is for finding all things managed by Helm.                                                                            |
+| `app.kubernetes.io/instance`   | This should be the `{{ .Release.Name }}`. It aids in differentiating between different instances of the same application.                                                       |
 
 If an item of metadata is not used for querying, it should be set as an annotation instead.
 

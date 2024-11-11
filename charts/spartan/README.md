@@ -47,7 +47,6 @@ helm upgrade <release_name> [--install] spartan/spartan -n <namespace> -f /value
 To uninstall/delete the `<release_name>` deployment from the `<namespace>`:
 
 ```console
-# Uninstalling the spartan chart
 helm delete <release_name> -n <namespace>
 ```
 The command removes all the resources associated with the chart and deletes the release.

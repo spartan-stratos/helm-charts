@@ -259,7 +259,6 @@ cronjobs:
     customImage:
       enabled: true
       image: busybox
-    podAnnotations: {}
     restartPolicy: Never
     extraEnvs:
       - name: SERVICE
