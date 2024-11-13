@@ -1,3 +1,7 @@
+## This workflow will create / update `index.yaml` on `/gh-pages` branch
+## whether there is any changes on chart(s),
+## and add created helm artifact(s) with version from `Chart.yaml` to Github release.
+##
 name: Release Charts
 
 on:
