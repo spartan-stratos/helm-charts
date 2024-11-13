@@ -1,4 +1,4 @@
-# Spartan helm charts
+# Spartan Helm Charts
 
 ## Overall
 
@@ -35,8 +35,13 @@ Custom charts will follow the Helm official File Structure as below: (For exampl
   templates/          # Directory of templates that, when combined with values, will generate valid Kubernetes manifest files.
     NOTES.txt         # OPTIONAL: A plain text file containing short usage notes
     tests/            # Folder consists of test files.
-  hosting/            # Folder consists of packaged charts and a file index.yaml which contains an index of all of the charts in the repository.
 ```
+
+### Helm Repository Index `index.yaml`
+
+`index.yaml` is an index file given a directory containing packaged charts.
+
+This file is located in `/gh-pages` branch with this `README.md` file.
 
 ## Standards and Conventions
 
@@ -51,13 +56,13 @@ Custom charts will follow the Helm official File Structure as below: (For exampl
 [INCORRECT] aws_cluster_auto_scaler    # no underscore
 ```
 
-- **Chart version:** Use [SemVer 2](https://semver.org/) to represent version numbers: `MAJOR.MINOR.PATCH`.
+- **Chart version:** Use [SemVer 2](https://semver.org/) to represent version numbers: `MAJOR.MINOR.PATCH`.
 
 ### Templates
 
 - Template files are located in `/templates` folder of a chart.
-- Template files should have the extension `.yaml` if they produce YAML output. The extension `.tpl` may be used for template files that produce no formatted content.
-- Template file names should reflect the resource kind in the name. e.g. `foo-pod.yaml`, `bar-svc.yaml`.
+- Template files should have the extension `.yaml` if they produce YAML output. The extension`.tpl` may be used for template files that produce no formatted content.
+- Template file names should reflect the resource kind in the name. e.g. `foo-pod.yaml`, `bar-svc.yaml`.
 - All defined template names should be name-spaced to avoid conflicts among subcharts since templates are globally accessible by each other.
 
 ```
@@ -74,7 +79,7 @@ Custom charts will follow the Helm official File Structure as below: (For exampl
 
 ### Formatting
 
-- YAML and template files should be indented using *two spaces* (and never tabs).
+- YAML and template files should be indented using *two spaces* (and never tabs).
 - Best to have no blank lines.
 - Should have whitespace after the opening braces and before the closing braces; and chomp whitespace where possible.
 
@@ -127,7 +132,7 @@ type: frobnitz
 [INCORRECT] chicken-noodle-soup: true    # do not use hyphens in the name
 ```
 
-Note that all of Helm's built-in variables begin with an uppercase letter to easily distinguish them from user-defined values: `.Release.Name`, `.Capabilities.KubeVersion`.
+Note that all of Helm's built-in variables begin with an uppercase letter to easily distinguish them from user-defined values: `.Release.Name`, `.Capabilities.KubeVersion`.
 
 - **Existence check:**
 
@@ -152,13 +157,13 @@ serverPort: 80
 
 - **Types clearance:**
 
-To avoid type conversion errors is to be explicit about strings, and implicit about everything else. Or, in short, *quote all strings*.
+To avoid type conversion errors is to be explicit about strings, and implicit about everything else. Or, in short, *quote all strings*.
 
-To avoid the integer casting issues, store your integers as strings, and use `{{ int $value }}` in the template to convert from a string back to an integer.
+To avoid the integer casting issues, store your integers as strings, and use `{{ int $value }}` in the template to convert from a string back to an integer.
 
 ### Chart manifests
 
-- **Images:** A container image should use a fixed tag or the SHA of the image. It should not use the tags `latest`, `head`, `canary`, or other tags that are designed to be "floating".
+- **Images:** A container image should use a fixed tag or the SHA of the image. It should not use the tags `latest`, `head`, `canary`, or other tags that are designed to be "floating".
 - **ImagePullPolicy:** should be `IfNotPresent` by default.
 - **PodTemplates Should Declare Selectors:** makes the relationship between the controller and the pod. Without this, Kubernetes will automatically try to match all labels and lose track of its pods, leading to mismatches or failures in rolling updates.
 
@@ -277,3 +282,21 @@ All notable changes to this project will be documented in this file.
 
 * Fix abc ([#1](https://pr-link) ([2517eb9](https://commit-link))
 ```
+
+## Release process for maintainers
+
+This section provides maintainers information on this `helm-charts` repo release process.
+
+**Prerequisites**: Merged PR to upgrade chart templates or `README.md`.
+
+**Important**: No changes should be made to **Chart.yaml**.
+
+**Actions**:
+
+1. Navigate to `Github Actions`.
+2. Run `Bump version` pipeline on branch master.
+
+**Result**:
+
+1. After `Bump version` pipeline is successful, it will automatically trigger `Release charts` pipeline.
+2. After `Release charts` pipline is successful, it will create/update `index.yaml` on `gh-pages` branch.
