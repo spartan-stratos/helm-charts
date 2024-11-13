@@ -1,0 +1,46 @@
+name: Bump Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        type: choice
+        description: Version type
+        required: true
+        options:
+          - major
+          - minor
+          - patch
+
+env:
+  GH_APP_ID: ${{ vars.APP_ID }}
+  GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@v1
+        id: github-app-token
+        with:
+          app-id: ${{ env.GH_APP_ID }}
+          private-key: ${{ env.GH_APP_PRIVATE_KEY }}
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+          token: ${{ steps.github-app-token.outputs.token }}
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+
+      - name: Update git configuration
+        run: |
+          git config user.email github-actions@spartan.com
+          git config user.name github-actions
+
+      - name: Bump version
+        run: |
+          echo ${{ github.event.inputs.message }}
+          ./tools/create_release.sh ${{ github.event.inputs.message }}

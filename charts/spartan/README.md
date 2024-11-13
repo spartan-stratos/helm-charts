@@ -14,7 +14,7 @@ This chart bootstraps a deployment on a [Kubernetes](http://kubernetes.io) clust
 ## Get Repo Info
 
 ```bash
-helm repo add spartan https://charts.spartan.com/spartan
+helm repo add spartan https://spartan-stratos.github.io/helm-charts/
 helm repo update
 ```
 
@@ -25,7 +25,7 @@ See [helm repo](https://helm.sh/docs/helm/helm_repo/) for command documentation.
 To install the spartan chart using Helm.
 
 ```sh
-helm install <release_name> spartan/spartan -n <namespace> --create-namespace
+helm install <release_name> spartan/spartan --version <version> -n <namespace> --create-namespace
 ```
 
 `<release_name>`: The name assigned to a release when install a Helm chart.
@@ -35,7 +35,7 @@ helm install <release_name> spartan/spartan -n <namespace> --create-namespace
 To upgrade the spartan chart using Helm.
 
 ```sh
-helm upgrade <release_name> [--install] spartan/spartan -n <namespace> -f /values.yaml
+helm upgrade <release_name> [--install] spartan/spartan --version <version> -n <namespace> -f /values.yaml
 ```
 
 `/values.yaml`: Points to a specific values file (values.yaml) that contains configuration settings for the Helm chart.
@@ -101,8 +101,8 @@ The following table lists the configurable parameters of the **spartan chart** a
 | autoscaling.maxReplicas                                                                                                                                           | Maximum amount of Replicas                                                                                                                         | 100          |
 | autoscaling.metrics                                                                                                                                               | Specifies resource metrics utilization threshold                                                                                                   | []           |
 | autoscaling.minReplicas                                                                                                                                           | Minimum amount of Replicas                                                                                                                         | 1            |
-| autoscaling.targetCPUUtilizationPercentage                                                                                                                        | Target CPU Utilization in percentage                                                                                                               | 80           |
-| autoscaling.targetMemoryUtilizationPercentage                                                                                                                     | Target Memory Utilization in percentage                                                                                                            | 80           |
+| autoscaling.targetCPUUtilizationPercentage                                                                                                                        | Target CPU Utilization in percentage                                                                                                               | null         |
+| autoscaling.targetMemoryUtilizationPercentage                                                                                                                     | Target Memory Utilization in percentage                                                                                                            | null         |
 | configMap.asFile.enabled                                                                                                                                          | Determines if the ConfigMap should be created from files                                                                                           | false        |
 | configMap.asFile.data                                                                                                                                             | Specifies the data for the ConfigMap created from files                                                                                            | {}           |
 | configMap.asFile.mountPath                                                                                                                                        | Specifies the path to mount files for the ConfigMap                                                                                                | {}           |

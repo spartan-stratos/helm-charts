@@ -4,15 +4,27 @@ on: pull_request
 
 env:
   HELM_CHARTS: "spartan"
+  GH_APP_ID: ${{ vars.APP_ID }}
+  GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
 jobs:
   helm-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v3
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@v1
+        id: github-app-token
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          app-id: ${{ env.GH_APP_ID }}
+          private-key: ${{ env.GH_APP_PRIVATE_KEY }}
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+          token: ${{ steps.github-app-token.outputs.token }}
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
 
       - name: helm-check-default
         uses: igabaydulin/helm-check-action@0.1.4
