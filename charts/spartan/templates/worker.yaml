@@ -1,3 +1,6 @@
-{{- range .Values.workers }}
-  {{- include "spartan.worker" (dict "worker" . "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+{{- range $index, $worker := (.Values.workers) }}
+  {{- include "spartan.worker" (dict "worker" $worker "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+  {{- if lt $index (sub (len $.Values.workers) 1) }}
+---
+  {{- end }}
 {{- end }}

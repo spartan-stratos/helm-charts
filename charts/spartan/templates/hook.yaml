@@ -1,5 +1,8 @@
-{{- range .Values.hooks }}
+{{- range $index, $hook := (.Values.hooks) }}
   {{ if .commands }}
-  {{- include "spartan.hook" (dict "hook" . "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+    {{- include "spartan.hook" (dict "hook" $hook "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+    {{- if lt $index (sub (len $.Values.hooks) 1) }}
+---
+    {{- end }}
   {{- end }}
 {{- end }}

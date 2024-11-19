@@ -1,7 +1,10 @@
-{{- range .Values.workers }}
-{{- if (dig "autoscaling" false .) }}
-{{- if .autoscaling.enabled }}
-  {{- include "spartan.workerHpa" (dict "worker" . "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
-{{- end }}
-{{- end }}
+{{- range $index, $worker := (.Values.workers) }}
+  {{- if (dig "autoscaling" false $worker) }}
+    {{- if .autoscaling.enabled }}
+      {{- include "spartan.workerHpa" (dict "worker" $worker "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+      {{- if lt $index (sub (len $.Values.workers) 1) }}
+---
+      {{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}
