@@ -8,7 +8,7 @@ name: Bump Version
 on:
   workflow_dispatch:
     inputs:
-      name:
+      version_type:
         type: choice
         description: Version type
         required: true
@@ -47,5 +47,5 @@ jobs:
 
       - name: Bump version
         run: |
-          echo ${{ github.event.inputs.message }}
-          ./tools/create_release.sh ${{ github.event.inputs.message }}
+          echo ${{ github.event.inputs.version_type }}
+          ./tools/create_release.sh ${{ github.event.inputs.version_type }}
