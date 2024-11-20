@@ -14,7 +14,7 @@ This chart bootstraps a deployment on a [Kubernetes](http://kubernetes.io) clust
 ## Get Repo Info
 
 ```bash
-helm repo add spartan https://spartan-stratos.github.io/helm-charts/
+helm repo add spartan https://spartan-stratos.github.io/helm-charts
 helm repo update
 ```
 
