@@ -287,16 +287,11 @@ All notable changes to this project will be documented in this file.
 
 This section provides maintainers information on this `helm-charts` repo release process.
 
-**Prerequisites**: Merged PR to upgrade chart templates or `README.md`.
-
-**Important**: No changes should be made to **Chart.yaml**.
-
 **Actions**:
 
-1. Navigate to `Github Actions`.
-2. Run `Bump version` pipeline on branch master.
+1. Create and merge PR on chart modification.
+2. Create and merge PR to update `CHANGELOG.md` and `Chart.yaml` with the same version type incremental for `version` and `appVersion` .
 
 **Result**:
 
-1. After `Bump version` pipeline is successful, it will automatically trigger `Release charts` pipeline.
-2. After `Release charts` pipline is successful, it will create/update `index.yaml` on `gh-pages` branch.
+After `Release charts` pipeline is successful, it will create a new tag and release, then create / update `index.yaml` on `gh-pages` branch.
