@@ -295,6 +295,7 @@ hooks:
 #    extraEnvs:
 #    - name: SERVICE
 #      value: hook
+#    collectLog: false
 
 ## cronjobs specifies list of cronjobs
 cronjobs: []

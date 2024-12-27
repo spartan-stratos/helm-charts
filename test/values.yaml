@@ -248,6 +248,24 @@ hooks:
     extraEnvs:
       - name: SERVICE
         value: hook
+    collectLog: false
+  - name: "datadog-agent"
+    hookTypes: "post-install,post-upgrade"
+    hookWeight: 0
+    shell: /bin/bash
+    commands:
+      - ls -la
+    resources: {}
+    customImage:
+      enabled: false
+      image: busybox
+    podAnnotations: {}
+    restartPolicy: Never
+    backoffLimit: 0
+    extraEnvs:
+      - name: SERVICE
+        value: hook
+    collectLog: false
 
 cronjobs:
   - name: "cleanup"
