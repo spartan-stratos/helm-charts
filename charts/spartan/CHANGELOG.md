@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-* Add `collectLog` field in hook to enable/disable collect the logs from datadog-agent [#5](https://github.com/spartan-stratos/helm-charts/pull/5)
+* Add `collectLog` field in hook to enable/disable collect the logs from datadog-agent [#9](https://github.com/spartan-stratos/helm-charts/pull/9)
 
 ## [0.1.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.1) (2024-11-20)
 
