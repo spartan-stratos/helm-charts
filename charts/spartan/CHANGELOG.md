@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.2](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.1) (2024-12-27)
+## [0.1.3](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.3) (2024-12-31)
+
+### Features
+
+* Update `worker labels` to fix the duplication labels for multiple workers definitions [#1](https://github.com/spartan-stratos/helm-charts/pull/11)
+
+## [0.1.2](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.2) (2024-12-27)
 
 ### Features
 

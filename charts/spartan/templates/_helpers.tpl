@@ -77,14 +77,14 @@ app.kubernetes.io/name: {{ include "spartan.name" . }}-hook
 app.kubernetes.io/instance: {{ .Release.Name }}-hook
 {{- end }}
 
-{{- /*
+{{/*
 Worker labels
 */}}
 {{- define "spartan.workerLabels" -}}
 {{- if .Values.appNameLabel -}}
-app.kubernetes.io/name: {{ .Values.appNameLabel }}-worker
+app.kubernetes.io/name: {{ .Values.appNameLabel }}-{{ .worker.name }}
 {{- else -}}
-app.kubernetes.io/name: {{ include "spartan.name" . }}-worker
+app.kubernetes.io/name: {{ include "spartan.name" . }}-{{ .worker.name }}
 {{- end }}
 app.kubernetes.io/instance: {{ .Release.Name }}-worker
 {{- end }}
