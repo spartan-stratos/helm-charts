@@ -230,6 +230,19 @@ workers:
     extraEnvs:
       - name: SERVICE
         value: worker
+  - name: worker-2
+    shell: /bin/bash
+    command: "echo worker-2"
+    customImage:
+      enabled: true
+      image: busybox
+    replicaCount: 1
+    terminationGracePeriodSeconds: 180
+    resources: {}
+    podAnnotations: {}
+    extraEnvs:
+      - name: SERVICE
+        value: worker
 
 hooks:
   - name: "ls"
