@@ -97,6 +97,10 @@ spec:
                 readOnly: true
                 mountPath: {{ .Values.configMap.externalConfigMapFile.mountPath | quote }}
             {{- end }}
+            {{- range .cronjob.persistentVolumes }}
+              - name: pv-{{ .claimName }}-volume
+                mountPath: {{ .mountPath }}
+            {{- end }}
             {{- range .Values.sidecars }}
             {{- if .sharedVolume }}
               - name: sidecar-volume
@@ -144,5 +148,10 @@ spec:
       {{- if .Values.sidecars }}
         - name: sidecar-volume
           emptyDir: {}
+      {{- end }}
+      {{- range .cronjob.persistentVolumes }}
+        - name: pv-{{ .claimName }}-volume
+          persistentVolumeClaim:
+            claimName: {{ .claimName }}
       {{- end }}
 {{- end }}

@@ -294,6 +294,29 @@ cronjobs:
     extraEnvs:
       - name: SERVICE
         value: cronjob
+  - name: "with-persistent-volume"
+    schedule: "0 * * * *"
+    shell: /bin/bash
+    commands:
+      - ls -la
+    resources: {}
+    customImage:
+      enabled: true
+      image: busybox
+    restartPolicy: Never
+    extraEnvs:
+      - name: SERVICE
+        value: cronjob
+    persistentVolumes:
+      - claimName: "my-pvc"
+        mountPath: "/data"
+
+persistentVolumeClaims:
+  - name: "my-pvc"
+    storageSize: "1Gi"
+    storageClassName: "efs"
+    accessModes:
+      - ReadWriteOnce
 
 sidecars:
   - name: datadog-agent
