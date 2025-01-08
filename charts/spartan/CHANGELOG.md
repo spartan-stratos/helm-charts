@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.4) (2025-01-08)
+### Features
+* Allow users to define custom PersistentVolumeClaims
+* Allow cronjobs to mount PersistentVolume
+
 ## [0.1.3](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.3) (2024-12-31)
 
 ### Features

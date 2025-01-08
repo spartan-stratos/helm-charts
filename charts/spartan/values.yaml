@@ -313,6 +313,10 @@ cronjobs: []
 #    extraEnvs:
 #    - name: SERVICE
 #      value: cronjob
+#    persistentVolumes:
+#    - mountPath: /data
+#      # must match the name of one of the persistentVolumeClaims
+#      claimName: shared-data 
 
 ## sidecars enables sidecars containers to run specific tasks and mounting shared volumes
 sidecars: []
@@ -376,3 +380,20 @@ pdb:
   minAvailable: 1
   ## maxUnavailable specifies the maximum number/percentage of pods that may be made unavailable
   maxUnavailable: ""
+
+# Persistent Volume Claim configuration
+## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+persistentVolumeClaims: []
+#   - name: shared-data
+#     storageSize: 1Gi
+#     storageClass: "efs"
+#     accessModes:
+#       - ReadWriteMany
+#     # Optional settings
+#     labels:
+#       app: worker
+#     annotations: {}
+#     finalizers:
+#       - kubernetes.io/pvc-protection
+#     selectorLabels:
+#       app: worker
