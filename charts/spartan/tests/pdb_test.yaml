@@ -1,0 +1,85 @@
+suite: "PodDisruptionBudget template tests"
+
+templates:
+  - "templates/pdb.yaml"
+
+tests:
+  - it: "should be created when pdb is enabled and replicaCount > 1"
+    set:
+      replicaCount: 2
+      pdb.enabled: true
+      autoscaling.enabled: false
+      autoscaling.minReplicas: 2
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should be created when replicaCount is 1 and autoscaling is enabled with minReplicas > 1"
+    set:
+      replicaCount: 1
+      pdb.enabled: true
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 2
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should be created when replicaCount > 1 and autoscaling is enabled with minReplicas > 1"
+    set:
+      replicaCount: 2
+      pdb.enabled: true
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 2
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should not be created when pdb and autoscaling are disabled"
+    set:
+      replicaCount: 1
+      pdb.enabled: false
+      autoscaling.enabled: false
+      autoscaling.minReplicas: 1
+    asserts:
+      - notExists:
+          path: PodDisruptionBudget
+
+  - it: "should not be created when pdb is disabled and autoscaling is enabled"
+    set:
+      replicaCount: 1
+      pdb.enabled: false
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 2
+    asserts:
+      - notExists:
+          path: PodDisruptionBudget
+
+  - it: "should not be created when pdb is enabled with minReplicas is 1"
+    set:
+      replicaCount: 1
+      pdb.enabled: true
+      autoscaling.enabled: false
+      autoscaling.minReplicas: 1
+    asserts:
+      - notExists:
+          path: PodDisruptionBudget
+
+  - it: "should not be created when autoscaling is enabled with minReplicas is 1"
+    set:
+      replicaCount: 1
+      pdb.enabled: true
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 1
+    asserts:
+      - notExists:
+          path: PodDisruptionBudget
+
+  - it: "should not be created when replicaCount > 1 and autoscaling is enabled with minReplicas is 1"
+    set:
+      replicaCount: 2
+      pdb.enabled: true
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 1
+    asserts:
+      - notExists:
+          path: PodDisruptionBudget
