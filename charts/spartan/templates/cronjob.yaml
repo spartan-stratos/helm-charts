@@ -1,6 +1,8 @@
 {{- range $index, $cronjob := (.Values.cronjobs) }}
-  {{- include "spartan.cronjob" (dict "cronjob" $cronjob "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
-  {{- if lt $index (sub (len $.Values.cronjobs) 1) }}
+  {{ if .commands }}
+    {{- include "spartan.cronjob" (dict "cronjob" $cronjob "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+    {{- if lt $index (sub (len $.Values.cronjobs) 1) }}
 ---
+    {{- end }} 
   {{- end }}
 {{- end }}
