@@ -12,8 +12,33 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          {{- if .cronjob.podAnnotations }}
+          {{- with .cronjob.podAnnotations }}
+          annotations:
+              {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- else }}
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          labels:
+            {{- include "spartan.cronjobLabels" $ | nindent 12 }}
+            tier: "cronjob"
         spec:
-          restartPolicy: {{ default "Never" .cronjob.restartPolicy }}
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+              {{- toYaml . | nindent 8 }}
+          {{- end }}
+          serviceAccountName: {{ include "spartan.serviceAccountName" . }}
+          securityContext:
+              {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          restartPolicy: {{ .cronjob.restartPolicy | default "Never" }}
+          {{- if .Values.datadog.enabled }}
+          shareProcessNamespace: true
+          {{- end }}
           containers:
             - name: {{ include "spartan.containerName" . }}
               command:
@@ -33,7 +58,7 @@ spec:
               {{- if .cronjob.customImage.enabled }}
               image: {{ .cronjob.customImage.image }}
               {{- else }}
-              image: "{{ .cronjob.image.repository }}:{{ .cronjob.image.tag | default "latest" }}"
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
               {{- end }}
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               resources:

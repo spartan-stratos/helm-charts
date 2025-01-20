@@ -89,6 +89,18 @@ app.kubernetes.io/name: {{ include "spartan.name" . }}-{{ .worker.name }}
 app.kubernetes.io/instance: {{ .Release.Name }}-worker
 {{- end }}
 
+{{/*
+Cronjob labels
+*/}}
+{{- define "spartan.cronjobLabels" -}}
+{{- if .Values.appNameLabel -}}
+app.kubernetes.io/name: {{ .Values.appNameLabel }}-{{ .cronjob.name }}
+{{- else -}}
+app.kubernetes.io/name: {{ include "spartan.name" . }}-{{ .cronjob.name }}
+{{- end }}
+app.kubernetes.io/instance: {{ .Release.Name }}-cronjob
+{{- end }}
+
 {{- /*
 Create the name of the service account to use
 */}}

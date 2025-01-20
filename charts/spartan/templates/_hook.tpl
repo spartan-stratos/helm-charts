@@ -29,10 +29,10 @@ spec:
         {{- include "spartan.hookLabels" . | nindent 8 }}
         tier: "hook"
     spec:
-        {{- with .Values.imagePullSecrets }}
+      {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
           {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
       serviceAccountName: {{ include "spartan.serviceAccountName" . }}
       securityContext:
           {{- toYaml .Values.podSecurityContext | nindent 8 }}

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.6) (2025-01-20)
+### Features
+* Update the `cronjob` configuration
+  * Fix `pkill agent` to terminate the `datadog-agent` pod
+  * Add `metadata` and some common configurations
+
 ## [0.1.6](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.6) (2025-01-20)
 ### Features
 * Fix indentation error in `_cronjob.tpl`
