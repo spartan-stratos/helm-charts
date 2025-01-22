@@ -292,7 +292,7 @@ extraEnvs: []
 #    value: 1.0.0
 
 ## workers enable users to deploy scalable and customizable worker components
-workers:
+workers: []
 #  - name: worker-1
 #    shell: /bin/bash
 #    command: "echo worker-1"
