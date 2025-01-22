@@ -1,6 +1,4 @@
-# Datadog
-
-![Version: 3.52.0](https://img.shields.io/badge/Version-3.52.0-informational?style=flat-square) ![AppVersion: 7](https://img.shields.io/badge/AppVersion-7-informational?style=flat-square)
+# Spartan Datadog Helm Chart
 
 [Datadog](https://www.datadoghq.com/) is a hosted infrastructure monitoring platform. This chart adds the Datadog Agent to all nodes in your cluster via a DaemonSet. It also optionally depends on the [kube-state-metrics chart](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-state-metrics). For more information about monitoring Kubernetes with Datadog, please refer to the [Datadog documentation website](https://docs.datadoghq.com/agent/basic_agent_usage/kubernetes/).
 
@@ -13,7 +11,7 @@ See the [Datadog JMX integration](https://docs.datadoghq.com/integrations/java/)
 You need to add this repository to your Helm repositories:
 
 ```
-helm repo add datadog https://helm.datadoghq.com
+helm repo add datadog https://spartan-stratos.github.io/helm-charts
 helm repo update
 ```
 
@@ -43,7 +41,7 @@ To install the chart with the release name `<RELEASE_NAME>`, retrieve your Datad
 
 ```bash
 helm install <RELEASE_NAME> \
-    --set datadog.apiKey=<DATADOG_API_KEY> datadog/datadog
+    --set datadog.apiKey=<DATADOG_API_KEY> spartan/datadog
 ```
 
 By default, this Chart creates a Secret and puts an API key in that Secret.
@@ -59,7 +57,7 @@ After a few minutes, you should see hosts and metrics being reported in Datadog.
 helm install <RELEASE_NAME> \
     --set datadog.appKey=<DATADOG_APP_KEY> \
     --set datadog.site=<DATADOG_SITE> \
-    datadog/datadog
+    spartan/datadog
 ```
 
 #### Create and provide a secret that contains your Datadog API and APP Keys
@@ -77,7 +75,7 @@ Now, the installation command contains the reference to the secret.
 
 ```bash
 helm install <RELEASE_NAME> \
-  --set datadog.apiKeyExistingSecret=$DATADOG_API_SECRET_NAME datadog/datadog
+  --set datadog.apiKeyExistingSecret=$DATADOG_API_SECRET_NAME spartan/datadog
 ```
 
 ### Enabling the Datadog Cluster Agent
@@ -110,7 +108,7 @@ helm install datadog-monitoring \
     --set datadog.appKeyExistingSecret=$DATADOG_APP_SECRET_NAME \
     --set clusterAgent.enabled=true \
     --set clusterAgent.metricsProvider.enabled=true \
-    datadog/datadog
+    spartan/datadog
 ```
 
 If you want to learn to use this feature, you can check out this [Datadog Cluster Agent walkthrough](https://github.com/DataDog/datadog-agent/blob/main/docs/cluster-agent/CUSTOM_METRICS_SERVER.md).
@@ -120,33 +118,6 @@ The Leader Election is enabled by default in the chart for the Cluster Agent. On
 #### Cluster Agent Token
 
 You can specify the Datadog Cluster Agent token used to secure the communication between the Cluster Agent(s) and the Agents with `clusterAgent.token`.
-
-### Upgrading
-
-#### From 2.x to 3.x
-
-The migration from 2.x to 3.x does not require manual action.
-As per the Changelog, we do not be guaranteeing support of Helm 2 moving forward.
-If you already have the legacy Kubernetes State Metrics Check enabled, migrating will only show you the deprecation notice.
-
-#### From 1.x to 2.x
-
-⚠️ Migrating from 1.x to 2.x requires a manual action.
-
-The `datadog` chart has been refactored to regroup the `values.yaml` parameters in a more logical way.
-Please follow the [migration guide](https://github.com/DataDog/helm-charts/blob/main/charts/datadog/docs/Migration_1.x_to_2.x.md) to update your `values.yaml` file.
-
-#### From 1.19.0 onwards
-
-Version `1.19.0` introduces the use of release name as full name if it contains the chart name(`datadog` in this case).
-E.g. with a release name of `datadog`, this renames the `DaemonSet` from `datadog-datadog` to `datadog`.
-The suggested approach is to delete the release and reinstall it.
-
-#### From 1.0.0 onwards
-
-Starting with version 1.0.0, this chart does not support deploying Agent 5.x anymore. If you cannot upgrade to Agent 6.x or later, you can use a previous version of the chart by calling helm install with `--version 0.18.0`.
-
-See [0.18.1's README](https://github.com/helm/charts/blob/847f737479bb78d89f8fb650db25627558fbe1f0/datadog/datadog/README.md) to see which options were supported at the time.
 
 ### Uninstalling the Chart
 
@@ -180,13 +151,13 @@ datadog:
 3. Install or upgrade the Datadog Helm chart with the new `datadog-values.yaml` file:
 
 ```bash
-helm install -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm install -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 OR
 
 ```bash
-helm upgrade -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm upgrade -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 See the [All configuration options](#all-configuration-options) section to discover all configuration possibilities in the Datadog chart.
@@ -283,7 +254,7 @@ datadog:
 then upgrade your Datadog Helm chart:
 
 ```bash
-helm upgrade -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm upgrade -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 ### Enabling Log Collection
@@ -301,7 +272,7 @@ datadog:
 then upgrade your Datadog Helm chart:
 
 ```bash
-helm upgrade -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm upgrade -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 ### Enabling Process Collection
@@ -319,7 +290,7 @@ datadog:
 then upgrade your Datadog Helm chart:
 
 ```bash
-helm upgrade -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm upgrade -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 ### Enabling NPM Collection
@@ -339,7 +310,7 @@ datadog:
 then upgrade your Datadog Helm chart:
 
 ```bash
-helm upgrade -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm upgrade -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 ### Kubernetes event collection
@@ -382,7 +353,7 @@ datadog:
 then upgrade your Datadog Helm chart:
 
 ```bash
-helm upgrade -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm upgrade -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 For more details, please refer to [the documentation](https://docs.datadoghq.com/agent/kubernetes/integrations/).
@@ -411,7 +382,7 @@ podLabelsAsTags:
 then upgrade your Datadog Helm chart:
 
 ```bash
-helm upgrade -f datadog-values.yaml <RELEASE_NAME> datadog/datadog
+helm upgrade -f datadog-values.yaml <RELEASE_NAME> spartan/datadog
 ```
 
 ### CRI integration
@@ -448,7 +419,7 @@ The following table lists the configurable parameters of the Datadog chart and t
 ```bash
 helm install <RELEASE_NAME> \
   --set datadog.apiKey=<DATADOG_API_KEY>,datadog.logLevel=DEBUG \
-  datadog/datadog
+  spartan/datadog
 ```
 
 ## Values
