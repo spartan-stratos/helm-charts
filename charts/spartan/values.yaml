@@ -166,6 +166,40 @@ autoscaling:
   ## behaviour specifies separate scaling policies upon scale-up and scale-down
   behavior: {}
 
+## this key indicates that the configuration is specific to keda https://keda.sh
+keda:
+  ## enabled specifies whether keda
+  enabled: false
+  ## minReplicas specifies minimum amount of Replicas
+  minReplicas: 1
+  ## maxReplicas specifies maximum amount of Replicas
+  maxReplicas: 100
+  ## controls the authentication between KEDA and the service it's autoscaling
+  authentication: []
+  #  - name: aws-irsa
+  #    ## Defines the identity provider for the Kubernetes pod. It can be aws/gcp
+  #    podIdentity:
+  #      provider: aws
+  #      identityOwner: workload
+
+  ## list of event sources that trigger the autoscaling https://keda.sh/docs/latest/scalers/
+  triggers: []
+  #  - type: cpu
+  #    metricType: Utilization # Allowed types are 'Utilization' or 'AverageValue'
+  #    metadata:
+  #      value: "80"
+  #  - type: memory
+  #    metricType: Utilization # Allowed types are 'Utilization' or 'AverageValue'
+  #    metadata:
+  #      value: "80"
+  #  - type: aws-sqs-queue
+  #    authentication:
+  #      name: aws-irsa
+  #    metadata:
+  #      queueURL: https://sqs.us-west-2.amazonaws.com/000000000000/keda
+  #      queueLength: "5"
+  #      awsRegion: us-west-2
+
 vpa:
   ## enabled specifies whether a vertical pod autoscaling should be created
   enabled: false
