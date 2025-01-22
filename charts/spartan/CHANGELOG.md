@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.6) (2025-01-22)
+### Features
+* Add the `keda` configuration to support autoscaling by using [Keda](https://keda.sh/)
+
 ## [0.1.7](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.6) (2025-01-20)
 ### Features
 * Update the `cronjob` configuration
