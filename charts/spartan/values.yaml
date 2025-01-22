@@ -160,7 +160,7 @@ autoscaling:
   ## minReplicas specifies minimum amount of Replicas
   minReplicas: 1
   ## maxReplicas specifies maximum amount of Replicas
-  maxReplicas: 100
+  maxReplicas: 10
   ## metrics specifies resource metrics utilization threshold
   metrics: []
   ## behaviour specifies separate scaling policies upon scale-up and scale-down
@@ -173,7 +173,9 @@ keda:
   ## minReplicas specifies minimum amount of Replicas
   minReplicas: 1
   ## maxReplicas specifies maximum amount of Replicas
-  maxReplicas: 100
+  maxReplicas: 10
+  ## pollingInterval specifies internal of polling the metrics
+  pollingInterval: 30
   ## controls the authentication between KEDA and the service it's autoscaling
   authentication: []
   #  - name: aws-irsa
@@ -302,11 +304,18 @@ workers: []
 #      image: busybox
 #    podAnnotations: {}
 #    autoscaling:
-#      enabled: true
-#      minReplicas: 2
+#      enabled: false
+#      minReplicas: 1
 #      maxReplicas: 10
 #      targetCPUUtilizationPercentage: 80
 #      targetMemoryUtilizationPercentage: 80
+#    keda:
+#      enabled: false
+#      minReplicas: 1
+#      maxReplicas: 10
+#      pollingInterval: 30
+#      authentication: []
+#      triggers: []
 #    extraEnvs:
 #      - name: SERVICE
 #        value: worker
