@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 ### Features
 * Add the `keda` configuration to support autoscaling by using [Keda](https://keda.sh/)
 
-## [0.1.7](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.6) (2025-01-20)
+## [0.1.7](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.7) (2025-01-20)
 ### Features
 * Update the `cronjob` configuration
   * Fix `pkill agent` to terminate the `datadog-agent` pod
