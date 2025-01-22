@@ -3,7 +3,13 @@
     {{- if .autoscaling.enabled }}
       {{- include "spartan.workerHpa" (dict "worker" $worker "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
       {{- if lt $index (sub (len $.Values.workers) 1) }}
----
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- if (dig "keda" false $worker) }}
+    {{- if .keda.enabled }}
+      {{- include "spartan.workerKeda" (dict "worker" $worker "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
+      {{- if lt $index (sub (len $.Values.workers) 1) }}
       {{- end }}
     {{- end }}
   {{- end }}
