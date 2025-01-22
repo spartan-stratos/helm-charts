@@ -16,6 +16,9 @@ kind: ScaledObject
 metadata:
   name: {{ $fullName }}
 spec:
+  minReplicaCount: {{ .Values.keda.minReplicas}}
+  maxReplicaCount: {{ .Values.keda.maxReplicas}}
+  pollingInterval: {{ .Values.keda.pollingInterval}}
   scaleTargetRef:
     name: {{ $fullName }}
   triggers:

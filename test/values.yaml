@@ -170,17 +170,17 @@ keda:
     - type: cpu
       metricType: Utilization
       metadata:
-        value: 80
+        value: "80"
     - type: memory
       metricType: AverageValue
       metadata:
-        value: 80
+        value: "80"
     - type: aws-sqs-queue
       authentication:
         name: aws-irsa
       metadata:
         queueURL: https://sqs.us-west-2.amazonaws.com/000000000000/keda
-        queueLength: 5
+        queueLength: "5"
         awsRegion: us-west-2
 
 nodeSelector: {}
