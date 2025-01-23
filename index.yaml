@@ -1,5 +1,27 @@
 apiVersion: v1
 entries:
+  datadog:
+  - apiVersion: v2
+    appVersion: 7.61.0
+    created: "2025-01-23T10:24:47.037035887Z"
+    dependencies:
+    - condition: clusterAgent.metricsProvider.useDatadogMetrics
+      name: datadog-crds
+      repository: https://helm.datadoghq.com
+      tags:
+      - install-crds
+      version: 1.0.1
+    - condition: datadog.kubeStateMetricsEnabled
+      name: kube-state-metrics
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 2.13.2
+    description: Datadog Agent
+    digest: f87898bfaf6f101743a79d83141f04bac278ab61cce7d9c630e0c31220dc6145
+    name: datadog
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/datadog-0.1.0/datadog-0.1.0.tgz
+    version: 0.1.0
   spartan:
   - apiVersion: v2
     appVersion: 0.1.8
@@ -91,4 +113,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/spartan-0.1.0/spartan-0.1.0.tgz
     version: 0.1.0
-generated: "2025-01-22T14:32:42.165034325Z"
+generated: "2025-01-23T10:24:47.037065092Z"
