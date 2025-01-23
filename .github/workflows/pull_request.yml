@@ -3,12 +3,15 @@ name: Helm Check
 on: pull_request
 
 env:
-  HELM_CHARTS: "spartan"
   GH_APP_ID: ${{ vars.APP_ID }}
   GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
 jobs:
   helm-check:
+    strategy:
+      matrix:
+        chart: [ spartan, datadog ]
+
     runs-on: ubuntu-latest
     steps:
       - name: Create GitHub App Token
@@ -26,13 +29,24 @@ jobs:
           ref: ${{ github.head_ref }}
           persist-credentials: false
 
+      - name: Helm repo add
+        if: matrix.chart == 'datadog' # for datadog chart only
+        run: |
+          helm repo add datadog https://helm.datadoghq.com
+          helm repo add prometheus https://prometheus-community.github.io/helm-charts
+
+      - name: Helm dependency build
+        if: matrix.chart == 'datadog' # for datadog chart only
+        run: helm dependency build ./charts/${{ matrix.chart }}
+
       - name: helm-check-default
         uses: igabaydulin/helm-check-action@0.1.4
         env:
-          CHART_LOCATION: ./charts/spartan
-          CHART_VALUES: ./charts/spartan/values.yaml
+          CHART_LOCATION: ./charts/${{ matrix.chart }}
+          CHART_VALUES: ./charts/${{ matrix.chart }}/values.yaml
 
       - name: helm-check-enabled-all
+        if: matrix.chart == 'spartan' # for spartan chart only
         uses: igabaydulin/helm-check-action@0.1.4
         env:
           CHART_LOCATION: ./charts/spartan
@@ -44,8 +58,5 @@ jobs:
 
       - name: Run helm-unittest
         run: |
-          for chart in $HELM_CHARTS
-          do
-            echo "Running unittest for ${chart} chart"
-            helm unittest "charts/${chart}"
-          done
+          echo "Running unittest for ${{ matrix.chart }}} chart"
+          helm unittest "charts/${{ matrix.chart }}"
