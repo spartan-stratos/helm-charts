@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.9](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.9) (2025-03-18)
+### Features
+* Enable transfer of HPA ownership in `keda` ScaledObject
+
 ## [0.1.8](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.8) (2025-01-22)
 ### Features
 * Add the `keda` configuration to support autoscaling by using [Keda](https://keda.sh/)
