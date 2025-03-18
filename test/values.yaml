@@ -257,6 +257,36 @@ workers:
     extraEnvs:
       - name: SERVICE
         value: worker
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 100
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 80
+        - type: Resource
+          resource:
+            name: memory
+            target:
+              type: Utilization
+              averageUtilization: 80
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 120
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 50
+              periodSeconds: 60
     keda:
       enabled: true
       minReplicas: 1

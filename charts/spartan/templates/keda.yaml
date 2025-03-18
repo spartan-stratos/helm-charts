@@ -15,12 +15,21 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: {{ $fullName }}
+  {{- if .Values.autoscaling.enabled }}
+  annotations:
+    scaledobject.keda.sh/transfer-hpa-ownership: "true"
+  {{- end }}
 spec:
-  minReplicaCount: {{ .Values.keda.minReplicas}}
-  maxReplicaCount: {{ .Values.keda.maxReplicas}}
-  pollingInterval: {{ .Values.keda.pollingInterval}}
+  minReplicaCount: {{ .Values.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.keda.maxReplicas }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
   scaleTargetRef:
     name: {{ $fullName }}
+  {{- if .Values.autoscaling.enabled }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      name: {{ include "spartan.fullname" . }}
+  {{- end }}
   triggers:
     {{- range .Values.keda.triggers }}
     - type: {{ .type }}
