@@ -442,6 +442,6 @@ persistentVolumeClaims: []
 #       app: worker
 
 #  Override the default command for the container
-command: {}
-  # shell: /bin/sh
+entrypoint: {}
+  # shell: /bin/bash
   # command: "echo hello world"
