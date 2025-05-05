@@ -37,6 +37,12 @@ spec:
       {{- end }}
       containers:
         - name: {{ include "spartan.containerName" . }}
+          {{- if and .Values.entrypoint .Values.entrypoint.command }}
+          command:
+            - {{ default "/bin/sh" .Values.entrypoint.shell }}
+            - -c
+            - {{ .Values.entrypoint.command }}
+          {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
