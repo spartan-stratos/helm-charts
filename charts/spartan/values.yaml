@@ -440,3 +440,8 @@ persistentVolumeClaims: []
 #       - kubernetes.io/pvc-protection
 #     selectorLabels:
 #       app: worker
+
+#  Override the default command for the container
+command: {}
+  # shell: /bin/sh
+  # command: "echo hello world"
