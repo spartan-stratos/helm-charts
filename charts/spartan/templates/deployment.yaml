@@ -37,7 +37,7 @@ spec:
       {{- end }}
       containers:
         - name: {{ include "spartan.containerName" . }}
-          {{- if .Values.command }}
+          {{- if and .Values.command .Values.command.command }}
           command:
             - {{ default "/bin/sh" .Values.command.shell }}
             - -c
