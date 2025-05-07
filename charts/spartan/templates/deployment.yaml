@@ -129,6 +129,10 @@ spec:
               subPath: {{ .name }}
           {{- end }}
           {{- end }}
+          {{- range .persistentVolumes }}
+            - name: pv-{{ .claimName }}-volume
+              mountPath: {{ .mountPath }}
+          {{- end }}
         {{- range $sidecar := .Values.sidecars }}
         {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
         {{- end }}
@@ -168,4 +172,9 @@ spec:
       {{- if .Values.sidecars }}
         - name: sidecar-volume
           emptyDir: {}
+      {{- end }}
+      {{- range .persistentVolumes }}
+        - name: pv-{{ .claimName }}-volume
+          persistentVolumeClaim:
+            claimName: {{ .claimName }}
       {{- end }}
