@@ -406,7 +406,7 @@ persistentVolumeClaims:
     accessModes:
       - ReadWriteOnce
 
-persistentVolumes:
+persistence:
   - claimName: "my-pvc"
     mountPath: "/data"
 
