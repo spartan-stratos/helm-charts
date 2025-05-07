@@ -441,6 +441,12 @@ persistentVolumeClaims: []
 #     selectorLabels:
 #       app: worker
 
+# Volume mount configuration for the main service
+persistence: []
+# - mountPath: /data
+#   # must match the name of one of the persistentVolumeClaims
+#   claimName: shared-data 
+
 #  Override the default command for the container
 entrypoint: {}
   # shell: /bin/bash

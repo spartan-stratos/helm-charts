@@ -406,6 +406,10 @@ persistentVolumeClaims:
     accessModes:
       - ReadWriteOnce
 
+persistence:
+  - claimName: "my-pvc"
+    mountPath: "/data"
+
 sidecars:
   - name: datadog-agent
     image: datadog/agent
