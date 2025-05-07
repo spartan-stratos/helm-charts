@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.10](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.11) (2025-05-05)
+## [0.1.11](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.11) (2025-05-07)
 ### Features
 * Add ability to add persistent volumes for the main deployment
 
