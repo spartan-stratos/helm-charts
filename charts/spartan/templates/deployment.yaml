@@ -129,7 +129,7 @@ spec:
               subPath: {{ .name }}
           {{- end }}
           {{- end }}
-          {{- range .persistence }}
+          {{- range .Values.persistence }}
             - name: {{ .claimName }}-volume
               mountPath: {{ .mountPath }}
           {{- end }}
@@ -173,7 +173,7 @@ spec:
         - name: sidecar-volume
           emptyDir: {}
       {{- end }}
-      {{- range .persistence }}
+      {{- range .Values.persistence }}
         - name: {{ .claimName }}-volume
           persistentVolumeClaim:
             claimName: {{ .claimName }}
