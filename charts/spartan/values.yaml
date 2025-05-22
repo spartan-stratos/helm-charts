@@ -451,3 +451,10 @@ persistence: []
 entrypoint: {}
   # shell: /bin/bash
   # command: "echo hello world"
+
+# The default args for the pod container 
+args: []
+  # This is an example for OPA container
+  # - "run"
+  # - "--ignore=.*" # exclude hidden dirs created by Kubernetes
+  # - "--server"
