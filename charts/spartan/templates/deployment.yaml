@@ -51,6 +51,9 @@ spec:
             - name: http
               containerPort: {{ .Values.containerPort | default 80 }}
               protocol: TCP
+          {{- if .Values.args | len }}
+          args: {{- toYaml .Values.args | nindent 12 }}
+          {{- end }}
           {{- if .Values.livenessProbe }}
           livenessProbe: {{- toYaml .Values.livenessProbe | nindent 12 }}
           {{- end }}
