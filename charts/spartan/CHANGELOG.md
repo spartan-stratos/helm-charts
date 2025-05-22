@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.13](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.13) (2025-05-22)
+### Features
+* Add `args` as a configurable param in the `deployment.yaml` template of the `spartan` chart. The values can be configured in the `values.yaml`.
+
 ## [0.1.12](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.12) (2025-05-08)
 ### Features
 * Fix helm issue (wrong reference to persistence values. Should be .Values.persistence instead of .persistence)
