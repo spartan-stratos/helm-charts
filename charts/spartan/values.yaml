@@ -29,11 +29,11 @@ fullnameOverride: ""
 appNameLabel: ""
 
 #lifeCycle preStop will execute a script before the pod started to be terminated
-lifecycle: {}
-#  preStop:
-#    enabled: true
-#    exec:
-#      command: ["/bin/sh", "-c", "echo PreStop Hook; sleep 10"]
+lifecycle:
+  preStop:
+    enabled: false
+#   exec:
+#     command: ["/bin/sh", "-c", "echo PreStop Hook; sleep 10"]
 
 serviceAccount:
   ## create specifies whether a service account should be created
