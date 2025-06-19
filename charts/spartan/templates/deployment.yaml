@@ -51,6 +51,12 @@ spec:
             - name: http
               containerPort: {{ .Values.containerPort | default 80 }}
               protocol: TCP
+          {{- if .Values.lifecycle.preStop.enabled }}
+          lifecycle:
+            preStop:
+              exec:
+                command: {{ toJson .Values.lifecycle.preStop.exec.command }}
+          {{- end }}
           {{- if .Values.args | len }}
           args: {{- toYaml .Values.args | nindent 12 }}
           {{- end }}
