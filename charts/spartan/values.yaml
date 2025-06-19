@@ -53,6 +53,13 @@ securityContext: {}
 #  runAsNonRoot: true
 #  runAsUser: 1000
 
+## volumes is for customizing volumes with hostPath, which will shared volumes with other pods in managed node
+volumes: []
+#   - name: app-logs
+#     hostPath:
+#       path: /var/log/application
+#       type: DirectoryOrCreate
+
 service:
   ## annotations specifies service annotations
   annotations: {}

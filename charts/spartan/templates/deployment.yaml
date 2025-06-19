@@ -181,3 +181,13 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .claimName }}
       {{- end }}
+      {{- range .Values.volumes }}
+        - name: {{ .name }}
+        {{- if .hostPath }}
+          hostPath:
+            path: {{ .hostPath.path }}
+          {{- if .hostPath.type }}
+            type: {{ .hostPath.type }}
+          {{- end }}
+        {{- end }}
+      {{- end }}

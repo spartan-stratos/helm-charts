@@ -1,6 +1,9 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.1.14](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.14) (2025-05-22)
+### Features
+* Added support for custom `volumes` in `values.yaml`, allowing users to define and mount arbitrary volumes for `deployment.yaml`, including hostPath volumes.
 
 ## [0.1.13](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.13) (2025-05-22)
 ### Features
