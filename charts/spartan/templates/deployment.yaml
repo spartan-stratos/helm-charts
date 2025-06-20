@@ -142,6 +142,10 @@ spec:
             - name: {{ .claimName }}-volume
               mountPath: {{ .mountPath }}
           {{- end }}
+          {{- range .Values.volmueMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+          {{- end }}
         {{- range $sidecar := .Values.sidecars }}
         {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
         {{- end }}

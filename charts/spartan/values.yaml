@@ -60,6 +60,11 @@ securityContext: {}
 #  runAsNonRoot: true
 #  runAsUser: 1000
 
+volumeMounts: []
+#   - name: app-logs
+#     mountPath: /var/log/application
+#
+
 ## volumes is for customizing volumes with hostPath, which will shared volumes with other pods in managed node
 volumes: []
 #   - name: app-logs
