@@ -51,6 +51,12 @@ spec:
             - name: http
               containerPort: {{ .Values.containerPort | default 80 }}
               protocol: TCP
+          {{- if .Values.lifecycle.preStop.enabled }}
+          lifecycle:
+            preStop:
+              exec:
+                command: {{ toJson .Values.lifecycle.preStop.exec.command }}
+          {{- end }}
           {{- if .Values.args | len }}
           args: {{- toYaml .Values.args | nindent 12 }}
           {{- end }}
@@ -136,6 +142,10 @@ spec:
             - name: {{ .claimName }}-volume
               mountPath: {{ .mountPath }}
           {{- end }}
+          {{- range .Values.volumeMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+          {{- end }}
         {{- range $sidecar := .Values.sidecars }}
         {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
         {{- end }}
@@ -180,4 +190,14 @@ spec:
         - name: {{ .claimName }}-volume
           persistentVolumeClaim:
             claimName: {{ .claimName }}
+      {{- end }}
+      {{- range .Values.volumes }}
+        - name: {{ .name }}
+        {{- if .hostPath }}
+          hostPath:
+            path: {{ .hostPath.path }}
+          {{- if .hostPath.type }}
+            type: {{ .hostPath.type }}
+          {{- end }}
+        {{- end }}
       {{- end }}

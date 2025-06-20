@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.1.14](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.14) (2025-05-22)
+### Features
+* Added support for custom `volumes` in `values.yaml`, allowing users to define and mount arbitrary volumes for `deployment.yaml`, including hostPath volumes.
+* Added a preStop hook which will execute after the pods got signal to be terminated. After that it will execute the script defined in `Values.lifecycle.preStop.command`. By using that, we should add a sleep timeout for about `10s` to `30s` to make sure pod could successfully complete request before terminated 
 
 ## [0.1.13](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.13) (2025-05-22)
 ### Features

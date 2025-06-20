@@ -28,6 +28,13 @@ fullnameOverride: ""
 ## appNameLabel is used for app.kubernetes.io/name k8s resources label
 appNameLabel: ""
 
+#lifeCycle preStop will execute a script before the pod started to be terminated
+lifecycle:
+  preStop:
+    enabled: false
+#   exec:
+#     command: ["/bin/sh", "-c", "echo PreStop Hook; sleep 10"]
+
 serviceAccount:
   ## create specifies whether a service account should be created
   create: false
@@ -52,6 +59,18 @@ securityContext: {}
 #  readOnlyRootFilesystem: true
 #  runAsNonRoot: true
 #  runAsUser: 1000
+
+volumeMounts: []
+#   - name: app-logs
+#     mountPath: /var/log/application
+#
+
+## volumes allows defining custom pod volumes
+volumes: []
+#   - name: app-logs
+#     hostPath:
+#       path: /var/log/application
+#       type: DirectoryOrCreate
 
 service:
   ## annotations specifies service annotations
