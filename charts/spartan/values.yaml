@@ -65,7 +65,7 @@ volumeMounts: []
 #     mountPath: /var/log/application
 #
 
-## volumes is for customizing volumes with hostPath, which will shared volumes with other pods in managed node
+## volumes allows defining custom pod volumes
 volumes: []
 #   - name: app-logs
 #     hostPath:

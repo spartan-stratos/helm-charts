@@ -142,7 +142,7 @@ spec:
             - name: {{ .claimName }}-volume
               mountPath: {{ .mountPath }}
           {{- end }}
-          {{- range .Values.volmueMounts }}
+          {{- range .Values.volumeMounts }}
             - name: {{ .name }}
               mountPath: {{ .mountPath }}
           {{- end }}
