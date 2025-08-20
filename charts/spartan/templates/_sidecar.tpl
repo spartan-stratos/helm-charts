@@ -46,7 +46,9 @@
     - name: DD_CLUSTER_AGENT_ENABLED
       value: "true"
   {{- end }}
+  {{- if or .Values.extraEnvs .sidecar.extraEnvs }}
   {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .sidecar.extraEnvs)) | nindent 4 }}
+  {{- end }}
   {{- if .sidecar.ports}}
   ports: {{- toYaml .sidecar.ports | nindent 4 }}
   {{- end }}

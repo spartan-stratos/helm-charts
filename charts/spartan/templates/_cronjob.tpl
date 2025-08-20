@@ -100,7 +100,9 @@ spec:
                 - name: DD_CLUSTER_AGENT_ENABLED
                   value: "true"
               {{- end }}
+              {{- if or .Values.extraEnvs .cronjob.extraEnvs }}
                 {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .cronjob.extraEnvs)) | nindent 16 }}
+              {{- end }}
               volumeMounts:
               {{- if .Values.secret.asFile.enabled }}
                 - name: {{ include "spartan.secretAsFile" $ }}

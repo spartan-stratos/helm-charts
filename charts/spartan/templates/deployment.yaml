@@ -108,7 +108,9 @@ spec:
             - name: DD_CLUSTER_AGENT_ENABLED
               value: "true"
           {{- end }}
+          {{- if .Values.extraEnvs }}
           {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs)) | nindent 12 }}
+          {{- end }}
           volumeMounts:
           {{- if .Values.secret.asFile.enabled }}
             - name: {{ include "spartan.secretAsFile" . }}
@@ -199,5 +201,20 @@ spec:
           {{- if .hostPath.type }}
             type: {{ .hostPath.type }}
           {{- end }}
+        {{- end }}
+        {{- if .emptyDir }}
+          emptyDir: {}
+        {{- end }}
+        {{- if .configMap }}
+          configMap:
+            name: {{ .configMap.name }}
+        {{- end }}
+        {{- if .secret }}
+          secret:
+            secretName: {{ .secret.secretName }}
+        {{- end }}
+        {{- if .persistentVolumeClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .persistentVolumeClaim.claimName }}
         {{- end }}
       {{- end }}
