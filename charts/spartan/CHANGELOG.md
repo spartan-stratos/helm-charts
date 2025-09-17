@@ -2,7 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.15](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.14) (2025-08-20)
+## [0.1.16](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.16) (2025-09-17)
+
+### Features
+
+* Added optional fields on CronJob.spec and jobTemplate.spec:
+  
+  * concurrencyPolicy, startingDeadlineSeconds, suspend, timeZone 
+  * backoffLimit, activeDeadlineSeconds, ttlSecondsAfterFinished, completions, parallelism
+
+## [0.1.15](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.15) (2025-08-20)
 
 ### Bug Fixes
 
