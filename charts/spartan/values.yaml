@@ -363,6 +363,14 @@ hooks:
 cronjobs: []
 #  - name: "cleanup"
 #    schedule: "0 * * * *"
+#    # Prevent overlapping runs. Options: Allow|Forbid|Replace
+#    concurrencyPolicy: Forbid
+#    # If a scheduled run is missed, how long to start it late (seconds)
+#    startingDeadlineSeconds: 300
+#    # Pause the cron schedule without deleting it
+#    suspend: false
+#    # Set time zone for schedule interpretation (K8s v1.27+)
+#    timeZone: "UTC"
 #    shell: /bin/bash
 #    commands:
 #      - ls -la
@@ -372,6 +380,12 @@ cronjobs: []
 #      image: busybox
 #    podAnnotations: {}
 #    restartPolicy: Never
+#    # Job-level controls to limit retries and duration
+#    backoffLimit: 1                 # retries before marking Job failed (default K8s: 6)
+#    activeDeadlineSeconds: 900      # hard timeout for Job run (seconds)
+#    ttlSecondsAfterFinished: 600    # clean up finished Jobs faster
+#    completions: 1                  # number of successful pods required
+#    parallelism: 1                  # number of pods to run at once
 #    extraEnvs:
 #    - name: SERVICE
 #      value: cronjob

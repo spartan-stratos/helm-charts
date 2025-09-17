@@ -9,8 +9,35 @@ spec:
   schedule: {{ default "0 * * * *" .cronjob.schedule | quote }}
   successfulJobsHistoryLimit: {{ default "3" .cronjob.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ default "3" .cronjob.failedJobsHistoryLimit }}
+  {{- if .cronjob.concurrencyPolicy }}
+  concurrencyPolicy: {{ .cronjob.concurrencyPolicy }}
+  {{- end }}
+  {{- if .cronjob.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ .cronjob.startingDeadlineSeconds }}
+  {{- end }}
+  {{- if hasKey .cronjob "suspend" }}
+  suspend: {{ .cronjob.suspend }}
+  {{- end }}
+  {{- if .cronjob.timeZone }}
+  timeZone: {{ .cronjob.timeZone | quote }}
+  {{- end }}
   jobTemplate:
     spec:
+      {{- if .cronjob.backoffLimit }}
+      backoffLimit: {{ .cronjob.backoffLimit }}
+      {{- end }}
+      {{- if .cronjob.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ .cronjob.activeDeadlineSeconds }}
+      {{- end }}
+      {{- if .cronjob.ttlSecondsAfterFinished }}
+      ttlSecondsAfterFinished: {{ .cronjob.ttlSecondsAfterFinished }}
+      {{- end }}
+      {{- if .cronjob.completions }}
+      completions: {{ .cronjob.completions }}
+      {{- end }}
+      {{- if .cronjob.parallelism }}
+      parallelism: {{ .cronjob.parallelism }}
+      {{- end }}
       template:
         metadata:
           {{- if .cronjob.podAnnotations }}
