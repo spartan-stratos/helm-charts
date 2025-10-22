@@ -9,8 +9,7 @@ This chart bootstraps a deployment on a [Kubernetes](http://kubernetes.io) clust
 ## Features
 
 - **Flexible Application Deployment**: Deploy any containerized application with customizable configurations
-- **Automatic Reloading**: Integration with [Stakater Reloader](https://github.com/stakater/Reloader) for automatic deployment updates when ConfigMaps/Secrets change
-- **GitOps Ready**: Support for annotations-based reload strategy for GitOps environments
+- **Custom Deployment Annotations**: Support for adding custom annotations to deployments for various tool integrations
 - **Comprehensive Configuration**: Support for HPA, PDB, PVCs, sidecars, and more
 - **Multi-Cloud Support**: Works with AWS, GCP, and other cloud providers
 
@@ -98,38 +97,53 @@ This command will gen template-file.yaml file at /charts/spartan/
 
 ## Deployment Annotations
 
-The spartan chart supports adding custom annotations to deployments through the `deploymentAnnotations` configuration. This is useful for various integrations including Reloader, monitoring, and other tools.
+The spartan chart supports adding custom annotations to deployments through the `deploymentAnnotations` configuration. This is useful for various integrations including monitoring, backup, and other tools.
 
-### Reloader Integration
-
-Enable automatic reloading when ConfigMaps and Secrets are updated:
+### Basic Annotations
 
 ```yaml
 deploymentAnnotations:
-  "reloader.stakater.com/auto": "true"
+  "deployment.kubernetes.io/revision": "1"
+  "monitoring.coreos.com/scrape": "true"
 ```
 
-### Advanced Reloader Configuration
+### Monitoring Annotations
 
 ```yaml
 deploymentAnnotations:
-  "configmap.reloader.stakater.com/reload": "app-config"
-  "secret.reloader.stakater.com/reload": "app-secrets"
-  "reloader.stakater.com/search": "true"
-  "reloader.stakater.com/match": "my-app-*"
+  "prometheus.io/scrape": "true"
+  "prometheus.io/port": "8080"
+  "prometheus.io/path": "/metrics"
+```
+
+### Backup Annotations
+
+```yaml
+deploymentAnnotations:
+  "backup.velero.io/backup-volumes": "data"
+  "backup.velero.io/backup-volumes-excludes": "temp"
+```
+
+### Custom Annotations
+
+```yaml
+deploymentAnnotations:
+  "custom.annotation/team": "platform"
+  "custom.annotation/environment": "production"
+  "custom.annotation/owner": "devops-team"
 ```
 
 ### Mixed Annotations
 
 ```yaml
 deploymentAnnotations:
-  "reloader.stakater.com/auto": "true"
-  "monitoring.coreos.com/scrape": "true"
-  "custom.annotation/team": "platform"
   "deployment.kubernetes.io/revision": "1"
+  "monitoring.coreos.com/scrape": "true"
+  "prometheus.io/scrape": "true"
+  "prometheus.io/port": "8080"
+  "custom.annotation/team": "platform"
+  "backup.velero.io/backup-volumes": "data"
 ```
-
-**Note**: The Reloader controller itself must be deployed separately (typically via Terraform). This chart only adds the necessary annotations to your deployment.
 
 ## Configuration
 

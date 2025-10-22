@@ -495,17 +495,13 @@ args: []
 ## deploymentAnnotations specifies custom annotations to add to the deployment
 ## These annotations will be applied to the deployment metadata
 ## 
-## Example for Reloader integration:
-## deploymentAnnotations:
-##   "reloader.stakater.com/auto": "true"
-##   "configmap.reloader.stakater.com/reload": "my-config"
-##   "secret.reloader.stakater.com/reload": "my-secret"
-##   "reloader.stakater.com/search": "true"
-##   "reloader.stakater.com/match": "my-app-*"
-##
-## Example for other annotations:
+## Examples:
 ## deploymentAnnotations:
 ##   "deployment.kubernetes.io/revision": "1"
 ##   "monitoring.coreos.com/scrape": "true"
 ##   "custom.annotation/team": "platform"
+##   "custom.annotation/environment": "production"
+##   "backup.velero.io/backup-volumes": "data"
+##   "prometheus.io/scrape": "true"
+##   "prometheus.io/port": "8080"
 deploymentAnnotations: {}
