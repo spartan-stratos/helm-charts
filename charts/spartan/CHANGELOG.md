@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.17](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.17) (2025-01-XX)
+
+### Features
+
+* **Reloader Integration**: Added support for [Stakater Reloader](https://github.com/stakater/Reloader) annotations to enable automatic deployment updates when ConfigMaps and Secrets change
+  * `reloader.enabled`: Enable/disable Reloader annotations
+  * `reloader.autoReload`: Auto-reload for all ConfigMaps/Secrets
+  * `reloader.specificConfigMaps`: Watch specific ConfigMaps (comma-separated)
+  * `reloader.specificSecrets`: Watch specific Secrets (comma-separated)
+  * `reloader.searchPattern`: Watch resources matching a pattern (e.g., "my-app-*")
+* **Additional Annotations**: Added `additionalAnnotations` for general-purpose deployment annotations (not Reloader-specific)
+* **GitOps Ready**: Reloader annotations work with both env-vars and annotations strategies for GitOps environments
+
+### Documentation
+
+* Added comprehensive Reloader integration documentation in README.md
+* Added example values file (`examples/reloader-values.yaml`) with usage examples
+* Updated chart documentation with Reloader configuration options
+
 ## [0.1.16](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.16) (2025-09-17)
 
 ### Features
