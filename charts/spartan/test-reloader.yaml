@@ -1,0 +1,12 @@
+# Test values for different Reloader configurations
+
+# Test 1: Auto-reload
+reloader:
+  enabled: true
+  autoReload: true
+
+image:
+  repository: "nginx"
+  tag: "latest"
+
+replicaCount: 1

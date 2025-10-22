@@ -6,6 +6,14 @@ Provide a simple way to deploy applications base on our demand.
 
 This chart bootstraps a deployment on a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
 
+## Features
+
+- **Flexible Application Deployment**: Deploy any containerized application with customizable configurations
+- **Automatic Reloading**: Integration with [Stakater Reloader](https://github.com/stakater/Reloader) for automatic deployment updates when ConfigMaps/Secrets change
+- **GitOps Ready**: Support for annotations-based reload strategy for GitOps environments
+- **Comprehensive Configuration**: Support for HPA, PDB, PVCs, sidecars, and more
+- **Multi-Cloud Support**: Works with AWS, GCP, and other cloud providers
+
 ## Prerequisites
 
 - Kubernetes 1.14+
@@ -87,6 +95,36 @@ helm template spartan-0.1.0.tgz --namespace dev -f "values.yaml" > template-file
 
 This command will gen template-file.yaml file at /charts/spartan/
 ```
+
+## Reloader Integration
+
+The spartan chart supports automatic reloading of deployments when ConfigMaps and Secrets are updated. This is achieved by adding Reloader annotations to the deployment.
+
+### Quick Start
+
+Enable automatic reloading for all ConfigMaps and Secrets:
+
+```yaml
+reloader:
+  enabled: true
+  autoReload: true
+```
+
+### Advanced Configuration
+
+```yaml
+reloader:
+  enabled: true
+  autoReload: false
+  specificConfigMaps: "app-config,database-config"
+  specificSecrets: "app-secrets,database-secrets"
+  customAnnotations:
+    "custom.reloader.com/team": "platform"
+```
+
+For detailed Reloader configuration options, see [RELOADER.md](RELOADER.md).
+
+**Note**: The Reloader controller itself must be deployed separately (typically via Terraform). This chart only adds the necessary annotations to your deployment.
 
 ## Configuration
 

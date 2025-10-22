@@ -1,0 +1,39 @@
+# Example values for enabling Reloader annotations in spartan chart
+# This assumes Reloader is deployed separately via Terraform
+
+# Basic auto-reload configuration
+reloader:
+  enabled: true
+  autoReload: true  # Watch all ConfigMaps and Secrets
+
+# Example with specific resources
+# reloader:
+#   enabled: true
+#   autoReload: false
+#   specificConfigMaps: "app-config,database-config"
+#   specificSecrets: "app-secrets,database-secrets"
+
+# Example with search pattern
+# reloader:
+#   enabled: true
+#   autoReload: false
+#   searchPattern: "my-app-*"  # Watch all ConfigMaps/Secrets starting with "my-app-"
+
+# Example with custom annotations
+# reloader:
+#   enabled: true
+#   autoReload: true
+#   customAnnotations:
+#     "custom.reloader.com/team": "platform"
+#     "custom.reloader.com/environment": "production"
+
+# Your application configuration
+image:
+  repository: "nginx"
+  tag: "latest"
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 80
