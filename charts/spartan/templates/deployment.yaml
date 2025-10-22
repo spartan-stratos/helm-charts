@@ -26,9 +26,9 @@ metadata:
     reloader.stakater.com/search: "true"
     reloader.stakater.com/match: {{ .Values.reloader.searchPattern | quote }}
     {{- end }}
-    {{- with .Values.reloader.customAnnotations }}
-    {{- toYaml . | nindent 4 }}
     {{- end }}
+    {{- with .Values.additionalAnnotations }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
   {{- if not .Values.autoscaling.enabled }}

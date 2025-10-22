@@ -518,6 +518,7 @@ reloader:
   ## searchPattern specifies a pattern to search for ConfigMaps/Secrets
   ## e.g., "my-app-*" will watch all ConfigMaps/Secrets starting with "my-app-"
   searchPattern: ""
-  
-  ## customAnnotations specifies additional custom annotations to add to the deployment
-  customAnnotations: {}
+
+## additionalAnnotations specifies additional custom annotations to add to the deployment
+## These annotations will be applied to the deployment metadata
+additionalAnnotations: {}

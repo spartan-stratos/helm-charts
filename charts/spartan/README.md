@@ -118,8 +118,10 @@ reloader:
   autoReload: false
   specificConfigMaps: "app-config,database-config"
   specificSecrets: "app-secrets,database-secrets"
-  customAnnotations:
-    "custom.reloader.com/team": "platform"
+
+additionalAnnotations:
+  "custom.reloader.com/team": "platform"
+  "deployment.kubernetes.io/revision": "1"
 ```
 
 For detailed Reloader configuration options, see [RELOADER.md](RELOADER.md).
