@@ -96,35 +96,38 @@ helm template spartan-0.1.0.tgz --namespace dev -f "values.yaml" > template-file
 This command will gen template-file.yaml file at /charts/spartan/
 ```
 
-## Reloader Integration
+## Deployment Annotations
 
-The spartan chart supports automatic reloading of deployments when ConfigMaps and Secrets are updated. This is achieved by adding Reloader annotations to the deployment.
+The spartan chart supports adding custom annotations to deployments through the `deploymentAnnotations` configuration. This is useful for various integrations including Reloader, monitoring, and other tools.
 
-### Quick Start
+### Reloader Integration
 
-Enable automatic reloading for all ConfigMaps and Secrets:
+Enable automatic reloading when ConfigMaps and Secrets are updated:
 
 ```yaml
-reloader:
-  enabled: true
-  autoReload: true
+deploymentAnnotations:
+  "reloader.stakater.com/auto": "true"
 ```
 
-### Advanced Configuration
+### Advanced Reloader Configuration
 
 ```yaml
-reloader:
-  enabled: true
-  autoReload: false
-  specificConfigMaps: "app-config,database-config"
-  specificSecrets: "app-secrets,database-secrets"
-
 deploymentAnnotations:
-  "custom.reloader.com/team": "platform"
+  "configmap.reloader.stakater.com/reload": "app-config"
+  "secret.reloader.stakater.com/reload": "app-secrets"
+  "reloader.stakater.com/search": "true"
+  "reloader.stakater.com/match": "my-app-*"
+```
+
+### Mixed Annotations
+
+```yaml
+deploymentAnnotations:
+  "reloader.stakater.com/auto": "true"
+  "monitoring.coreos.com/scrape": "true"
+  "custom.annotation/team": "platform"
   "deployment.kubernetes.io/revision": "1"
 ```
-
-For detailed Reloader configuration options, see [RELOADER.md](RELOADER.md).
 
 **Note**: The Reloader controller itself must be deployed separately (typically via Terraform). This chart only adds the necessary annotations to your deployment.
 

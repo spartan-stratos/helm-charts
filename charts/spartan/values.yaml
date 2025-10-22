@@ -492,33 +492,20 @@ args: []
   # - "--ignore=.*" # exclude hidden dirs created by Kubernetes
   # - "--server"
 
-## Reloader annotation configuration for automatic reloading on ConfigMap/Secret changes
-## ref: https://github.com/stakater/Reloader
-## Note: Reloader deployment is managed separately by Terraform
-reloader:
-  ## enabled specifies whether to add Reloader annotations to the deployment
-  enabled: false
-  
-  ## strategy specifies the reload strategy (env-vars or annotations)
-  ## env-vars: Adds environment variables to trigger rolling updates
-  ## annotations: Adds annotations to trigger rolling updates (GitOps-friendly)
-  strategy: "env-vars"
-  
-  ## autoReload specifies whether to enable auto-reload for all ConfigMaps/Secrets
-  autoReload: true
-  
-  ## specificConfigMaps specifies specific ConfigMaps to watch (comma-separated)
-  ## If empty and autoReload is false, no ConfigMaps will be watched
-  specificConfigMaps: ""
-  
-  ## specificSecrets specifies specific Secrets to watch (comma-separated)
-  ## If empty and autoReload is false, no Secrets will be watched
-  specificSecrets: ""
-  
-  ## searchPattern specifies a pattern to search for ConfigMaps/Secrets
-  ## e.g., "my-app-*" will watch all ConfigMaps/Secrets starting with "my-app-"
-  searchPattern: ""
-
 ## deploymentAnnotations specifies custom annotations to add to the deployment
 ## These annotations will be applied to the deployment metadata
+## 
+## Example for Reloader integration:
+## deploymentAnnotations:
+##   "reloader.stakater.com/auto": "true"
+##   "configmap.reloader.stakater.com/reload": "my-config"
+##   "secret.reloader.stakater.com/reload": "my-secret"
+##   "reloader.stakater.com/search": "true"
+##   "reloader.stakater.com/match": "my-app-*"
+##
+## Example for other annotations:
+## deploymentAnnotations:
+##   "deployment.kubernetes.io/revision": "1"
+##   "monitoring.coreos.com/scrape": "true"
+##   "custom.annotation/team": "platform"
 deploymentAnnotations: {}

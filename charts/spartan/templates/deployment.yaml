@@ -6,27 +6,6 @@ metadata:
     {{- include "spartan.labels" . | nindent 4 }}
     tier: "application"
   annotations:
-    {{- if .Values.reloader.enabled }}
-    {{- if .Values.reloader.autoReload }}
-    reloader.stakater.com/auto: "true"
-    {{- end }}
-    {{- if .Values.reloader.specificConfigMaps }}
-    {{- $configmaps := split "," .Values.reloader.specificConfigMaps }}
-    {{- range $configmap := $configmaps }}
-    configmap.reloader.stakater.com/reload: {{ trim $configmap | quote }}
-    {{- end }}
-    {{- end }}
-    {{- if .Values.reloader.specificSecrets }}
-    {{- $secrets := split "," .Values.reloader.specificSecrets }}
-    {{- range $secret := $secrets }}
-    secret.reloader.stakater.com/reload: {{ trim $secret | quote }}
-    {{- end }}
-    {{- end }}
-    {{- if .Values.reloader.searchPattern }}
-    reloader.stakater.com/search: "true"
-    reloader.stakater.com/match: {{ .Values.reloader.searchPattern | quote }}
-    {{- end }}
-    {{- end }}
     {{- with .Values.deploymentAnnotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
