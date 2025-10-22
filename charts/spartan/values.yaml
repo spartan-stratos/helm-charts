@@ -519,6 +519,6 @@ reloader:
   ## e.g., "my-app-*" will watch all ConfigMaps/Secrets starting with "my-app-"
   searchPattern: ""
 
-## additionalAnnotations specifies additional custom annotations to add to the deployment
+## deploymentAnnotations specifies custom annotations to add to the deployment
 ## These annotations will be applied to the deployment metadata
-additionalAnnotations: {}
+deploymentAnnotations: {}

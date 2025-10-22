@@ -27,7 +27,7 @@ metadata:
     reloader.stakater.com/match: {{ .Values.reloader.searchPattern | quote }}
     {{- end }}
     {{- end }}
-    {{- with .Values.additionalAnnotations }}
+    {{- with .Values.deploymentAnnotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:

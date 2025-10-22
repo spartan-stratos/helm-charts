@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
   * `reloader.specificConfigMaps`: Watch specific ConfigMaps (comma-separated)
   * `reloader.specificSecrets`: Watch specific Secrets (comma-separated)
   * `reloader.searchPattern`: Watch resources matching a pattern (e.g., "my-app-*")
-* **Additional Annotations**: Added `additionalAnnotations` for general-purpose deployment annotations (not Reloader-specific)
+* **Deployment Annotations**: Added `deploymentAnnotations` for custom deployment annotations (not Reloader-specific)
 * **GitOps Ready**: Reloader annotations work with both env-vars and annotations strategies for GitOps environments
 
 ### Documentation

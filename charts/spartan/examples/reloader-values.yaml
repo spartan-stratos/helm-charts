@@ -19,12 +19,12 @@ reloader:
 #   autoReload: false
 #   searchPattern: "my-app-*"  # Watch all ConfigMaps/Secrets starting with "my-app-"
 
-# Example with additional annotations
+# Example with deployment annotations
 # reloader:
 #   enabled: true
 #   autoReload: true
 # 
-# additionalAnnotations:
+# deploymentAnnotations:
 #   "custom.reloader.com/team": "platform"
 #   "custom.reloader.com/environment": "production"
 #   "deployment.kubernetes.io/revision": "1"

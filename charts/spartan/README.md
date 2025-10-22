@@ -119,7 +119,7 @@ reloader:
   specificConfigMaps: "app-config,database-config"
   specificSecrets: "app-secrets,database-secrets"
 
-additionalAnnotations:
+deploymentAnnotations:
   "custom.reloader.com/team": "platform"
   "deployment.kubernetes.io/revision": "1"
 ```
