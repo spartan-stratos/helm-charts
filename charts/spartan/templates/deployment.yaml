@@ -5,6 +5,10 @@ metadata:
   labels:
     {{- include "spartan.labels" . | nindent 4 }}
     tier: "application"
+  annotations:
+    {{- with .Values.deploymentAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}

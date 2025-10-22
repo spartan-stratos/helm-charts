@@ -6,6 +6,13 @@ Provide a simple way to deploy applications base on our demand.
 
 This chart bootstraps a deployment on a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
 
+## Features
+
+- **Flexible Application Deployment**: Deploy any containerized application with customizable configurations
+- **Custom Deployment Annotations**: Support for adding custom annotations to deployments for various tool integrations
+- **Comprehensive Configuration**: Support for HPA, PDB, PVCs, sidecars, and more
+- **Multi-Cloud Support**: Works with AWS, GCP, and other cloud providers
+
 ## Prerequisites
 
 - Kubernetes 1.14+
@@ -86,6 +93,56 @@ helm package .
 helm template spartan-0.1.0.tgz --namespace dev -f "values.yaml" > template-file.yaml
 
 This command will gen template-file.yaml file at /charts/spartan/
+```
+
+## Deployment Annotations
+
+The spartan chart supports adding custom annotations to deployments through the `deploymentAnnotations` configuration. This is useful for various integrations including monitoring, backup, and other tools.
+
+### Basic Annotations
+
+```yaml
+deploymentAnnotations:
+  "deployment.kubernetes.io/revision": "1"
+  "monitoring.coreos.com/scrape": "true"
+```
+
+### Monitoring Annotations
+
+```yaml
+deploymentAnnotations:
+  "prometheus.io/scrape": "true"
+  "prometheus.io/port": "8080"
+  "prometheus.io/path": "/metrics"
+```
+
+### Backup Annotations
+
+```yaml
+deploymentAnnotations:
+  "backup.velero.io/backup-volumes": "data"
+  "backup.velero.io/backup-volumes-excludes": "temp"
+```
+
+### Custom Annotations
+
+```yaml
+deploymentAnnotations:
+  "custom.annotation/team": "platform"
+  "custom.annotation/environment": "production"
+  "custom.annotation/owner": "devops-team"
+```
+
+### Mixed Annotations
+
+```yaml
+deploymentAnnotations:
+  "deployment.kubernetes.io/revision": "1"
+  "monitoring.coreos.com/scrape": "true"
+  "prometheus.io/scrape": "true"
+  "prometheus.io/port": "8080"
+  "custom.annotation/team": "platform"
+  "backup.velero.io/backup-volumes": "data"
 ```
 
 ## Configuration

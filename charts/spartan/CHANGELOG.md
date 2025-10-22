@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.17](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.17) (2025-01-XX)
+
+### Features
+
+* **Deployment Annotations**: Added `deploymentAnnotations` for custom deployment annotations
+  * Supports any custom annotations for monitoring, backup, and other tool integrations
+  * Users can define their own annotations directly in `deploymentAnnotations`
+  * Examples provided for common annotation patterns (monitoring, backup, custom labels)
+
+### Documentation
+
+* Added comprehensive deployment annotations documentation in README.md
+* Updated chart documentation with deployment annotations configuration options
+
 ## [0.1.16](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.16) (2025-09-17)
 
 ### Features
