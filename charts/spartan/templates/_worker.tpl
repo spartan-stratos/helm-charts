@@ -77,6 +77,8 @@ spec:
             {{- end }}
           env:
           {{- if .Values.datadog.enabled }}
+            - name: DD_SERVICE
+              value: "{{ include "spartan.workerContainerName" . }}"
             - name: DD_KUBERNETES_KUBELET_NODENAME
               valueFrom:
                 fieldRef:
