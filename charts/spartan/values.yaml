@@ -313,6 +313,7 @@ extraEnvs: []
 ## workers enable users to deploy scalable and customizable worker components
 workers: []
 #  - name: worker-1
+#    containerName: "my-worker-1-container"  # Optional: custom container name for this worker
 #    shell: /bin/bash
 #    command: "echo worker-1"
 #    replicaCount: 1

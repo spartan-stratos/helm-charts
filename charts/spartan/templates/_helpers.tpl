@@ -35,6 +35,18 @@ Define a new container name based on spartan.fullname or spartan.name.
 {{- end }}
 
 {{- /*
+Define a worker-specific container name.
+If worker.containerName is set, use it; otherwise fall back to main container name with worker name suffix.
+*/}}
+{{- define "spartan.workerContainerName" -}}
+{{- if .worker.containerName }}
+{{- .worker.containerName | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" (include "spartan.containerName" .) .worker.name | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+{{- end }}
+
+{{- /*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "spartan.chart" -}}

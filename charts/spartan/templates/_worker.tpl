@@ -41,7 +41,7 @@ spec:
       shareProcessNamespace: true
       {{- end }}
       containers:
-        - name: {{ include "spartan.containerName" . }}
+        - name: {{ include "spartan.workerContainerName" . }}
           {{- if .worker.command }}
           command:
             - {{ default "/bin/sh" .worker.shell }}
