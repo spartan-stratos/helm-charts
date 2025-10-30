@@ -143,6 +143,13 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .worker.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .worker.topologySpreadConstraints | nindent 8 }}
+      {{- else if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
       volumes:
       {{- if .Values.secret.asFile.enabled }}
         - name: {{ include "spartan.secretAsFile" $ }}
