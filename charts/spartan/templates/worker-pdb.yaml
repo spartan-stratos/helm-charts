@@ -1,0 +1,28 @@
+{{- range $index, $worker := (.Values.workers) }}
+  {{- $replicaCount := int (default 1 $worker.replicaCount) }}
+  {{- $autoscalingEnabled := (and $worker.autoscaling $worker.autoscaling.enabled) }}
+  {{- $autoscalingMinReplica := int (default 1 (dig "autoscaling" "minReplicas" 1 $worker)) }}
+  {{- if and $worker.pdb $worker.pdb.enabled (or (and (gt $replicaCount 1) (not $autoscalingEnabled)) (and $autoscalingEnabled (gt $autoscalingMinReplica 1))) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "spartan.fullname" $ }}-worker-{{ $worker.name }}
+  labels:
+    {{- include "spartan.labels" $ | nindent 4 }}
+    tier: "pdb"
+spec:
+  {{- if $worker.pdb.minAvailable }}
+  minAvailable: {{ $worker.pdb.minAvailable }}
+  {{- end }}
+  {{- if $worker.pdb.maxUnavailable }}
+  maxUnavailable: {{ $worker.pdb.maxUnavailable }}
+  {{- end  }}
+  selector:
+    matchLabels:
+      {{- include "spartan.workerLabels" (dict "Values" $.Values "Chart" $.Chart "Release" $.Release "worker" $worker) | nindent 6 }}
+      tier: "worker"
+  {{- end }}
+  {{- if lt $index (sub (len $.Values.workers) 1) }}
+---
+  {{- end }}
+{{- end }}

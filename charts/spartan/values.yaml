@@ -236,6 +236,15 @@ tolerations: []
 ## affinity specifies affinity settings for pod assignment
 affinity: {}
 
+## topologySpreadConstraints allow spreading pods across topology domains
+## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+topologySpreadConstraints: []
+# - maxSkew: 1
+#   topologyKey: topology.kubernetes.io/zone
+#   whenUnsatisfiable: ScheduleAnyway
+#   labelSelector:
+#     matchLabels: {}
+
 testConnection:
   ## testConnection enables test connection
   enabled: false
@@ -322,6 +331,12 @@ workers: []
 #      enabled: false
 #      image: busybox
 #    podAnnotations: {}
+#    pdb:
+#      enabled: false
+#      # ONLY 1 between minAvailable or maxUnavailable should be defined
+#      minAvailable: 1
+#      maxUnavailable: ""
+#    topologySpreadConstraints: []
 #    autoscaling:
 #      enabled: false
 #      minReplicas: 1

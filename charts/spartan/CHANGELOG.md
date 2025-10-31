@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.18](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.18) (2025-10-30)
+
+### Features
+
+* Add topologySpreadConstraints support
+  * Global `topologySpreadConstraints` for the main Deployment
+  * Per-worker `workers[].topologySpreadConstraints` with fallback to global
+* Add per-worker PodDisruptionBudgets (PDBs)
+  * Enable via `workers[].pdb.enabled`
+  * Support `minAvailable` or `maxUnavailable`
+  * Safe rendering only when `replicaCount > 1` or `autoscaling.minReplicas > 1`
+
 ## [0.1.17](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.17) (2025-01-XX)
 
 ### Features
