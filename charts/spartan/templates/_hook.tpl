@@ -9,7 +9,11 @@ metadata:
   annotations:
     "helm.sh/hook": {{ .hook.hookTypes | quote }}
     "helm.sh/hook-weight": "{{ .hook.hookWeight | default "0" }}"
+    {{- if .hook.deletePolicy }}
+    "helm.sh/hook-delete-policy": {{ .hook.deletePolicy | quote }}
+    {{- else }}
     "helm.sh/resource-policy": keep
+    {{- end }}
 spec:
   backoffLimit: {{ .hook.backoffLimit | default 0 }}
   template:
