@@ -369,6 +369,7 @@ hooks:
 #    podAnnotations: {}
 #    restartPolicy: Never
 #    backoffLimit: 0
+#    deletePolicy: before-hook-creation
 #    extraEnvs:
 #    - name: SERVICE
 #      value: hook
