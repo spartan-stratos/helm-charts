@@ -1,0 +1,92 @@
+suite: "Hook template tests"
+
+templates:
+  - "templates/hook.yaml"
+
+tests:
+  - it: "renders hook delete policy and keeps hook wiring intact"
+    set:
+      image.repository: test-image
+      image.tag: test-tag
+      imagePullSecrets:
+        - name: regcred
+      serviceAccount.name: service-platform
+      secret.externalSecretEnv.enabled: true
+      secret.externalSecretEnv.name: service-platform-env-var
+      configMap.externalConfigMapEnv.enabled: true
+      configMap.externalConfigMapEnv.name: service-platform-config-map
+      extraEnvs:
+        - name: GLOBAL_ENV
+          value: global
+      hooks:
+        - name: migration
+          hookTypes: pre-install,pre-upgrade
+          deletePolicy: before-hook-creation
+          shell: /bin/sh
+          commands:
+            - yarn run migrate:up
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          extraEnvs:
+            - name: HOOK_ENV
+              value: hook
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - notExists:
+          path: metadata.annotations["helm.sh/resource-policy"]
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: service-platform
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: regcred
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: migration-image:test
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: service-platform-env-var
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].configMapRef.name
+          value: service-platform-config-map
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GLOBAL_ENV
+            value: global
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HOOK_ENV
+            value: hook
+
+  - it: "keeps legacy resource-policy annotation when delete policy is unset"
+    set:
+      hooks:
+        - name: migration
+          hookTypes: pre-install,pre-upgrade
+          shell: /bin/sh
+          commands:
+            - yarn run migrate:up
+          resources: {}
+          customImage:
+            enabled: false
+            image: busybox
+          restartPolicy: Never
+          backoffLimit: 0
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+      - notExists:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]

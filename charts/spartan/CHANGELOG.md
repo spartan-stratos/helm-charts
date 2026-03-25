@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.19](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.19) (2026-03-23)
+
+### Bug Fixes
+
+* Add optional `hooks[].deletePolicy` so Argo CD-managed hooks can rerun on every sync.
+
 ## [0.1.18](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.18) (2025-10-30)
 
 ### Features
