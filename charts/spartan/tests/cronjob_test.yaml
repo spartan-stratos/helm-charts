@@ -1,0 +1,33 @@
+suite: "CronJob template tests"
+
+templates:
+  - "templates/cronjob.yaml"
+
+tests:
+  - it: "uses datadog startupProbe gating instead of command polling"
+    set:
+      datadog.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+      cronjobs:
+        - name: cleanup
+          schedule: "0 * * * *"
+          shell: /bin/sh
+          commands:
+            - ls -la
+          resources: {}
+          customImage:
+            enabled: true
+            image: busybox
+          restartPolicy: Never
+    asserts:
+      - isKind:
+          of: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.initContainers[0].startupProbe.tcpSocket.port
+          value: 8126
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].command[2]
+          value: |
+            ls -la

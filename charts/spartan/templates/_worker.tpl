@@ -40,6 +40,18 @@ spec:
       {{- if .Values.datadog.enabled }}
       shareProcessNamespace: true
       {{- end }}
+      {{- $hasDatadogSidecar := false }}
+      {{- range .Values.sidecars }}
+      {{- if eq .name "datadog-agent" }}
+      {{- $hasDatadogSidecar = true }}
+      {{- end }}
+      {{- end }}
+      {{- if $hasDatadogSidecar }}
+      initContainers:
+        {{- range $sidecar := .Values.sidecars }}
+        {{ include "sidecar.initTemplate" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
+        {{- end }}
+      {{- end }}
       containers:
         - name: {{ include "spartan.containerName" . }}
           {{- if .worker.command }}
@@ -120,7 +132,7 @@ spec:
               mountPath: {{ .Values.configMap.externalConfigMapFile.mountPath | quote }}
           {{- end }}
           {{- range .Values.sidecars }}
-          {{- if .sharedVolume }}
+          {{- if hasKey . "sharedVolume" }}
             - name: sidecar-volume
               readOnly: false
               mountPath: {{ .sharedVolume.mountPath }}

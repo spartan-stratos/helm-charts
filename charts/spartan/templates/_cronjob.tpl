@@ -66,17 +66,24 @@ spec:
           {{- if .Values.datadog.enabled }}
           shareProcessNamespace: true
           {{- end }}
+          {{- $hasDatadogSidecar := false }}
+          {{- range .Values.sidecars }}
+          {{- if eq .name "datadog-agent" }}
+          {{- $hasDatadogSidecar = true }}
+          {{- end }}
+          {{- end }}
+          {{- if $hasDatadogSidecar }}
+          initContainers:
+            {{- range $sidecar := .Values.sidecars }}
+            {{ include "sidecar.initTemplate" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 12 }}
+            {{- end }}
+          {{- end }}
           containers:
             - name: {{ include "spartan.containerName" . }}
               command:
                 - {{ default "/bin/sh" .cronjob.shell }}
                 - -c
                 - |
-                {{- if .Values.datadog.enabled }}
-                  trap 'sleep 10 && pkill agent' EXIT
-                  set -o pipefail
-                  if [ ! `which curl` ]; then sleep 300; else while ! curl -Ns localhost:8126; do sleep 1 && echo "Waiting for datadog agent to start..."; done; fi
-                {{- end }}
                 {{- range .cronjob.commands }}
                   {{ . }}
                 {{- end }}
@@ -156,7 +163,7 @@ spec:
                   mountPath: {{ .mountPath }}
               {{- end }}
               {{- range .Values.sidecars }}
-              {{- if .sharedVolume }}
+              {{- if hasKey . "sharedVolume" }}
                 - name: sidecar-volume
                   readOnly: false
                   mountPath: {{ .sharedVolume.mountPath }}

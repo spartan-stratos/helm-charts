@@ -443,7 +443,7 @@ sidecars: []
 
 ## This field supports the datadog agent as sidecar pattern
 ## It will add additional environment variables for datadog
-## It will also add stop condition for datadog agent container
+## The datadog-agent sidecar is rendered as a native Kubernetes sidecar container
 datadog:
   enabled: false
 
