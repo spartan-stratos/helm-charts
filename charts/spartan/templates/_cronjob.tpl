@@ -84,10 +84,6 @@ spec:
                 - {{ default "/bin/sh" .cronjob.shell }}
                 - -c
                 - |
-                {{- if .Values.datadog.enabled }}
-                  set -o pipefail
-                  if [ ! `which curl` ]; then sleep 300; else while ! curl -Ns localhost:8126; do sleep 1 && echo "Waiting for datadog agent to start..."; done; fi
-                {{- end }}
                 {{- range .cronjob.commands }}
                   {{ . }}
                 {{- end }}

@@ -19,5 +19,8 @@ tests:
           path: spec.template.spec.initContainers[0].image
           value: datadog/agent
       - equal:
+          path: spec.template.spec.initContainers[0].startupProbe.tcpSocket.port
+          value: 8126
+      - equal:
           path: spec.template.spec.containers[1].name
           value: busybox

@@ -90,3 +90,31 @@ tests:
           value: keep
       - notExists:
           path: metadata.annotations["helm.sh/hook-delete-policy"]
+
+  - it: "uses datadog startupProbe gating instead of command polling when collectLog is enabled"
+    set:
+      datadog.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+      hooks:
+        - name: migration
+          hookTypes: pre-install,pre-upgrade
+          shell: /bin/sh
+          commands:
+            - yarn run migrate:up
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].startupProbe.tcpSocket.port
+          value: 8126
+      - equal:
+          path: spec.template.spec.containers[0].command[2]
+          value: |
+            yarn run migrate:up

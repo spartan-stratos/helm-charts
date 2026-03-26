@@ -54,6 +54,13 @@
   {{- if .sidecar.ports}}
   ports: {{- toYaml .sidecar.ports | nindent 4 }}
   {{- end }}
+  {{- if eq .sidecar.name "datadog-agent" }}
+  startupProbe:
+    tcpSocket:
+      port: 8126
+    periodSeconds: 1
+    failureThreshold: 300
+  {{- end }}
   {{- if .sidecar.livenessProbe }}
   livenessProbe: {{- toYaml .sidecar.livenessProbe | nindent 4 }}
   {{- end }}
