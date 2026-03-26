@@ -44,6 +44,14 @@ spec:
       {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
       shareProcessNamespace: true
       {{- end }}
+      {{- if .hook.collectLog }}
+      initContainers:
+        {{- range $sidecar := .Values.sidecars }}
+          {{- if eq $sidecar.name "datadog-agent" }}
+        {{ include "sidecar.initTemplate" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
       containers:
         - name: {{ include "spartan.containerName" . }}
           securityContext:
@@ -59,7 +67,6 @@ spec:
             - -c
             - |
             {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
-              trap 'sleep 10 && pkill agent' EXIT
               set -o pipefail
               if [ ! `which curl` ]; then sleep 300; else while ! curl -Ns localhost:8126; do sleep 1 && echo "Waiting for datadog agent to start...."; done; fi
             {{- end }}
@@ -130,19 +137,13 @@ spec:
               mountPath: {{ .Values.configMap.externalConfigMapFile.mountPath | quote }}
             {{- end }}
             {{- range .Values.sidecars }}
-            {{- if .sharedVolume }}
+            {{- if hasKey . "sharedVolume" }}
             - name: sidecar-volume
               readOnly: false
               mountPath: {{ .sharedVolume.mountPath }}
               subPath: {{ .name }}
             {{- end }}
           {{- end }}
-        {{- $hook := .hook }}
-        {{- range $sidecar := .Values.sidecars }}
-          {{- if and (eq $sidecar.name "datadog-agent") ($hook.collectLog) }}
-            {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
-          {{- end }}
-        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
           {{- toYaml . | nindent 8 }}

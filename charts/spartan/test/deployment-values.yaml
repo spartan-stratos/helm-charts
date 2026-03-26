@@ -1,0 +1,12 @@
+datadog:
+  enabled: true
+
+sidecars:
+  - name: datadog-agent
+    image: datadog/agent
+    sharedVolume:
+      mountPath: /var/log/application
+  - name: busybox
+    image: busybox
+    sharedVolume:
+      mountPath: /tmp/sidecar

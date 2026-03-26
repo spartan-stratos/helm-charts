@@ -1,0 +1,23 @@
+suite: "Deployment template tests"
+
+templates:
+  - "templates/deployment.yaml"
+
+values:
+  - "../test/deployment-values.yaml"
+
+tests:
+  - it: "renders the datadog sidecar as a native sidecar init container"
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: datadog-agent
+      - equal:
+          path: spec.template.spec.initContainers[0].restartPolicy
+          value: Always
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: datadog/agent
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: busybox

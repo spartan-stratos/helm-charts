@@ -1,8 +1,10 @@
-{{- define "sidecar.template" }}
-{{- if .sidecar }}
+{{- define "sidecar.fields" }}
 - name: {{ .sidecar.name }}
   image: {{ .sidecar.image }}
   imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+  {{- if .native }}
+  restartPolicy: Always
+  {{- end }}
   {{- if .sidecar.command }}
   command: 
   - {{ default "/bin/sh" .sidecar.shell }}
@@ -82,10 +84,21 @@
       readOnly: true
       mountPath: {{ .Values.configMap.externalConfigMapFile.mountPath | quote }}
   {{- end }}
-  {{- if .sidecar.sharedVolume }}
+  {{- if hasKey .sidecar "sharedVolume" }}
     - mountPath: {{ .sidecar.sharedVolume.mountPath | quote }}
       name: sidecar-volume
       subPath: {{ .sidecar.name | quote }}
   {{- end }}
+{{- end }}
+
+{{- define "sidecar.template" }}
+{{- if and .sidecar (ne .sidecar.name "datadog-agent") }}
+{{ include "sidecar.fields" (dict "sidecar" .sidecar "Values" .Values "Chart" .Chart "Release" .Release "native" false) }}
+{{- end }}
+{{- end }}
+
+{{- define "sidecar.initTemplate" }}
+{{- if and .sidecar (eq .sidecar.name "datadog-agent") }}
+{{ include "sidecar.fields" (dict "sidecar" .sidecar "Values" .Values "Chart" .Chart "Release" .Release "native" true) }}
 {{- end }}
 {{- end }}
