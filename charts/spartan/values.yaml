@@ -35,6 +35,11 @@ lifecycle:
 #   exec:
 #     command: ["/bin/sh", "-c", "echo PreStop Hook; sleep 10"]
 
+## terminationGracePeriodSeconds optionally sets pod shutdown grace period
+## for the main application Deployment. When null, Kubernetes uses the
+## cluster default for pods.
+terminationGracePeriodSeconds: null
+
 serviceAccount:
   ## create specifies whether a service account should be created
   create: false
