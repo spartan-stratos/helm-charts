@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.20](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.20) (2026-04-01)
+
+### Features
+
+* Add optional top-level `terminationGracePeriodSeconds` support for the main application Deployment.
+
 ## [0.1.19](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.19) (2026-03-23)
 
 ### Bug Fixes
