@@ -16,9 +16,18 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
+    {{- if .Values.service.ports }}
+    {{- range .Values.service.ports }}
+    - port: {{ .port }}
+      targetPort: {{ .targetPort | default .port }}
+      protocol: {{ .protocol | default "TCP" }}
+      name: {{ .name }}
+    {{- end }}
+    {{- else }}
     - port: {{ .Values.service.port | default 80 }}
       targetPort: {{ .Values.containerPort | default 80 }}
       protocol: {{ .Values.service.protocol | default "TCP" }}
       name: {{ .Values.service.name | default "http" }}
+    {{- end }}
   selector:
     {{- include "spartan.selectorLabels" . | nindent 4 }}

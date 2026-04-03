@@ -12,6 +12,6 @@ spec:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ include "spartan.fullname" . }}:{{ .Values.service.port }}']
+      args: ['{{ include "spartan.fullname" . }}:{{ include "spartan.servicePrimaryPort" . }}']
   restartPolicy: Never
 {{- end }}

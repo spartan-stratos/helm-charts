@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.21](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.21) (2026-04-03)
+
+### Features
+
+* Add optional `service.ports` list for multi-port Service support.
+  * When `service.ports` is non-empty, the Service renders all listed ports.
+  * When empty or unset, falls back to the existing `service.port` single-port behavior (no breaking change).
+* Add `spartan.servicePrimaryPort` helper used by Ingress, test-connection, and NOTES.
+
 ## [0.1.20](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.20) (2026-04-01)
 
 ### Features
