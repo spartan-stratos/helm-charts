@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.22](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.22) (2026-04-04)
+* Add optional per-path `servicePort` in Ingress for routing different paths to different Service ports.
+
 ## [0.1.21](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.21) (2026-04-03)
 
 ### Features
