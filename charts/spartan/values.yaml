@@ -82,11 +82,21 @@ service:
   annotations: {}
   ## type specifies the service type
   type: ClusterIP
-  ## port specifies the service port
+  ## port specifies the service port (legacy single-port mode)
   port: 80
   ## protocol specifies the service protocol
   protocol: TCP
   ## name specifies the service name
+  ## ports overrides the single-port config above with a full list when non-empty
+  ## Example:
+  ##   ports:
+  ##     - name: http
+  ##       port: 80
+  ##       targetPort: 8080
+  ##     - name: jobrunr
+  ##       port: 3000
+  ##       targetPort: 3000
+  ports: []
   name: http
 
 gcp:

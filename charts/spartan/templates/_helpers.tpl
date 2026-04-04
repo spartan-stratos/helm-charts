@@ -189,6 +189,17 @@ Get list of resources type
 {{- end }}
 
 {{- /*
+Primary service port (first entry from service.ports, or legacy service.port)
+*/}}
+{{- define "spartan.servicePrimaryPort" -}}
+{{- if .Values.service.ports -}}
+{{- (index .Values.service.ports 0).port -}}
+{{- else -}}
+{{- .Values.service.port | default 80 -}}
+{{- end -}}
+{{- end -}}
+
+{{- /*
 Merge extraEnvs
 */}}
 {{- define "spartan.extraEnvs" -}}
