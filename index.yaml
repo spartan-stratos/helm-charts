@@ -24,6 +24,16 @@ entries:
     version: 0.1.0
   spartan:
   - apiVersion: v2
+    appVersion: 0.1.22
+    created: "2026-04-04T06:10:31.974730642Z"
+    description: A Helm chart for Kubernetes
+    digest: 893445e0df23318decd98fc252c6efce444142d8829f268d67397f68c53f0592
+    name: spartan
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/spartan-0.1.22/spartan-0.1.22.tgz
+    version: 0.1.22
+  - apiVersion: v2
     appVersion: 0.1.21
     created: "2026-04-04T05:29:01.428649857Z"
     description: A Helm chart for Kubernetes
@@ -243,4 +253,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/spartan-0.1.0/spartan-0.1.0.tgz
     version: 0.1.0
-generated: "2026-04-04T05:29:01.428822199Z"
+generated: "2026-04-04T06:10:31.974873912Z"
