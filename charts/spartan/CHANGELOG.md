@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.23](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.23) (2026-04-28)
+
+### Features
+
+* Add global `podLabels` support across Spartan pod templates
+  * Applies to the main Deployment, workers, CronJobs, and hooks
+  * Keeps workload selectors unchanged while allowing extra operational labels on pods
+
 ## [0.1.22](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.22) (2026-04-04)
 * Add optional per-path `servicePort` in Ingress for routing different paths to different Service ports.
 
@@ -57,8 +65,8 @@ All notable changes to this project will be documented in this file.
 ### Features
 
 * Added optional fields on CronJob.spec and jobTemplate.spec:
-  
-  * concurrencyPolicy, startingDeadlineSeconds, suspend, timeZone 
+
+  * concurrencyPolicy, startingDeadlineSeconds, suspend, timeZone
   * backoffLimit, activeDeadlineSeconds, ttlSecondsAfterFinished, completions, parallelism
 
 ## [0.1.15](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.15) (2025-08-20)
