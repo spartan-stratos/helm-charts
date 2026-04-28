@@ -54,6 +54,7 @@ spec:
           labels:
             {{- include "spartan.cronjobLabels" $ | nindent 12 }}
             tier: "cronjob"
+            {{- include "spartan.podLabels" . | nindent 12 }}
         spec:
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets:

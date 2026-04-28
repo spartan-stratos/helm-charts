@@ -32,6 +32,7 @@ spec:
       labels:
         {{- include "spartan.hookLabels" . | nindent 8 }}
         tier: "hook"
+        {{- include "spartan.podLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

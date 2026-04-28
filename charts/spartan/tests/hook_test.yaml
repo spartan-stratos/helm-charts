@@ -90,3 +90,30 @@ tests:
           value: keep
       - notExists:
           path: metadata.annotations["helm.sh/hook-delete-policy"]
+
+  - it: "renders global podLabels on hook pod templates"
+    set:
+      podLabels:
+        team: platform
+        environment: production
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          shell: /bin/sh
+          commands:
+            - echo migration
+          resources: {}
+          customImage:
+            enabled: false
+            image: busybox
+          restartPolicy: Never
+          backoffLimit: 0
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: spec.template.metadata.labels.team
+          value: platform
+      - equal:
+          path: spec.template.metadata.labels.environment
+          value: production
