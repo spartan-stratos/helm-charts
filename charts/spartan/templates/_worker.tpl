@@ -28,6 +28,7 @@ spec:
       labels:
         {{- include "spartan.workerLabels" $ | nindent 8 }}
         tier: "worker"
+        {{- include "spartan.podLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

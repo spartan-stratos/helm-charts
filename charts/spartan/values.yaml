@@ -52,6 +52,9 @@ serviceAccount:
 ## podAnnocations specify pods annotation
 podAnnotations: {}
 
+## podLabels specify global labels added to all pod templates
+podLabels: {}
+
 ## podSecurityContext is custom pod security context for spartan pod
 podSecurityContext: {}
   # fsGroup: 2000

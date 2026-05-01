@@ -101,6 +101,15 @@ app.kubernetes.io/name: {{ include "spartan.name" . }}-{{ .cronjob.name }}
 app.kubernetes.io/instance: {{ .Release.Name }}-cronjob
 {{- end }}
 
+{{/*
+Global pod labels
+*/}}
+{{- define "spartan.podLabels" -}}
+{{- with .Values.podLabels }}
+{{- toYaml . }}
+{{- end }}
+{{- end }}
+
 {{- /*
 Create the name of the service account to use
 */}}
@@ -225,4 +234,3 @@ Merge extraEnvs
   {{- end -}}
   {{- toYaml $merged }}
 {{- end -}}
-

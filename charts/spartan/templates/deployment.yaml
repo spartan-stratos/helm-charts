@@ -28,6 +28,7 @@ spec:
       labels:
         {{- include "spartan.selectorLabels" . | nindent 8 }}
         tier: "application"
+        {{- include "spartan.podLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

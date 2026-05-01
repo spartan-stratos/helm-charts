@@ -1,0 +1,20 @@
+suite: "Deployment template tests"
+
+templates:
+  - "templates/deployment.yaml"
+
+tests:
+  - it: "renders global podLabels on the main deployment pod template"
+    set:
+      podLabels:
+        team: platform
+        environment: production
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.metadata.labels.team
+          value: platform
+      - equal:
+          path: spec.template.metadata.labels.environment
+          value: production

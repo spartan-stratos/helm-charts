@@ -145,6 +145,16 @@ deploymentAnnotations:
   "backup.velero.io/backup-volumes": "data"
 ```
 
+## Global Pod Labels
+
+The spartan chart supports adding custom labels to every pod template it renders through the `podLabels` configuration. These labels are applied to application deployments, workers, cronjobs, and hooks without changing workload selectors.
+
+```yaml
+podLabels:
+  team: platform
+  environment: production
+```
+
 ## Configuration
 
 The following table lists the configurable parameters of the **spartan chart** and their default values.
@@ -209,6 +219,7 @@ The following table lists the configurable parameters of the **spartan chart** a
 | pdb.minAvailable                                                                                                                                                  | Minimum number/percentage of pods that should remain scheduled                                                                                     | 1            |
 | pdb.maxUnavailable                                                                                                                                                | Maximum number/percentage of pods that may be made unavailable                                                                                     | ""           |
 | podAnnotations                                                                                                                                                    | Pods annotations                                                                                                                                   | {}           |
+| podLabels                                                                                                                                                         | Global labels added to all pod templates                                                                                                           | {}           |
 | podSecurityContext                                                                                                                                                | Custom pod security context for spartan pod                                                                                                        | {}           |
 | readinessProbe                                                                                                                                                    | Readiness Probe initial delay and timeout                                                                                                          | {}           |
 | replicaCount                                                                                                                                                      | Number of replicas                                                                                                                                 | 1            |
