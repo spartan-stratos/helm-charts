@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.2.0) (2026-05-06)
+
+### Features
+
+* Add `projected` volume type support in the custom `volumes` list
+  * Enables Kubernetes projected ServiceAccountToken volumes required for GCP Workload Identity Federation (WIF)
+  * Previously unrecognised volume types silently fell back to `emptyDir`; `projected` sources are now rendered correctly
+
 ## [0.1.23](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.1.23) (2026-04-28)
 
 ### Features
