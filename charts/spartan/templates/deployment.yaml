@@ -229,4 +229,9 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .persistentVolumeClaim.claimName }}
         {{- end }}
+        {{- if .projected }}
+          projected:
+            sources:
+              {{- toYaml .projected.sources | nindent 14 }}
+        {{- end }}
       {{- end }}
