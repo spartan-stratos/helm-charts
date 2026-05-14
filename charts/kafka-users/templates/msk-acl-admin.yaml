@@ -1,0 +1,29 @@
+{{- if .Values.mskAclAdmin.enabled -}}
+# Self-grant for the principal the Strimzi User Operator authenticates as.
+#
+# Bootstrap: while the cluster keeps Kafka's default
+# `allow.everyone.if.no.acl.found = true`, any authenticated principal can
+# write ACL via the Admin API. The operator on its first reconcile applies
+# this CRD, granting itself the explicit `Alter Cluster` permission it needs
+# to keep working after a later PR flips the cluster default to `false`.
+#
+# This MUST exist before that flip — verify via `kafka-acls.sh --list
+# --principal User:msk-acl-admin` from a service-fleet pod after the
+# operator reports ready.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: msk-acl-admin
+  namespace: {{ .Values.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.clusterLabel }}
+spec:
+  authorization:
+    type: simple
+    acls:
+      # Full cluster admin — write/read ACL + cluster configs.
+      - resource:
+          type: cluster
+        operations: [Alter, AlterConfigs, Describe, DescribeConfigs]
+        type: allow
+{{- end -}}

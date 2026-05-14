@@ -1,0 +1,21 @@
+# kafka-users defaults. Override per env.
+
+# Used as KafkaUser `strimzi.io/cluster` label. Strimzi standalone UO doesn't
+# require a matching Kafka CR but the label is mandatory on every CRD.
+# Set per env.
+clusterLabel: ""
+
+namespace: kafka-acl
+
+# msk-acl-admin's self-grant: keep this principal in Alter Cluster perms so
+# it survives the eventual `allow.everyone.if.no.acl.found = false` flip.
+mskAclAdmin:
+  enabled: true
+
+# samsara-producer: external Kafka Connector. Write/Describe on samsara.*
+# topics, denied on fleet.*.
+samsaraProducer:
+  enabled: true
+  topicPrefix: "samsara."
+  deniedTopicPrefixes:
+    - "fleet."

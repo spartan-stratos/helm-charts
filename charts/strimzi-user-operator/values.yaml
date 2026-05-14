@@ -1,0 +1,51 @@
+# Strimzi User Operator (standalone) defaults. Override per env.
+# See values-dev.yaml / values-prod.yaml for env-specific bindings.
+
+# Environment label — surfaces in pod labels / observability + drives the
+# KafkaUser CRD `strimzi.io/cluster` selector. Set per env file.
+env: ""
+
+namespace:
+  create: true
+  name: kafka-acl
+
+# Strimzi standalone User Operator image. Upstream Quay registry. We do NOT
+# build a custom image — the operator uses SASL/SCRAM to talk to MSK, which
+# is supported natively by the stock image (no aws-msk-iam-auth jar needed).
+image:
+  repository: quay.io/strimzi/operator
+  tag: "0.45.1"
+  pullPolicy: IfNotPresent
+
+# MSK SASL/SCRAM bootstrap endpoint — output from infra-terraform/live.
+# Set per env file. Example shape:
+#   "b-1.<cluster>.kafka.us-west-2.amazonaws.com:9096,b-2.<cluster>...,b-3..."
+mskBootstrapServersSaslScram: ""
+
+# AWS Secrets Manager secret name for the msk-acl-admin SCRAM credential.
+# Created by infra-terraform `module.msk_acl_admin`. ExternalSecrets syncs
+# this into a K8s Secret consumed as JAAS config.
+mskAclAdminSecret:
+  awsSecretName: ""   # e.g. AmazonMSK_msk-acl-admin-dev-xxxxxx
+  k8sSecretName: msk-acl-admin-creds
+
+# ExternalSecrets store — must match the ClusterSecretStore/SecretStore
+# already configured for service-fleet (re-use existing AWS Secrets Manager
+# binding rather than create a new one).
+externalSecretStore:
+  kind: ClusterSecretStore
+  name: aws-secrets-manager
+
+# Resource sizing — operator is lightweight (Java AdminClient + reconcile
+# loop). 256Mi heap is plenty.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Reconcile cadence (ms). Strimzi default is 120000 (2 min). Keep default —
+# our ACL change frequency is low.
+fullReconciliationIntervalMs: 120000
