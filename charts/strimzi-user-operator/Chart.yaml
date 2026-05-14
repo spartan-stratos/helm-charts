@@ -13,5 +13,5 @@ description: |
   Manages Kafka ACL declaratively via KafkaUser CRDs. KafkaUser CRD
   instances live in the sibling `kafka-users` chart.
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: "0.45.1"

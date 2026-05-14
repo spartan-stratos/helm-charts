@@ -32,9 +32,23 @@ mskAclAdminSecret:
   awsSecretName: ""   # e.g. AmazonMSK_msk-acl-admin-dev-xxxxxx
   k8sSecretName: msk-acl-admin-creds
 
-# ExternalSecrets store reference — must point at an existing
-# ClusterSecretStore (or SecretStore) wired to AWS Secrets Manager in the
-# target cluster. This chart does not create the store.
+# Whether to render the `ExternalSecret` resource that syncs the SCRAM
+# admin credential from AWS Secrets Manager into the K8s Secret named in
+# `mskAclAdminSecret.k8sSecretName`.
+#
+# Set to `false` if the consumer's cluster does NOT run the ExternalSecrets
+# operator (https://external-secrets.io). When disabled, the consumer is
+# responsible for creating the K8s Secret out-of-band — e.g. via Terraform
+# `kubernetes_secret` that reads the AWS Secrets Manager value and writes a
+# JAAS-format `admin.properties` key. The operator will pick the Secret up
+# via `STRIMZI_KAFKA_ADMIN_CLIENT_CONFIGURATION` either way.
+externalSecret:
+  enabled: true
+
+# ExternalSecrets store reference (used only when `externalSecret.enabled`
+# is true) — must point at an existing ClusterSecretStore or SecretStore
+# wired to AWS Secrets Manager in the target cluster. This chart does not
+# create the store.
 externalSecretStore:
   kind: ClusterSecretStore
   name: aws-secrets-manager

@@ -2,6 +2,23 @@
 
 All notable changes to this chart are documented in this file.
 
+## [0.3.0](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.0) (2026-05-14)
+
+### Features
+
+* `externalSecret.enabled` toggle (default `true`) — when set to `false`,
+  the chart skips rendering the `ExternalSecret` resource. The consumer
+  is then responsible for provisioning the JAAS-format K8s Secret
+  out-of-band (e.g. via Terraform `kubernetes_secret`). Useful for
+  clusters that do not run the ExternalSecrets operator.
+
+### Why
+
+The chart's ExternalSecret made ExternalSecrets a hard prerequisite.
+Some clusters intentionally don't run that operator (or run a different
+secret-sync mechanism). The toggle lets the chart work in both
+environments without forking.
+
 ## [0.2.0](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.2.0) (2026-05-14)
 
 ### Breaking changes
