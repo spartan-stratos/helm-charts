@@ -291,6 +291,22 @@ entries:
   strimzi-user-operator:
   - apiVersion: v2
     appVersion: 0.45.1
+    created: "2026-05-14T08:49:57.513498881Z"
+    description: 'Strimzi User Operator (standalone mode) pointed at an external Kafka
+      cluster (e.g. AWS MSK).  Deploys only namespace-scoped resources — Namespace,
+      KafkaUser CRD definition, and cluster-scoped RBAC are the consumer''s responsibility
+      to bootstrap (typically via Terraform). This keeps the chart deployable from
+      an ArgoCD AppProject without cluster-scoped resource whitelist entries.  Manages
+      Kafka ACL declaratively via KafkaUser CRDs. KafkaUser CRD instances live in
+      the sibling `kafka-users` chart. '
+    digest: 33fdf24ab51fcbebdff70b31932c3d478951d1219b60dff003e30f49c9d07134
+    name: strimzi-user-operator
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.2.0/strimzi-user-operator-0.2.0.tgz
+    version: 0.2.0
+  - apiVersion: v2
+    appVersion: 0.45.1
     created: "2026-05-14T08:00:05.494885524Z"
     description: 'Strimzi User Operator (standalone mode) pointed at AWS MSK.  Manages
       Kafka ACL declaratively via KafkaUser CRDs. The operator authenticates to MSK
@@ -302,4 +318,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-05-14T08:00:05.49496337Z"
+generated: "2026-05-14T08:49:57.513572258Z"
