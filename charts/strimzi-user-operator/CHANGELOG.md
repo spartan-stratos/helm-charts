@@ -2,6 +2,22 @@
 
 All notable changes to this chart are documented in this file.
 
+## [0.3.4](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.4) (2026-05-14)
+
+### Bug fixes
+
+* Add **Starfield Services Root Certificate Authority - G2** to the
+  trust-root bundle. AWS MSK serves a cross-signed `Amazon Root CA 1`
+  (subject=`Amazon Root CA 1`, issuer=`Starfield G2`). Java's PKIX
+  builder strict-follows the Authority Key Identifier chain rather
+  than matching trust anchors by Subject DN + public key, so the
+  self-signed Amazon roots in 0.3.3 were NOT sufficient — Java tried
+  to chain up to Starfield G2 as the trust anchor and failed with
+  `PKIX path building failed`. The bundle is renamed
+  `files/amazon-trust-roots.pem` → `files/msk-trust-roots.pem` to
+  reflect that it contains both Amazon and Starfield material
+  needed for MSK.
+
 ## [0.3.3](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.3) (2026-05-14)
 
 ### Bug fixes
