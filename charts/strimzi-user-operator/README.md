@@ -55,11 +55,20 @@ Provision them once via the consumer's Terraform / one-off kubectl
    ```
    https://github.com/strimzi/strimzi-kafka-operator/blob/0.45.1/install/cluster-operator/044-Crd-kafkauser.yaml
    ```
-3. **ExternalSecrets operator** installed cluster-wide
-   (`external-secrets.io/v1beta1` CRDs available).
-4. **`ClusterSecretStore`** (or `SecretStore` in the target namespace)
-   wired to AWS Secrets Manager via IRSA. The default `externalSecretStore.name`
-   is `aws-secrets-manager`; override if your store has a different name.
+3. **A K8s `Secret`** named per `mskAclAdminSecret.k8sSecretName` (default
+   `msk-acl-admin-creds`) holding a single key `admin.properties` with the
+   JAAS config the operator reads. Two ways to provision it:
+   - **`externalSecret.enabled: true` (default)** — requires the
+     ExternalSecrets operator (`external-secrets.io/v1beta1` CRDs)
+     installed cluster-wide, plus a `ClusterSecretStore`/`SecretStore`
+     wired to AWS Secrets Manager via IRSA (default store name
+     `aws-secrets-manager` — override via `externalSecretStore.name`).
+     The chart will render an `ExternalSecret` that syncs the credential
+     from AWS Secrets Manager into the K8s Secret.
+   - **`externalSecret.enabled: false`** — consumer creates the K8s
+     Secret directly (e.g. via Terraform `kubernetes_secret` that reads
+     the AWS Secrets Manager value and writes the JAAS properties).
+     Use this if the cluster does not run ExternalSecrets.
 
 ## Values
 
@@ -73,8 +82,9 @@ Provision them once via the consumer's Terraform / one-off kubectl
 | `mskBootstrapServersSaslScram` | string | `""` | MSK SASL/SCRAM bootstrap-broker list (comma-separated `host:9096`) |
 | `mskAclAdminSecret.awsSecretName` | string | `""` | Friendly name of the AWS Secrets Manager secret containing `username` + `password` JSON keys |
 | `mskAclAdminSecret.k8sSecretName` | string | `msk-acl-admin-creds` | Name of the K8s `Secret` ExternalSecrets renders into |
-| `externalSecretStore.kind` | string | `ClusterSecretStore` | `ClusterSecretStore` or `SecretStore` |
-| `externalSecretStore.name` | string | `aws-secrets-manager` | Name of the existing ExternalSecrets store binding |
+| `externalSecret.enabled` | bool | `true` | Render the `ExternalSecret` resource. Set `false` if the cluster does not run the ExternalSecrets operator — the consumer then provisions the K8s Secret out-of-band (e.g. Terraform). |
+| `externalSecretStore.kind` | string | `ClusterSecretStore` | Used only when `externalSecret.enabled` is `true`. `ClusterSecretStore` or `SecretStore`. |
+| `externalSecretStore.name` | string | `aws-secrets-manager` | Used only when `externalSecret.enabled` is `true`. Name of the existing ExternalSecrets store binding. |
 | `resources.*` | object | see `values.yaml` | CPU + memory requests/limits — operator is lightweight |
 | `fullReconciliationIntervalMs` | int | `120000` | Reconcile cadence (ms) — matches Strimzi default |
 
