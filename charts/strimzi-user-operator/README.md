@@ -25,9 +25,12 @@ Use this chart when:
 
 ## What this chart ships
 
-- `Namespace` (optional, create-or-not toggle)
-- `ServiceAccount` + cluster-scoped `RBAC` for the operator
-- Strimzi `KafkaUser` CRD definition (vendored from Strimzi 0.45.1)
+All resources are **namespace-scoped** (drops in a default-deny
+`AppProject`):
+
+- `ServiceAccount` + namespace-scoped `Role`/`RoleBinding` for the
+  operator (operator watches a single namespace via
+  `STRIMZI_NAMESPACE`)
 - `ExternalSecret` that pulls the operator's SCRAM credential from AWS
   Secrets Manager and renders it as a JAAS `admin.properties` file in a
   K8s `Secret`
@@ -40,13 +43,30 @@ Use this chart when:
 KafkaUser CRD **instances** (the actual ACL declarations) ship in the
 companion `kafka-users` chart.
 
+## Prerequisites (consumer-bootstrapped — NOT in this chart)
+
+These cluster-scoped resources must exist BEFORE installing the chart.
+Provision them once via the consumer's Terraform / one-off kubectl
+(then never touch them):
+
+1. **Target Namespace** (default `kafka-acl`).
+2. **Strimzi `KafkaUser` CRD** — vendor the YAML from upstream and
+   apply once:
+   ```
+   https://github.com/strimzi/strimzi-kafka-operator/blob/0.45.1/install/cluster-operator/044-Crd-kafkauser.yaml
+   ```
+3. **ExternalSecrets operator** installed cluster-wide
+   (`external-secrets.io/v1beta1` CRDs available).
+4. **`ClusterSecretStore`** (or `SecretStore` in the target namespace)
+   wired to AWS Secrets Manager via IRSA. The default `externalSecretStore.name`
+   is `aws-secrets-manager`; override if your store has a different name.
+
 ## Values
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `env` | string | `""` | Environment label (e.g. `dev`, `prod`) — surfaces in pod labels |
-| `namespace.create` | bool | `true` | Whether the chart creates the namespace |
-| `namespace.name` | string | `kafka-acl` | Namespace the operator lives in |
+| `namespace.name` | string | `kafka-acl` | Namespace the operator lives in — must be pre-created |
 | `image.repository` | string | `quay.io/strimzi/operator` | Upstream Strimzi operator image |
 | `image.tag` | string | `0.45.1` | Pinned image tag (must match the vendored CRD version) |
 | `image.pullPolicy` | string | `IfNotPresent` | |

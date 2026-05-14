@@ -5,8 +5,11 @@
 # KafkaUser CRD `strimzi.io/cluster` selector. Set per env file.
 env: ""
 
+# Namespace the operator lives in. This chart does NOT create the namespace
+# (cluster-scoped resource — kept out so the chart fits a default-deny
+# ArgoCD AppProject). The namespace must be created out-of-band — e.g. by
+# the consumer's Terraform alongside the Kafka CRD bootstrap.
 namespace:
-  create: true
   name: kafka-acl
 
 # Strimzi standalone User Operator image. Upstream Quay registry. We do NOT
