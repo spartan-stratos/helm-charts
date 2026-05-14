@@ -29,9 +29,9 @@ mskAclAdminSecret:
   awsSecretName: ""   # e.g. AmazonMSK_msk-acl-admin-dev-xxxxxx
   k8sSecretName: msk-acl-admin-creds
 
-# ExternalSecrets store — must match the ClusterSecretStore/SecretStore
-# already configured for service-fleet (re-use existing AWS Secrets Manager
-# binding rather than create a new one).
+# ExternalSecrets store reference — must point at an existing
+# ClusterSecretStore (or SecretStore) wired to AWS Secrets Manager in the
+# target cluster. This chart does not create the store.
 externalSecretStore:
   kind: ClusterSecretStore
   name: aws-secrets-manager

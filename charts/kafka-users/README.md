@@ -2,81 +2,40 @@
 
 Declarative `KafkaUser` CRD instances for use with the
 [`strimzi-user-operator`](../strimzi-user-operator/) chart pointed at
-an external AWS MSK cluster.
+an external Kafka cluster (designed for AWS MSK but works against any
+Kafka the operator can reach).
 
-This chart only produces `KafkaUser` Custom Resources — the Strimzi
-User Operator pod and the `KafkaUser` CRD definition itself come from
-the sibling `strimzi-user-operator` chart.
+This chart only produces `KafkaUser` Custom Resources from a `users[]`
+list you supply. The Strimzi User Operator pod and the `KafkaUser` CRD
+definition itself come from the sibling `strimzi-user-operator` chart.
 
 ## When to use
 
-Use this chart immediately after deploying `strimzi-user-operator`
-against an MSK cluster. Together, they realise a GitOps flow for Kafka
-ACL: declare a `KafkaUser` here, ArgoCD syncs the CRD, the operator
-reconciles ACL on MSK via the Kafka Admin API.
+Use this chart immediately after deploying `strimzi-user-operator`.
+Together, they realise a GitOps flow for Kafka ACL: declare a
+`KafkaUser` here, ArgoCD (or any Helm-managed pipeline) syncs the CRD,
+the operator reconciles ACL on Kafka via the Admin API.
 
-## Bundled principals
-
-| Principal | Purpose | Toggle |
-|---|---|---|
-| `msk-acl-admin` | Self-grant for the operator's own admin user (`Alter`, `AlterConfigs`, `Describe`, `DescribeConfigs` on Cluster) — keeps the principal usable after a later flip of `allow.everyone.if.no.acl.found` to `false`. | `mskAclAdmin.enabled` |
-| `samsara-producer` | External Samsara Kafka Connector — `Write,Describe` on `<topicPrefix>` (default `samsara.`), `IdempotentWrite` on Cluster, explicit `Deny All` on every `deniedTopicPrefixes[]` entry. | `samsaraProducer.enabled` |
-
-Both principals declare `authorization.type: simple` ONLY — no
-`authentication:` block. SCRAM credentials themselves live in AWS
-Secrets Manager (created out-of-band, e.g. by Terraform).
+All bundled `KafkaUser` declarations use `authorization.type: simple`
+ONLY — no `authentication:` block. Credential lifecycle stays with
+whoever created the SCRAM/mTLS principal upstream (e.g. Terraform).
 
 ## Values
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `clusterLabel` | string | `""` | Value of the required `strimzi.io/cluster` label on each KafkaUser — pick a stable string per environment (e.g. `msk-dev`). The Strimzi standalone UO does not require a matching `Kafka` CR; the label just namespaces KafkaUsers by target cluster. |
+| `clusterLabel` | string | `""` | Value of the required `strimzi.io/cluster` label on each KafkaUser. Standalone UO does not require a matching `Kafka` CR; the label namespaces KafkaUsers by target cluster. Pick a stable string per environment (e.g. `msk-dev`). |
 | `namespace` | string | `kafka-acl` | Namespace for the KafkaUser instances — must match where the operator watches. |
-| `mskAclAdmin.enabled` | bool | `true` | Whether to render the operator's self-grant CRD. |
-| `samsaraProducer.enabled` | bool | `true` | Whether to render the samsara-producer ACL CRD. |
-| `samsaraProducer.topicPrefix` | string | `samsara.` | Topic prefix the principal may produce to (Strimzi uses `patternType: prefix`). Trailing dot prevents `samsara.*` from matching lookalike topics like `samsararogue`. |
-| `samsaraProducer.deniedTopicPrefixes` | list | `["fleet."]` | Topic prefixes the principal is explicitly denied — defense in depth. |
+| `users` | list | `[]` | List of principals whose ACL this chart manages. See schema below. Empty by default. |
 
-## Adding a new vendor principal
+### `users[]` entry schema
 
-Drop a new template file in `templates/<vendor>.yaml`:
-
-```yaml
-{{- if .Values.<vendor>.enabled -}}
-apiVersion: kafka.strimzi.io/v1beta2
-kind: KafkaUser
-metadata:
-  name: <vendor>-producer
-  namespace: {{ .Values.namespace }}
-  labels:
-    strimzi.io/cluster: {{ .Values.clusterLabel }}
-spec:
-  authorization:
-    type: simple
-    acls:
-      - resource:
-          type: topic
-          name: {{ .Values.<vendor>.topicPrefix | quote }}
-          patternType: prefix
-        operations: [Write, Describe]
-        type: allow
-      - resource: { type: cluster }
-        operations: [IdempotentWrite]
-        type: allow
-      {{- range .Values.<vendor>.deniedTopicPrefixes }}
-      - resource:
-          type: topic
-          name: {{ . | quote }}
-          patternType: prefix
-        operations: [All]
-        type: deny
-      {{- end }}
-{{- end -}}
-```
-
-Extend `values.yaml` with `<vendor>.enabled` + topic config. Bump the
-chart version (semver patch for additive change). Open a PR — the
-release workflow auto-publishes after merge.
+| Key | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Kafka principal name — becomes the `KafkaUser` `metadata.name` and the SCRAM username the ACL applies to. |
+| `acls` | list | yes | List of Strimzi ACL rules — passed verbatim into `spec.authorization.acls`. See the upstream [AclRule reference](https://strimzi.io/docs/operators/latest/configuring.html#type-AclRule-reference). |
+| `labels` | map | no | Extra labels merged into the rendered `KafkaUser` metadata. |
+| `annotations` | map | no | Extra annotations on the rendered `KafkaUser` metadata. |
 
 ## Example consumer (ArgoCD Application)
 
@@ -94,9 +53,50 @@ spec:
       releaseName: kafka-users
       valuesObject:
         clusterLabel: msk-dev
-        samsaraProducer:
-          topicPrefix: "samsara."
-          deniedTopicPrefixes: ["fleet."]
+        namespace: kafka-acl
+        users:
+          # Self-grant for the operator's own admin principal — must exist
+          # before the consumer flips `allow.everyone.if.no.acl.found = false`
+          # on the cluster, otherwise the operator locks itself out.
+          - name: kafka-acl-admin
+            acls:
+              - resource: { type: cluster }
+                operations: [Alter, AlterConfigs, Describe, DescribeConfigs]
+                type: allow
+
+          # Example producer principal — Write/Describe on a topic prefix,
+          # IdempotentWrite at the cluster level (required for
+          # enable.idempotence = true), and an explicit Deny on a foreign
+          # topic prefix for defense in depth.
+          - name: my-producer
+            acls:
+              - resource:
+                  type: topic
+                  name: "my-prefix."
+                  patternType: prefix
+                operations: [Write, Describe]
+                type: allow
+              - resource: { type: cluster }
+                operations: [IdempotentWrite]
+                type: allow
+              - resource:
+                  type: topic
+                  name: "other-prefix."
+                  patternType: prefix
+                operations: [All]
+                type: deny
   destination:
     namespace: kafka-acl
 ```
+
+## Bootstrap chicken-and-egg
+
+The operator's admin principal needs ACL on the cluster before it can
+write any ACL — but only itself can write that ACL. If you operate
+against AWS MSK (or any cluster where you cannot set `super.users`),
+rely on Kafka's default `allow.everyone.if.no.acl.found = true`: while
+that flag is on, any authenticated principal can write ACL. The first
+`users[]` entry should be the operator's own self-grant
+(`Alter Cluster` etc.), applied during this window. After you flip
+`allow.everyone.if.no.acl.found = false` on the cluster, the operator
+keeps working via the explicit ACL it wrote for itself.

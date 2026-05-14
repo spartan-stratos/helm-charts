@@ -6,8 +6,9 @@ All notable changes to this chart are documented in this file.
 
 ### Features
 
-* Initial release — companion chart to `strimzi-user-operator`
-* Bundled `KafkaUser` CRD templates:
-  * `msk-acl-admin` — self-grant `Alter/AlterConfigs/Describe/DescribeConfigs` on Cluster (toggle via `mskAclAdmin.enabled`)
-  * `samsara-producer` — Write/Describe on `samsara.` prefix, IdempotentWrite on Cluster, explicit Deny on `fleet.` prefix (toggle via `samsaraProducer.enabled`)
-* `authorization.type: simple` only — no credential management (credentials live in AWS Secrets Manager, managed by Terraform)
+* Initial release — companion chart to `strimzi-user-operator`.
+* `users[]` list in values drives KafkaUser CRD generation. Each entry
+  renders one `KafkaUser` with `authorization.type: simple` only — no
+  `authentication:` block, so credential lifecycle stays with whoever
+  created the SCRAM/mTLS principal upstream.
+* Per-entry: `name`, `acls`, optional `labels` and `annotations`.

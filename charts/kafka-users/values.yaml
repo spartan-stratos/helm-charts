@@ -1,21 +1,42 @@
-# kafka-users defaults. Override per env.
+# kafka-users defaults.
 
-# Used as KafkaUser `strimzi.io/cluster` label. Strimzi standalone UO doesn't
-# require a matching Kafka CR but the label is mandatory on every CRD.
-# Set per env.
+# Value of the required `strimzi.io/cluster` label on each KafkaUser. The
+# Strimzi standalone User Operator does not need a matching `Kafka` CR; the
+# label just namespaces KafkaUsers by target cluster. Set per-environment
+# in the consumer's values (e.g. `msk-dev`, `msk-prod`).
 clusterLabel: ""
 
+# Namespace the KafkaUser instances live in. Must match the operator's
+# watched namespace (the strimzi-user-operator chart defaults to kafka-acl).
 namespace: kafka-acl
 
-# msk-acl-admin's self-grant: keep this principal in Alter Cluster perms so
-# it survives the eventual `allow.everyone.if.no.acl.found = false` flip.
-mskAclAdmin:
-  enabled: true
-
-# samsara-producer: external Kafka Connector. Write/Describe on samsara.*
-# topics, denied on fleet.*.
-samsaraProducer:
-  enabled: true
-  topicPrefix: "samsara."
-  deniedTopicPrefixes:
-    - "fleet."
+# List of principals whose ACL this chart manages. Each entry renders one
+# KafkaUser CRD with `authorization.type: simple` only — no
+# `authentication:` block, so credential lifecycle stays with whoever
+# created the SCRAM/mTLS principal upstream.
+#
+# Schema per entry:
+#   - name:        (required) Kafka principal name. Becomes the KafkaUser
+#                  metadata.name and the SCRAM username it grants ACL to.
+#   - acls:        (required) List of Strimzi ACL rules — passed through
+#                  to spec.authorization.acls verbatim.
+#                  See https://strimzi.io/docs/operators/latest/configuring.html#type-AclRule-reference
+#   - labels:      (optional) Extra metadata.labels on the KafkaUser CRD.
+#   - annotations: (optional) Extra metadata.annotations on the KafkaUser CRD.
+#
+# Empty by default — consumers populate via valuesObject (ArgoCD) or
+# values override (helm install). Example:
+#
+#   users:
+#     - name: my-producer
+#       acls:
+#         - resource:
+#             type: topic
+#             name: "my-topic-prefix."
+#             patternType: prefix
+#           operations: [Write, Describe]
+#           type: allow
+#         - resource: { type: cluster }
+#           operations: [IdempotentWrite]
+#           type: allow
+users: []
