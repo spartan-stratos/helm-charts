@@ -1,0 +1,42 @@
+# Strimzi User Operator needs to:
+# - Read/write KafkaUser CRD instances (its own resource)
+# - Read/write Secrets in its watched namespace (would generate credentials
+#   IF we used authentication mode — we don't, so this is unused but
+#   required by the operator startup checks)
+# - Read events (for status reporting on KafkaUser CRDs)
+#
+# Cluster-scoped because the standalone operator's leader election + CRD
+# discovery cross namespace boundaries.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: strimzi-user-operator
+  labels:
+    app.kubernetes.io/name: strimzi-user-operator
+rules:
+  - apiGroups: ["kafka.strimzi.io"]
+    resources:
+      - kafkausers
+      - kafkausers/status
+    verbs: [get, list, watch, create, patch, update, delete]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list, watch, create, patch, update, delete]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [create, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: strimzi-user-operator
+  labels:
+    app.kubernetes.io/name: strimzi-user-operator
+subjects:
+  - kind: ServiceAccount
+    name: strimzi-user-operator
+    namespace: {{ .Values.namespace.name }}
+roleRef:
+  kind: ClusterRole
+  name: strimzi-user-operator
+  apiGroup: rbac.authorization.k8s.io

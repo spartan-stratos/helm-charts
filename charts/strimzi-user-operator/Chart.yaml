@@ -1,0 +1,12 @@
+apiVersion: v2
+name: strimzi-user-operator
+description: |
+  Strimzi User Operator (standalone mode) pointed at AWS MSK.
+
+  Manages Kafka ACL declaratively via KafkaUser CRDs. The operator
+  authenticates to MSK over SASL/SCRAM using msk-acl-admin (created in
+  infra-terraform). KafkaUser CRD instances live in the sibling
+  `kafka-users` chart.
+type: application
+version: 0.1.0
+appVersion: "0.45.1"

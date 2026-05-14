@@ -1,0 +1,13 @@
+apiVersion: v2
+name: kafka-users
+description: |
+  KafkaUser CRD instances reconciled by the Strimzi User Operator
+  (deployed by the sibling `strimzi-user-operator` chart).
+
+  One CRD per principal whose ACL we manage on AWS MSK. Credentials
+  themselves live in AWS Secrets Manager (managed by infra-terraform);
+  these CRDs use `authorization.type: simple` ONLY — no
+  `authentication:` block.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
