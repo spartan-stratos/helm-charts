@@ -2,6 +2,18 @@
 
 All notable changes to this chart are documented in this file.
 
+## [0.3.2](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.2) (2026-05-14)
+
+### Bug fixes
+
+* Populate the placeholder CA Secrets with a generated self-signed cert
+  (`genCA`) instead of leaving them empty. Strimzi 0.45.x's startup
+  actually parses these Secrets — `PemTrustSet.extractCerts()` throws
+  `RuntimeException: The Secret ... does not contain any fields with the
+  suffix .crt` if the Secret data is empty. The throwaway CA is never
+  trusted by anything (operator talks to MSK over public-CA TLS via
+  `STRIMZI_PUBLIC_CA=true`); it exists solely to satisfy the parser.
+
 ## [0.3.1](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.1) (2026-05-14)
 
 ### Features
