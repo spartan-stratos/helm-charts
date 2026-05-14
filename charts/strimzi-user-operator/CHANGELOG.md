@@ -2,6 +2,24 @@
 
 All notable changes to this chart are documented in this file.
 
+## [0.3.3](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.3) (2026-05-14)
+
+### Bug fixes
+
+* Populate `placeholder-ca-cert` with the Amazon Trust Services Root CA
+  bundle instead of a random `genCA` self-signed cert. Despite
+  `STRIMZI_PUBLIC_CA=true`, Strimzi 0.45.x still loads the
+  Cluster-CA-secret bytes into the Kafka AdminClient
+  `ssl.truststore.certificates`. A random CA there caused
+  `SSLHandshakeException: PKIX path building failed` against MSK
+  brokers (which serve certs signed by Amazon Trust roots). Bundling
+  the public Amazon Trust roots in `files/amazon-trust-roots.pem`
+  produces a truststore the operator can use to complete the TLS
+  handshake to MSK.
+
+  `placeholder-ca-key` still ships a throwaway `genCA` key — the
+  field is parsed but unused in authorization-only mode.
+
 ## [0.3.2](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.2) (2026-05-14)
 
 ### Bug fixes
