@@ -1,12 +1,17 @@
 apiVersion: v2
 name: strimzi-user-operator
 description: |
-  Strimzi User Operator (standalone mode) pointed at AWS MSK.
+  Strimzi User Operator (standalone mode) pointed at an external Kafka
+  cluster (e.g. AWS MSK).
 
-  Manages Kafka ACL declaratively via KafkaUser CRDs. The operator
-  authenticates to MSK over SASL/SCRAM using msk-acl-admin (created in
-  infra-terraform). KafkaUser CRD instances live in the sibling
-  `kafka-users` chart.
+  Deploys only namespace-scoped resources — Namespace, KafkaUser CRD
+  definition, and cluster-scoped RBAC are the consumer's responsibility
+  to bootstrap (typically via Terraform). This keeps the chart deployable
+  from an ArgoCD AppProject without cluster-scoped resource whitelist
+  entries.
+
+  Manages Kafka ACL declaratively via KafkaUser CRDs. KafkaUser CRD
+  instances live in the sibling `kafka-users` chart.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "0.45.1"
