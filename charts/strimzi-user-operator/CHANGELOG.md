@@ -2,6 +2,16 @@
 
 All notable changes to this chart are documented in this file.
 
+## [0.3.1](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.1) (2026-05-14)
+
+### Features
+
+* `nodeSelector`, `tolerations`, `affinity` values added to the Deployment.
+  Required for clusters whose nodes carry taints (e.g. EKS Fargate adds
+  `eks.amazonaws.com/compute-type=fargate:NoSchedule` to every node — pods
+  without a matching toleration stay `Pending` with `FailedScheduling`).
+  Defaults are empty so the chart still works on untainted clusters.
+
 ## [0.3.0](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.0) (2026-05-14)
 
 ### Features

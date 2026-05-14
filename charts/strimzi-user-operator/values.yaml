@@ -63,6 +63,14 @@ resources:
     cpu: 500m
     memory: 512Mi
 
+# Pod scheduling hints — empty defaults so the chart works on any cluster.
+# Set per-consumer if the target cluster has tainted nodes (e.g. EKS Fargate
+# adds `eks.amazonaws.com/compute-type=fargate:NoSchedule` to its nodes;
+# consumer must supply a matching toleration).
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
 # Reconcile cadence (ms). Strimzi default is 120000 (2 min). Keep default —
 # our ACL change frequency is low.
 fullReconciliationIntervalMs: 120000
