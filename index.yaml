@@ -22,6 +22,21 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/datadog-0.1.0/datadog-0.1.0.tgz
     version: 0.1.0
+  kafka-users:
+  - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2026-05-14T08:00:05.258491523Z"
+    description: 'KafkaUser CRD instances reconciled by the Strimzi User Operator
+      (deployed by the sibling `strimzi-user-operator` chart).  One CRD per principal
+      whose ACL we manage on AWS MSK. Credentials themselves live in AWS Secrets Manager
+      (managed by infra-terraform); these CRDs use `authorization.type: simple` ONLY
+      — no `authentication:` block. '
+    digest: f4b5de2a5ced9bdde3dbf692385a82ae61829615f43103abf2bb9a8521a32cec
+    name: kafka-users
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/kafka-users-0.1.0/kafka-users-0.1.0.tgz
+    version: 0.1.0
   spartan:
   - apiVersion: v2
     appVersion: 0.2.0
@@ -273,4 +288,18 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/spartan-0.1.0/spartan-0.1.0.tgz
     version: 0.1.0
-generated: "2026-05-06T14:18:03.37406633Z"
+  strimzi-user-operator:
+  - apiVersion: v2
+    appVersion: 0.45.1
+    created: "2026-05-14T08:00:05.494885524Z"
+    description: 'Strimzi User Operator (standalone mode) pointed at AWS MSK.  Manages
+      Kafka ACL declaratively via KafkaUser CRDs. The operator authenticates to MSK
+      over SASL/SCRAM using msk-acl-admin (created in infra-terraform). KafkaUser
+      CRD instances live in the sibling `kafka-users` chart. '
+    digest: 2a9ed4951ad065e7e0d11282ec7ff7e0de9455332c8295534c94e10ab82b9bfc
+    name: strimzi-user-operator
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-05-14T08:00:05.49496337Z"
