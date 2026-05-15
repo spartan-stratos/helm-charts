@@ -1,0 +1,83 @@
+# Confluent Schema Registry — defaults. Override per env.
+# See values-dev.yaml / values-prod.yaml in the consumer ArgoCD repo
+# for env-specific bindings (MSK bootstrap, replication factor, etc.).
+
+env: ""
+
+namespace:
+  name: schema-registry
+
+image:
+  repository: confluentinc/cp-schema-registry
+  tag: "7.6.1"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# MSK SASL/SCRAM bootstrap endpoint — output from infra-terraform/live
+# (module.msk.bootstrap_brokers_sasl_scram). Per env.
+mskBootstrapServersSaslScram: ""
+
+# K8s Secret carrying the `schema-registry` SCRAM credential, created by
+# infra-terraform live/schema-registry-bootstrap.tf. Must hold a key
+# `jaas` whose value is a single-line JAAS string for SASL/SCRAM.
+scramSecret:
+  name: schema-registry-creds
+  jaasKey: jaas
+
+# `_schemas` topic settings — must match what was provisioned in MSK.
+# Replication factor of 3 in prod, 1 in dev to stay under broker count.
+# The topic is `_schemas` (literal); SR refuses to start if any other
+# value is given here.
+kafkaStore:
+  topic: _schemas
+  replicationFactor: 1
+
+# Leader election among replicas. Only one SR pod writes to `_schemas`
+# at a time; followers serve reads.
+leaderEligibility: true
+
+# Container port for the REST listener. Helm Service forwards 8081 → here.
+listenerPort: 8081
+
+service:
+  type: ClusterIP
+  port: 8081
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Pod scheduling — empty defaults so the chart works on any cluster.
+# Consumers on EKS Fargate must supply the
+# `eks.amazonaws.com/compute-type=fargate:NoSchedule` toleration; the
+# matching Fargate Profile selector on the SR namespace is the
+# consumer's Terraform responsibility.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Probes — SR's REST endpoint `/subjects` returns 200 once Kafka store
+# warmup is done. Generous initial delay covers the initial topic
+# rebuild during pod startup.
+livenessProbe:
+  httpGet:
+    path: /subjects
+    port: 8081
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 5
+
+readinessProbe:
+  httpGet:
+    path: /subjects
+    port: 8081
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
