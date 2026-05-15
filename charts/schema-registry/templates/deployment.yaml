@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schema-registry
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/name: schema-registry
+    app.kubernetes.io/part-of: schema-registry
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: schema-registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: schema-registry
+        tags.datadoghq.com/env: {{ .Values.env }}
+        tags.datadoghq.com/service: schema-registry
+    spec:
+      containers:
+        - name: schema-registry
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.listenerPort }}
+              protocol: TCP
+          env:
+            - name: SCHEMA_REGISTRY_HOST_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SCHEMA_REGISTRY_LISTENERS
+              value: "http://0.0.0.0:{{ .Values.listenerPort }}"
+            # Confluent SR expects each broker carry its own protocol
+            # prefix: SASL_SSL://b-1...,SASL_SSL://b-2...,SASL_SSL://b-3...
+            # The chart input is the bare comma-separated MSK output, so
+            # rewrite the separators here.
+            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+              value: "SASL_SSL://{{ replace "," ",SASL_SSL://" .Values.mskBootstrapServersSaslScram }}"
+            - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC
+              value: {{ .Values.kafkaStore.topic | quote }}
+            - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR
+              value: "{{ .Values.kafkaStore.replicationFactor }}"
+            - name: SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL
+              value: SASL_SSL
+            - name: SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM
+              value: SCRAM-SHA-512
+            - name: SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.scramSecret.name }}
+                  key: {{ .Values.scramSecret.jaasKey }}
+            - name: SCHEMA_REGISTRY_LEADER_ELIGIBILITY
+              value: "{{ .Values.leaderEligibility }}"
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: schema-registry
+description: |
+  Confluent Schema Registry pointed at an external Kafka cluster
+  (e.g. AWS MSK over SASL/SCRAM). Stateless Deployment + ClusterIP
+  Service; all durable state lives in the Kafka `_schemas` topic.
+
+  The chart only ships namespace-scoped resources (Deployment, Service).
+  Namespace, SCRAM credentials Secret, and the `_schemas` topic itself
+  are the consumer's responsibility to bootstrap — typically via
+  Terraform alongside the MSK cluster.
+type: application
+version: 0.1.0
+appVersion: "7.6.1"
