@@ -2,6 +2,20 @@
 
 All notable changes to this chart are documented in this file.
 
+## [0.4.0](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.4.0) (2026-05-15)
+
+### Features
+
+* Optional `brokersConfigMap` value sources the MSK bootstrap broker
+  endpoint from a consumer-provided K8s `ConfigMap` (via
+  `valueFrom.configMapKeyRef`) instead of the Helm value
+  `mskBootstrapServersSaslScram`. Enabling lets Terraform own the
+  broker DNS and roll the operator pod on MSK broker changes without
+  edits to ArgoCD values.
+
+  Backwards-compatible: `brokersConfigMap.enabled` defaults to `false`,
+  so existing consumers continue to use `mskBootstrapServersSaslScram`.
+
 ## [0.3.4](https://github.com/spartan-stratos/helm-charts/releases/tag/strimzi-user-operator-0.3.4) (2026-05-14)
 
 ### Bug fixes
