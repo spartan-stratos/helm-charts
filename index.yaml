@@ -40,6 +40,21 @@ entries:
   schema-registry:
   - apiVersion: v2
     appVersion: 7.6.1
+    created: "2026-05-15T09:59:47.677040481Z"
+    description: 'Confluent Schema Registry pointed at an external Kafka cluster (e.g.
+      AWS MSK over SASL/SCRAM). Stateless Deployment + ClusterIP Service; all durable
+      state lives in the Kafka `_schemas` topic.  The chart only ships namespace-scoped
+      resources (Deployment, Service). Namespace, SCRAM credentials Secret, and the
+      `_schemas` topic itself are the consumer''s responsibility to bootstrap — typically
+      via Terraform alongside the MSK cluster. '
+    digest: c493e420c30016022d0667e5a851c28f04a486da0db65b37052307f28f21d582
+    name: schema-registry
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/schema-registry-0.2.1/schema-registry-0.2.1.tgz
+    version: 0.2.1
+  - apiVersion: v2
+    appVersion: 7.6.1
     created: "2026-05-15T09:32:39.102891365Z"
     description: 'Confluent Schema Registry pointed at an external Kafka cluster (e.g.
       AWS MSK over SASL/SCRAM). Stateless Deployment + ClusterIP Service; all durable
@@ -445,4 +460,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-05-15T09:32:39.263738086Z"
+generated: "2026-05-15T09:59:47.677144415Z"
