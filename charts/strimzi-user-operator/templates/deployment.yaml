@@ -35,7 +35,14 @@ spec:
 
             # ── Connect to MSK ───────────────────────────────────────────
             - name: STRIMZI_KAFKA_BOOTSTRAP_SERVERS
+              {{- if .Values.brokersConfigMap.enabled }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.brokersConfigMap.name }}
+                  key: {{ .Values.brokersConfigMap.key }}
+              {{- else }}
               value: {{ .Values.mskBootstrapServersSaslScram | quote }}
+              {{- end }}
             # SASL/SCRAM config block read from the ExternalSecret-synced
             # K8s Secret. Strimzi accepts free-form admin client properties.
             - name: STRIMZI_KAFKA_ADMIN_CLIENT_CONFIGURATION

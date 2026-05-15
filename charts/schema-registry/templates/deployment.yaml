@@ -33,12 +33,11 @@ spec:
                   fieldPath: status.podIP
             - name: SCHEMA_REGISTRY_LISTENERS
               value: "http://0.0.0.0:{{ .Values.listenerPort }}"
-            # Confluent SR expects each broker carry its own protocol
-            # prefix: SASL_SSL://b-1...,SASL_SSL://b-2...,SASL_SSL://b-3...
-            # The chart input is the bare comma-separated MSK output, so
-            # rewrite the separators here.
             - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
-              value: "SASL_SSL://{{ replace "," ",SASL_SSL://" .Values.mskBootstrapServersSaslScram }}"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.brokersConfigMap.name }}
+                  key: {{ .Values.brokersConfigMap.key }}
             - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC
               value: {{ .Values.kafkaStore.topic | quote }}
             - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR

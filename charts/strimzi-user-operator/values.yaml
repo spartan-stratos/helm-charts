@@ -20,10 +20,24 @@ image:
   tag: "0.45.1"
   pullPolicy: IfNotPresent
 
-# MSK SASL/SCRAM bootstrap endpoint — output from infra-terraform/live.
-# Set per env file. Example shape:
-#   "b-1.<cluster>.kafka.us-west-2.amazonaws.com:9096,b-2.<cluster>...,b-3..."
+# MSK SASL/SCRAM bootstrap endpoint — legacy hardcoded value. Used only
+# when `brokersConfigMap.enabled` is false. Deprecated; prefer the
+# ConfigMap-sourced path below.
 mskBootstrapServersSaslScram: ""
+
+# Source the broker endpoint from a consumer-provided K8s ConfigMap
+# instead of the Helm value above. The ConfigMap key holds the bare
+# comma-separated broker list (no protocol prefix — Strimzi UO accepts
+# the bare form). Sourcing from K8s lets Terraform own the broker DNS
+# and roll the operator pod on MSK broker changes without edits to
+# ArgoCD values.
+#
+# Defaults disabled so existing consumers that pass
+# `mskBootstrapServersSaslScram` continue to work.
+brokersConfigMap:
+  enabled: false
+  name: msk-cluster-info
+  key: STRIMZI_KAFKA_BOOTSTRAP_SERVERS
 
 # AWS Secrets Manager secret name for the msk-acl-admin SCRAM credential.
 # Created by infra-terraform `module.msk_acl_admin`. ExternalSecrets syncs
