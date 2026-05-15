@@ -18,6 +18,12 @@ spec:
         tags.datadoghq.com/env: {{ .Values.env }}
         tags.datadoghq.com/service: schema-registry
     spec:
+      # K8s auto-injects env vars for every Service in the namespace,
+      # naming them <UPPERCASED_SERVICE>_PORT etc. Our `schema-registry`
+      # Service collides with the env var name `SCHEMA_REGISTRY_PORT`
+      # that Confluent's docker `configure` script treats as the legacy
+      # listener-port setting and exits 1 if set. Disable the auto-inject.
+      enableServiceLinks: false
       containers:
         - name: schema-registry
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+Set `pod.spec.enableServiceLinks: false`. K8s otherwise auto-injects an
+env var `SCHEMA_REGISTRY_PORT` derived from the chart's own Service.
+Confluent's `/etc/confluent/docker/configure` interprets that name as
+the legacy listener-port setting and exits 1 on startup.
+
 ## 0.2.0
 
 Broker DNS now sourced from a consumer-provided K8s `ConfigMap` instead
