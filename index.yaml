@@ -37,6 +37,22 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/kafka-users-0.1.0/kafka-users-0.1.0.tgz
     version: 0.1.0
+  schema-registry:
+  - apiVersion: v2
+    appVersion: 7.6.1
+    created: "2026-05-15T09:14:19.434848007Z"
+    description: 'Confluent Schema Registry pointed at an external Kafka cluster (e.g.
+      AWS MSK over SASL/SCRAM). Stateless Deployment + ClusterIP Service; all durable
+      state lives in the Kafka `_schemas` topic.  The chart only ships namespace-scoped
+      resources (Deployment, Service). Namespace, SCRAM credentials Secret, and the
+      `_schemas` topic itself are the consumer''s responsibility to bootstrap — typically
+      via Terraform alongside the MSK cluster. '
+    digest: da3b2bc194e5e6a0014540e2f83e64da44f17818eb4912f35c5baa91cb1be6cc
+    name: schema-registry
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/schema-registry-0.1.0/schema-registry-0.1.0.tgz
+    version: 0.1.0
   spartan:
   - apiVersion: v2
     appVersion: 0.2.0
@@ -398,4 +414,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-05-14T14:34:04.227055231Z"
+generated: "2026-05-15T09:14:19.434947895Z"
