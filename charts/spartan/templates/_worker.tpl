@@ -14,17 +14,18 @@ spec:
       tier: "worker"
   template:
     metadata:
-      {{- if .worker.podAnnotations }}
-      {{- with .worker.podAnnotations }}
       annotations:
-          {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- else }}
-      {{- with .Values.podAnnotations }}
-      annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") $ | sha256sum }}
+        {{- if .worker.podAnnotations }}
+        {{- with .worker.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- end }}
+        {{- end }}
+        {{- else }}
+        {{- with $.Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
       labels:
         {{- include "spartan.workerLabels" $ | nindent 8 }}
         tier: "worker"

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.4.0) (2026-05-19)
+
+### Features
+
+* Add `checksum/configmap` and `checksum/secret` pod-template annotations to worker Deployments
+  * `deployment.yaml` already emitted these in 0.3.0 for the main Deployment; this extends parity to the worker templates in `_worker.tpl`
+  * Workers now roll automatically when the chart-rendered ConfigMap or Secret content changes (env-var rotation, broker DNS change after MSK cluster recreate, SCRAM credential rotation, etc.)
+  * Eliminates the manual `kubectl rollout restart` step that was previously required after Helm value changes that flow into the chart's own ConfigMap/Secret
+
 ## [0.2.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.2.0) (2026-05-06)
 
 ### Features
