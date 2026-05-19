@@ -85,6 +85,16 @@ entries:
     version: 0.1.0
   spartan:
   - apiVersion: v2
+    appVersion: 0.3.0
+    created: "2026-05-19T00:42:55.425802284Z"
+    description: A Helm chart for Kubernetes
+    digest: 5a6d9d1a300893de5734b456b90d675296e0abda4cd84d9c4f04e5790d6ab208
+    name: spartan
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/spartan-0.3.0/spartan-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v2
     appVersion: 0.2.0
     created: "2026-05-06T14:18:03.373828094Z"
     description: A Helm chart for Kubernetes
@@ -460,4 +470,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-05-15T09:59:47.677144415Z"
+generated: "2026-05-19T00:42:55.426020682Z"
