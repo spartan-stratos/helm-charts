@@ -457,6 +457,10 @@ sidecars: []
 #        value: sidecar
 #  - name: log-collector
 #    image: fluent/fluent-bit:3.1.9
+#    # skipDeployment attaches this sidecar to hook Jobs only, never the Deployment.
+#    # Use for a hook-scoped log collector so the long-running pod keeps its own
+#    # sidecar set (e.g. the Datadog Agent for APM) unchanged. Default false.
+#    skipDeployment: true
 #    sharedVolume:
 #      mountPath: /var/log/application/
 #    resources:

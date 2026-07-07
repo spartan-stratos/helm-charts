@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
   * `logCollector.sidecarName` (default `datadog-agent`), `logCollector.readyCommand` (default the Datadog APM `:8126` wait), `logCollector.stopCommand` (default `sleep 10 && pkill agent`)
   * Lets a lightweight sidecar (e.g. Fluent Bit) collect the migration log instead of the full Datadog Agent image - smaller pull, faster hook start on nodes without an image cache (notably EKS Fargate)
   * Fully backward compatible: with no `logCollector` set the rendered hook Job is byte-identical to 0.4.0 (Datadog Agent readiness wait + `DD_*` env + `pkill agent` shutdown unchanged)
+* Add `sidecars[].skipDeployment` (default false) to attach a sidecar to hook Jobs only, never the Deployment
+  * Lets a hook-scoped log collector run on the migration Job while the long-running pod keeps its own sidecar set (e.g. the Datadog Agent for APM) unchanged
+  * Default false renders the Deployment byte-identically to 0.4.0
 
 ## [0.4.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.4.0) (2026-05-19)
 
