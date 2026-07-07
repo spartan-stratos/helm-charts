@@ -172,3 +172,29 @@ tests:
       - equal:
           path: spec.template.spec.containers[1].name
           value: log-collector
+
+  - it: "fails fast when a non-datadog collector omits readyCommand"
+    set:
+      datadog:
+        enabled: false
+      sidecars:
+        - name: log-collector
+          image: fluent/fluent-bit:3.1.9
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          logCollector:
+            sidecarName: log-collector
+    asserts:
+      - failedTemplate:
+          errorPattern: "logCollector.readyCommand"

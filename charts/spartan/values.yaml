@@ -395,6 +395,10 @@ hooks:
 #    # Optional: swap the log-collector sidecar used when collectLog is true.
 #    # Defaults reproduce the Datadog Agent behavior; override for a lightweight
 #    # collector (e.g. Fluent Bit) to avoid pulling the ~1GB agent image on the hook.
+#    # When sidecarName is NOT "datadog-agent", BOTH readyCommand and stopCommand are
+#    # required (template fails otherwise) - the datadog-agent defaults (:8126 wait,
+#    # pkill agent) would otherwise hang against a different collector. readyCommand /
+#    # stopCommand are shell snippets run verbatim; do not embed single quotes.
 #    logCollector:
 #      sidecarName: log-collector          # must match a sidecars[].name; default "datadog-agent"
 #      readyCommand: "while ! curl -Ns localhost:2020/api/v1/health; do sleep 1; done"

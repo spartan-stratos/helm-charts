@@ -1,6 +1,10 @@
 {{ define "spartan.hook" }}
 {{- $lc := .hook.logCollector | default dict }}
 {{- $lcName := $lc.sidecarName | default "datadog-agent" }}
+{{- if and $lc.sidecarName (ne $lcName "datadog-agent") }}
+{{- if not $lc.readyCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.readyCommand; a non-datadog-agent collector would hang on the default :8126 wait" .hook.name $lcName) }}{{- end }}
+{{- if not $lc.stopCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.stopCommand; the default 'pkill agent' would never stop the collector and the Job would hang" .hook.name $lcName) }}{{- end }}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
