@@ -117,3 +117,58 @@ tests:
       - equal:
           path: spec.template.metadata.labels.environment
           value: production
+
+  - it: "uses a custom logCollector sidecar instead of the datadog agent"
+    set:
+      datadog:
+        enabled: false
+      sidecars:
+        - name: log-collector
+          image: fluent/fluent-bit:3.1.9
+          sharedVolume:
+            mountPath: /var/log/application/
+      hooks:
+        - name: migration
+          hookTypes: pre-install,pre-upgrade
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          logCollector:
+            sidecarName: log-collector
+            readyCommand: "test -f /var/log/application/app.log"
+            stopCommand: "pkill fluent-bit"
+    asserts:
+      - isKind:
+          of: Job
+      # process namespace still shared so the trap can stop the collector
+      - equal:
+          path: spec.template.spec.shareProcessNamespace
+          value: true
+      # new collector's shutdown + readiness wiring is rendered
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "pkill fluent-bit"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "test -f /var/log/application/app.log"
+      # legacy datadog-agent wiring is gone
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "pkill agent"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "localhost:8126"
+      # no datadog env injected for a non-agent collector (no extraEnvs set → env is empty)
+      - isNullOrEmpty:
+          path: spec.template.spec.containers[0].env
+      # the configured sidecar is attached to the hook pod
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: log-collector

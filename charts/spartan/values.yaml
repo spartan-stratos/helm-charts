@@ -392,6 +392,13 @@ hooks:
 #    - name: SERVICE
 #      value: hook
 #    collectLog: false
+#    # Optional: swap the log-collector sidecar used when collectLog is true.
+#    # Defaults reproduce the Datadog Agent behavior; override for a lightweight
+#    # collector (e.g. Fluent Bit) to avoid pulling the ~1GB agent image on the hook.
+#    logCollector:
+#      sidecarName: log-collector          # must match a sidecars[].name; default "datadog-agent"
+#      readyCommand: "while ! curl -Ns localhost:2020/api/v1/health; do sleep 1; done"
+#      stopCommand: "sleep 5 && pkill fluent-bit"
 
 ## cronjobs specifies list of cronjobs
 cronjobs: []
@@ -444,6 +451,17 @@ sidecars: []
 #    extraEnvs:
 #      - name: SERVICE
 #        value: sidecar
+#  - name: log-collector
+#    image: fluent/fluent-bit:3.1.9
+#    sharedVolume:
+#      mountPath: /var/log/application/
+#    resources:
+#      requests:
+#        memory: 64Mi
+#        cpu: 50m
+#      limits:
+#        memory: 128Mi
+#        cpu: 200m
 #  - name: busybox
 #    image: busybox
 #    ports:

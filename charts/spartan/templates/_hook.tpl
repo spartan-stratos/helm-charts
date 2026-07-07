@@ -1,4 +1,6 @@
 {{ define "spartan.hook" }}
+{{- $lc := .hook.logCollector | default dict }}
+{{- $lcName := $lc.sidecarName | default "datadog-agent" }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -42,7 +44,7 @@ spec:
       securityContext:
           {{- toYaml .Values.podSecurityContext | nindent 8 }}
       restartPolicy: {{ .hook.restartPolicy | default "Never" }}
-      {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
+      {{- if and (.hook.collectLog) (or .Values.datadog.enabled .hook.logCollector) }}
       shareProcessNamespace: true
       {{- end }}
       containers:
@@ -59,10 +61,16 @@ spec:
             - {{ default "/bin/sh" .hook.shell }}
             - -c
             - |
-            {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
+            {{- if and (.hook.collectLog) (or .Values.datadog.enabled .hook.logCollector) }}
+            {{- if $lc.readyCommand }}
+              trap '{{ $lc.stopCommand | default "sleep 10 && pkill agent" }}' EXIT
+              set -o pipefail
+              {{ $lc.readyCommand }}
+            {{- else }}
               trap 'sleep 10 && pkill agent' EXIT
               set -o pipefail
               if [ ! `which curl` ]; then sleep 300; else while ! curl -Ns localhost:8126; do sleep 1 && echo "Waiting for datadog agent to start...."; done; fi
+            {{- end }}
             {{- end }}
             {{- range .hook.commands }}
               {{ . }}
@@ -87,7 +95,7 @@ spec:
                 name: {{ .Values.configMap.externalConfigMapEnv.name }}
               {{- end }}
           env:
-          {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
+          {{- if and (.hook.collectLog) (or .Values.datadog.enabled .hook.logCollector) (eq $lcName "datadog-agent") }}
             - name: DD_KUBERNETES_KUBELET_NODENAME
               valueFrom:
                 fieldRef:
@@ -140,7 +148,7 @@ spec:
           {{- end }}
         {{- $hook := .hook }}
         {{- range $sidecar := .Values.sidecars }}
-          {{- if and (eq $sidecar.name "datadog-agent") ($hook.collectLog) }}
+          {{- if and (eq $sidecar.name $lcName) ($hook.collectLog) }}
             {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
           {{- end }}
         {{- end }}
