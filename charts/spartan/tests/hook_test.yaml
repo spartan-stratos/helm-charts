@@ -253,3 +253,31 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "does not match any configured sidecar"
+
+  - it: "fails fast when logCollector omits sidecarName and no datadog-agent sidecar exists"
+    set:
+      datadog:
+        enabled: false
+      sidecars:
+        - name: metrics
+          image: some/metrics
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          # logCollector present (overriding only stopCommand) but no sidecarName ->
+          # resolves to the default "datadog-agent", which is not in sidecars -> fail
+          logCollector:
+            stopCommand: "sleep 5 && pkill agent"
+    asserts:
+      - failedTemplate:
+          errorPattern: "does not match any configured sidecar"

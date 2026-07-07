@@ -1,10 +1,10 @@
 {{ define "spartan.hook" }}
 {{- $lc := .hook.logCollector | default dict }}
 {{- $lcName := $lc.sidecarName | default "datadog-agent" }}
-{{- if and .hook.collectLog $lc.sidecarName }}
+{{- if and .hook.collectLog .hook.logCollector }}
 {{- $sidecarNames := list }}
 {{- range .Values.sidecars }}{{- $sidecarNames = append $sidecarNames .name }}{{- end }}
-{{- if not (has $lc.sidecarName $sidecarNames) }}{{ fail (printf "spartan: hook %q logCollector.sidecarName=%q does not match any configured sidecar (sidecars[].name: %v)" .hook.name $lcName $sidecarNames) }}{{- end }}
+{{- if not (has $lcName $sidecarNames) }}{{ fail (printf "spartan: hook %q log collector %q (logCollector.sidecarName, default \"datadog-agent\") does not match any configured sidecar (sidecars[].name: %v)" .hook.name $lcName $sidecarNames) }}{{- end }}
 {{- if ne $lcName "datadog-agent" }}
 {{- if not $lc.readyCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.readyCommand; a non-datadog-agent collector would hang on the default :8126 wait" .hook.name $lcName) }}{{- end }}
 {{- if not $lc.stopCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.stopCommand; the default 'pkill agent' would never stop the collector and the Job would hang" .hook.name $lcName) }}{{- end }}
