@@ -148,7 +148,7 @@ spec:
               mountPath: {{ .Values.configMap.externalConfigMapFile.mountPath | quote }}
             {{- end }}
             {{- range .Values.sidecars }}
-            {{- if .sharedVolume }}
+            {{- if and .sharedVolume (eq .name $lcName) }}
             - name: sidecar-volume
               readOnly: false
               mountPath: {{ .sharedVolume.mountPath }}
