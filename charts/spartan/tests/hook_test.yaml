@@ -198,3 +198,58 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "logCollector.readyCommand"
+
+  - it: "fails fast when a non-datadog collector omits stopCommand"
+    set:
+      datadog:
+        enabled: false
+      sidecars:
+        - name: log-collector
+          image: fluent/fluent-bit:3.1.9
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          logCollector:
+            sidecarName: log-collector
+            readyCommand: "test -f /x"
+    asserts:
+      - failedTemplate:
+          errorPattern: "logCollector.stopCommand"
+
+  - it: "fails fast when logCollector.sidecarName matches no configured sidecar"
+    set:
+      datadog:
+        enabled: false
+      sidecars:
+        - name: log-collector
+          image: fluent/fluent-bit:3.1.9
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          logCollector:
+            sidecarName: typo-collector
+            readyCommand: "test -f /x"
+            stopCommand: "pkill fluent-bit"
+    asserts:
+      - failedTemplate:
+          errorPattern: "does not match any configured sidecar"
