@@ -1,4 +1,15 @@
 {{ define "spartan.hook" }}
+{{- $lc := .hook.logCollector | default dict }}
+{{- $lcName := $lc.sidecarName | default "datadog-agent" }}
+{{- if and .hook.collectLog .hook.logCollector }}
+{{- $sidecarNames := list }}
+{{- range .Values.sidecars }}{{- $sidecarNames = append $sidecarNames .name }}{{- end }}
+{{- if not (has $lcName $sidecarNames) }}{{ fail (printf "spartan: hook %q log collector %q (logCollector.sidecarName, default \"datadog-agent\") does not match any configured sidecar (sidecars[].name: %v)" .hook.name $lcName $sidecarNames) }}{{- end }}
+{{- if ne $lcName "datadog-agent" }}
+{{- if not $lc.readyCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.readyCommand; a non-datadog-agent collector would hang on the default :8126 wait" .hook.name $lcName) }}{{- end }}
+{{- if not $lc.stopCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.stopCommand; the default 'pkill agent' would never stop the collector and the Job would hang" .hook.name $lcName) }}{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -42,7 +53,7 @@ spec:
       securityContext:
           {{- toYaml .Values.podSecurityContext | nindent 8 }}
       restartPolicy: {{ .hook.restartPolicy | default "Never" }}
-      {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
+      {{- if and (.hook.collectLog) (or .Values.datadog.enabled .hook.logCollector) }}
       shareProcessNamespace: true
       {{- end }}
       containers:
@@ -59,10 +70,16 @@ spec:
             - {{ default "/bin/sh" .hook.shell }}
             - -c
             - |
-            {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
-              trap 'sleep 10 && pkill agent' EXIT
+            {{- if and (.hook.collectLog) (or .Values.datadog.enabled .hook.logCollector) }}
+            {{- if $lc.readyCommand }}
+              trap '{{ $lc.stopCommand | default "sleep 10 && pkill agent" }}' EXIT
+              set -o pipefail
+              {{ $lc.readyCommand }}
+            {{- else }}
+              trap '{{ $lc.stopCommand | default "sleep 10 && pkill agent" }}' EXIT
               set -o pipefail
               if [ ! `which curl` ]; then sleep 300; else while ! curl -Ns localhost:8126; do sleep 1 && echo "Waiting for datadog agent to start...."; done; fi
+            {{- end }}
             {{- end }}
             {{- range .hook.commands }}
               {{ . }}
@@ -87,7 +104,7 @@ spec:
                 name: {{ .Values.configMap.externalConfigMapEnv.name }}
               {{- end }}
           env:
-          {{- if and (.Values.datadog.enabled) (.hook.collectLog) }}
+          {{- if and (.hook.collectLog) (or .Values.datadog.enabled .hook.logCollector) (eq $lcName "datadog-agent") }}
             - name: DD_KUBERNETES_KUBELET_NODENAME
               valueFrom:
                 fieldRef:
@@ -131,7 +148,7 @@ spec:
               mountPath: {{ .Values.configMap.externalConfigMapFile.mountPath | quote }}
             {{- end }}
             {{- range .Values.sidecars }}
-            {{- if .sharedVolume }}
+            {{- if and .sharedVolume (eq .name $lcName) }}
             - name: sidecar-volume
               readOnly: false
               mountPath: {{ .sharedVolume.mountPath }}
@@ -140,7 +157,7 @@ spec:
           {{- end }}
         {{- $hook := .hook }}
         {{- range $sidecar := .Values.sidecars }}
-          {{- if and (eq $sidecar.name "datadog-agent") ($hook.collectLog) }}
+          {{- if and (eq $sidecar.name $lcName) ($hook.collectLog) }}
             {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
           {{- end }}
         {{- end }}

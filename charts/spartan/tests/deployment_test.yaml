@@ -56,3 +56,33 @@ tests:
       - equal:
           path: spec.template.metadata.annotations["custom.io/foo"]
           value: bar
+
+  - it: "skipDeployment sidecar is not attached to the Deployment"
+    template: "templates/deployment.yaml"
+    set:
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+          sharedVolume:
+            mountPath: /var/log/application/
+        - name: log-collector
+          image: fluent/fluent-bit:3.1.9
+          skipDeployment: true
+          sharedVolume:
+            mountPath: /var/log/application/
+    asserts:
+      # main container + datadog-agent only; log-collector is hook-only
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: datadog-agent
+      # the skipDeployment sidecar's subPath mount is absent from the main container
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: sidecar-volume
+            readOnly: false
+            mountPath: /var/log/application/
+            subPath: log-collector
