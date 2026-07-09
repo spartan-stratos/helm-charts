@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.7.0) (2026-07-09)
+
+### Features
+
+* Add `datadog.cloudProviderMetadataEnabled` (default `true`) across the datadog-agent renderers (sidecar / worker / hook / cronjob / deployment)
+  * Set to `false` on EKS Fargate, where the pod cannot reach the EC2 IMDS (`169.254.169.254`). It renders `DD_CLOUD_PROVIDER_METADATA=""`, so the agent stops probing IMDS and logging `Could not fetch instance type for AWS: ... context deadline exceeded`
+  * Fully backward compatible: with the value unset no env var is added, so rendered manifests are byte-identical to 0.6.0
+
 ## [0.6.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.6.0) (2026-07-09)
 
 ### Features

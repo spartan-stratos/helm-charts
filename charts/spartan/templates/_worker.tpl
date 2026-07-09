@@ -96,6 +96,10 @@ spec:
               value: "true"
             - name: DD_CLUSTER_AGENT_ENABLED
               value: {{ .Values.datadog.clusterAgentEnabled | quote }}
+            {{- if not .Values.datadog.cloudProviderMetadataEnabled }}
+            - name: DD_CLOUD_PROVIDER_METADATA
+              value: ""
+            {{- end }}
           {{- end }}
           {{- if or .Values.extraEnvs .worker.extraEnvs }}
           {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .worker.extraEnvs)) | nindent 12 }}
