@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.6.0) (2026-07-09)
+
+### Features
+
+* Add `datadog.clusterAgentEnabled` and `datadog.orchestratorExplorerEnabled` (both default `true`) to toggle `DD_CLUSTER_AGENT_ENABLED` and `DD_ORCHESTRATOR_EXPLORER_ENABLED` on the datadog-agent containers (sidecar / worker / hook / cronjob / deployment)
+  * Set both to `false` for per-pod agents that have no Datadog Cluster Agent connection wired in (e.g. EKS Fargate sidecars). This stops two coupled log-spam sources: the `failed to load cluster agent auth token: ... cluster_agent.auth_token: no such file or directory` error, and the `Cluster Agent not ready yet, skipping orchestrator_pod check` warnings/errors. The Orchestrator Explorer requires the Cluster Agent, so it is non-functional on such agents regardless
+  * Fully backward compatible: with the values unset the rendered manifests are byte-identical to 0.5.0 (both env vars still `"true"`)
+
 ## [0.5.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.5.0) (2026-07-07)
 
 ### Features

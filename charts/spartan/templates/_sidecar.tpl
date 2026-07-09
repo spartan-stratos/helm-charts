@@ -40,11 +40,11 @@
     - name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
       value: "true"
     - name: DD_ORCHESTRATOR_EXPLORER_ENABLED
-      value: "true"
+      value: {{ .Values.datadog.orchestratorExplorerEnabled | quote }}
     - name: DD_PROCESS_AGENT_ENABLED
       value: "true"
     - name: DD_CLUSTER_AGENT_ENABLED
-      value: "true"
+      value: {{ .Values.datadog.clusterAgentEnabled | quote }}
   {{- end }}
   {{- if or .Values.extraEnvs .sidecar.extraEnvs }}
   {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .sidecar.extraEnvs)) | nindent 4 }}

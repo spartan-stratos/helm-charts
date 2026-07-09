@@ -490,6 +490,12 @@ sidecars: []
 ## It will also add stop condition for datadog agent container
 datadog:
   enabled: false
+  ## Set false for per-pod agents with no Cluster Agent token (e.g. Fargate
+  ## sidecars) to stop the recurring cluster-agent auth-token error.
+  clusterAgentEnabled: true
+  ## Orchestrator Explorer requires the Cluster Agent; disable it alongside
+  ## clusterAgentEnabled on per-pod agents to stop the orchestrator-check spam.
+  orchestratorExplorerEnabled: true
 
 ## StrategyType configuration
 ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
