@@ -490,17 +490,11 @@ sidecars: []
 ## It will also add stop condition for datadog agent container
 datadog:
   enabled: false
-  ## clusterAgentEnabled toggles DD_CLUSTER_AGENT_ENABLED on the datadog-agent
-  ## containers (sidecar/worker/hook/cronjob/deployment). Defaults to true to
-  ## preserve existing behavior. Set to false for per-pod agents that do not need
-  ## the Datadog Cluster Agent (e.g. Fargate sidecars) to stop the recurring
-  ## "failed to load cluster agent auth token" error when no token is wired in.
+  ## Set false for per-pod agents with no Cluster Agent token (e.g. Fargate
+  ## sidecars) to stop the recurring cluster-agent auth-token error.
   clusterAgentEnabled: true
-  ## orchestratorExplorerEnabled toggles DD_ORCHESTRATOR_EXPLORER_ENABLED. The
-  ## Orchestrator Explorer requires the Cluster Agent, so a per-pod agent with no
-  ## Cluster Agent connection emits its own "Cluster Agent not ready, skipping
-  ## orchestrator_pod check" noise. Set this false alongside clusterAgentEnabled
-  ## on such agents; leaving it true there is non-functional and only adds log spam.
+  ## Orchestrator Explorer requires the Cluster Agent; disable it alongside
+  ## clusterAgentEnabled on per-pod agents to stop the orchestrator-check spam.
   orchestratorExplorerEnabled: true
 
 ## StrategyType configuration
