@@ -127,3 +127,40 @@ tests:
           content:
             name: DD_CLUSTER_AGENT_ENABLED
             value: "true"
+
+  - it: "cloudProviderMetadataEnabled defaults to true and adds no DD_CLOUD_PROVIDER_METADATA env"
+    template: "templates/deployment.yaml"
+    set:
+      datadog:
+        enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_CLOUD_PROVIDER_METADATA
+            value: ""
+
+  - it: "cloudProviderMetadataEnabled=false disables IMDS probing via empty DD_CLOUD_PROVIDER_METADATA"
+    template: "templates/deployment.yaml"
+    set:
+      datadog:
+        enabled: true
+        cloudProviderMetadataEnabled: false
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+          sharedVolume:
+            mountPath: /var/log/application/
+    asserts:
+      # primary container (deployment.yaml renderer)
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_CLOUD_PROVIDER_METADATA
+            value: ""
+      # datadog-agent sidecar (_sidecar.tpl renderer)
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: DD_CLOUD_PROVIDER_METADATA
+            value: ""

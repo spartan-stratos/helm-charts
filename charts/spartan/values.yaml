@@ -496,6 +496,11 @@ datadog:
   ## Orchestrator Explorer requires the Cluster Agent; disable it alongside
   ## clusterAgentEnabled on per-pod agents to stop the orchestrator-check spam.
   orchestratorExplorerEnabled: true
+  ## Set false on EKS Fargate, where the pod cannot reach the EC2 IMDS
+  ## (169.254.169.254); this renders DD_CLOUD_PROVIDER_METADATA="" so the agent
+  ## stops probing IMDS and logging "Could not fetch instance type ... context
+  ## deadline exceeded". Default true keeps the current behavior (no env added).
+  cloudProviderMetadataEnabled: true
 
 ## StrategyType configuration
 ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
