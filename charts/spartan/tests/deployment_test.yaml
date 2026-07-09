@@ -146,9 +146,21 @@ tests:
       datadog:
         enabled: true
         cloudProviderMetadataEnabled: false
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+          sharedVolume:
+            mountPath: /var/log/application/
     asserts:
+      # primary container (deployment.yaml renderer)
       - contains:
           path: spec.template.spec.containers[0].env
+          content:
+            name: DD_CLOUD_PROVIDER_METADATA
+            value: ""
+      # datadog-agent sidecar (_sidecar.tpl renderer)
+      - contains:
+          path: spec.template.spec.containers[1].env
           content:
             name: DD_CLOUD_PROVIDER_METADATA
             value: ""
