@@ -490,6 +490,12 @@ sidecars: []
 ## It will also add stop condition for datadog agent container
 datadog:
   enabled: false
+  ## clusterAgentEnabled toggles DD_CLUSTER_AGENT_ENABLED on the datadog-agent
+  ## containers (sidecar/worker/hook/cronjob/deployment). Defaults to true to
+  ## preserve existing behavior. Set to false for per-pod agents that do not need
+  ## the Datadog Cluster Agent (e.g. Fargate sidecars) to stop the recurring
+  ## "failed to load cluster agent auth token" error when no token is wired in.
+  clusterAgentEnabled: true
 
 ## StrategyType configuration
 ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy

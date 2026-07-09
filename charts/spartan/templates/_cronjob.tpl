@@ -126,7 +126,7 @@ spec:
                 - name: DD_PROCESS_AGENT_ENABLED
                   value: "true"
                 - name: DD_CLUSTER_AGENT_ENABLED
-                  value: "true"
+                  value: {{ .Values.datadog.clusterAgentEnabled | quote }}
               {{- end }}
               {{- if or .Values.extraEnvs .cronjob.extraEnvs }}
                 {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .cronjob.extraEnvs)) | nindent 16 }}

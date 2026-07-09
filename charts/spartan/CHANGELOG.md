@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.6.0) (2026-07-09)
+
+### Features
+
+* Add `datadog.clusterAgentEnabled` (default `true`) to toggle `DD_CLUSTER_AGENT_ENABLED` on the datadog-agent containers (sidecar / worker / hook / cronjob / deployment)
+  * Set to `false` for per-pod agents that have no Datadog Cluster Agent connection wired in (e.g. EKS Fargate sidecars), stopping the recurring `failed to load cluster agent auth token: ... cluster_agent.auth_token: no such file or directory` error the agent logs on every retry
+  * Fully backward compatible: with the value unset the rendered manifests are byte-identical to 0.5.0 (`DD_CLUSTER_AGENT_ENABLED` still `"true"`)
+
 ## [0.5.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.5.0) (2026-07-07)
 
 ### Features
