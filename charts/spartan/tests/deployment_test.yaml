@@ -87,7 +87,7 @@ tests:
             mountPath: /var/log/application/
             subPath: log-collector
 
-  - it: "datadog.clusterAgentEnabled defaults to true"
+  - it: "datadog cluster-agent and orchestrator-explorer toggles default to true"
     template: "templates/deployment.yaml"
     set:
       datadog:
@@ -98,18 +98,29 @@ tests:
           content:
             name: DD_CLUSTER_AGENT_ENABLED
             value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_ORCHESTRATOR_EXPLORER_ENABLED
+            value: "true"
 
-  - it: "datadog.clusterAgentEnabled=false disables the cluster agent connection"
+  - it: "disabling clusterAgentEnabled + orchestratorExplorerEnabled silences the cluster-agent noise"
     template: "templates/deployment.yaml"
     set:
       datadog:
         enabled: true
         clusterAgentEnabled: false
+        orchestratorExplorerEnabled: false
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: DD_CLUSTER_AGENT_ENABLED
+            value: "false"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_ORCHESTRATOR_EXPLORER_ENABLED
             value: "false"
       - notContains:
           path: spec.template.spec.containers[0].env

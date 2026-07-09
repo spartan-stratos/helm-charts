@@ -496,6 +496,12 @@ datadog:
   ## the Datadog Cluster Agent (e.g. Fargate sidecars) to stop the recurring
   ## "failed to load cluster agent auth token" error when no token is wired in.
   clusterAgentEnabled: true
+  ## orchestratorExplorerEnabled toggles DD_ORCHESTRATOR_EXPLORER_ENABLED. The
+  ## Orchestrator Explorer requires the Cluster Agent, so a per-pod agent with no
+  ## Cluster Agent connection emits its own "Cluster Agent not ready, skipping
+  ## orchestrator_pod check" noise. Set this false alongside clusterAgentEnabled
+  ## on such agents; leaving it true there is non-functional and only adds log spam.
+  orchestratorExplorerEnabled: true
 
 ## StrategyType configuration
 ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
