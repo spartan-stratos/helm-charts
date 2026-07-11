@@ -87,6 +87,34 @@ tests:
             mountPath: /var/log/application/
             subPath: log-collector
 
+  - it: "renders sidecars[].lifecycle (preStop) on the sidecar container"
+    template: "templates/deployment.yaml"
+    set:
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sleep", "15"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: datadog-agent
+      - equal:
+          path: spec.template.spec.containers[1].lifecycle.preStop.exec.command
+          value: ["/bin/sleep", "15"]
+
+  - it: "omits lifecycle on sidecars when unset (backward compatible)"
+    template: "templates/deployment.yaml"
+    set:
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[1].lifecycle
+
   - it: "datadog cluster-agent and orchestrator-explorer toggles default to true"
     template: "templates/deployment.yaml"
     set:
