@@ -6,6 +6,7 @@
 {{- $sidecarNames := list }}
 {{- range .Values.sidecars }}{{- $sidecarNames = append $sidecarNames .name }}{{- end }}
 {{- if not (has $lcName $sidecarNames) }}{{ fail (printf "spartan: hook %q log collector %q (logCollector.sidecarName, default \"datadog-agent\") does not match any configured sidecar (sidecars[].name: %v)" .hook.name $lcName $sidecarNames) }}{{- end }}
+{{- if and $drain.enabled (eq $lcName "datadog-agent") }}{{ fail (printf "spartan: hook %q sets logCollector.drain.enabled with the datadog-agent collector; drain polls the Fluent Bit metrics API and pkills its process (default \"fluent-bit\"), which does not apply to datadog-agent (it uses :8126 and process \"agent\") - the hook would hang waiting for it to stop. Use a Fluent Bit-style collector, or logCollector.stopCommand instead" .hook.name) }}{{- end }}
 {{- if ne $lcName "datadog-agent" }}
 {{- if not $lc.readyCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.readyCommand; a non-datadog-agent collector would hang on the default :8126 wait" .hook.name $lcName) }}{{- end }}
 {{- if and (not $lc.stopCommand) (not $drain.enabled) }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.stopCommand and logCollector.drain.enabled is not true; the default 'pkill agent' would never stop the collector and the Job would hang" .hook.name $lcName) }}{{- end }}
