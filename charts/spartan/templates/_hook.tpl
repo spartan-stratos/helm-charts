@@ -82,9 +82,10 @@ spec:
               # all inputs/outputs); a multi-output collector would satisfy the
               # condition before every output drained.
               __spartan_drain() {
-                _url="{{ $drain.metricsUrl | default "http://localhost:2020/api/v1/metrics" }}"
+                _url={{ $drain.metricsUrl | default "http://localhost:2020/api/v1/metrics" | quote }}
+                _max={{ $drain.maxWaitSeconds | default 60 | int }}
                 _i=0; _prev=-1
-                while [ "$_i" -lt {{ $drain.maxWaitSeconds | default 60 }} ]; do
+                while [ "$_i" -lt "$_max" ]; do
                   _m=$(curl -s --max-time 5 "$_url" 2>/dev/null)
                   _in=0; for _n in $(printf '%s' "$_m" | grep -oE '"records":[0-9]+' | grep -oE '[0-9]+'); do _in=$((_in+_n)); done
                   _out=0; for _n in $(printf '%s' "$_m" | grep -oE '"proc_records":[0-9]+' | grep -oE '[0-9]+'); do _out=$((_out+_n)); done
@@ -93,8 +94,8 @@ spec:
                   if [ "$_in" -gt 0 ] && [ "$_in" -eq "$_prev" ] && [ "$_out" -ge "$_in" ]; then break; fi
                   _prev="$_in"; _i=$((_i+1)); sleep 1
                 done
-                [ "$_i" -ge {{ $drain.maxWaitSeconds | default 60 }} ] && echo "spartan drain: cap reached (in=$_in out=$_out); collector logs may be incomplete" >&2
-                pkill {{ $drain.signal | default "fluent-bit" }} || true
+                [ "$_i" -ge "$_max" ] && echo "spartan drain: cap reached (in=$_in out=$_out); collector logs may be incomplete" >&2
+                pkill {{ $drain.processName | default "fluent-bit" | quote }} || true
               }
               trap __spartan_drain EXIT
             {{- else }}
