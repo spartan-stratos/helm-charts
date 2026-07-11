@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.0) (2026-07-11)
+
+### Features
+
+* Render `sidecars[].lifecycle` (postStart / preStop) on sidecar containers
+  * Motivation: on pod termination all containers get SIGTERM concurrently, so a fast-exiting sidecar (e.g. the datadog-agent) can stop listening before the main app finishes its graceful shutdown - the app's final DogStatsD/trace sends then hit a dead port (`PortUnreachableException` on `:8125`). A `preStop` sleep on the sidecar keeps it alive through the app's drain window, ordering the shutdown without a fixed guess elsewhere
+  * Example: `sidecars: [{name: datadog-agent, ..., lifecycle: {preStop: {exec: {command: ["/bin/sleep","15"]}}}}]` (keep the sleep < `terminationGracePeriodSeconds`)
+  * Fully backward compatible: with no `sidecars[].lifecycle` set, rendered manifests are byte-identical to 0.8.0
+
 ## [0.8.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.8.0) (2026-07-11)
 
 ### Features

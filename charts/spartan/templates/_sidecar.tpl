@@ -65,6 +65,9 @@
   {{- if .sidecar.resources }}
   resources: {{- toYaml .sidecar.resources | nindent 4 }}
   {{- end }}
+  {{- if .sidecar.lifecycle }}
+  lifecycle: {{- toYaml .sidecar.lifecycle | nindent 4 }}
+  {{- end }}
   volumeMounts:
   {{- if .Values.secret.asFile.enabled }}
     - name: {{ include "spartan.secretAsFile" . }}
