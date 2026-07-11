@@ -77,17 +77,23 @@ spec:
               # collector has SHIPPED every record it read (output proc_records >=
               # input records) before stopping it - no fixed sleep to out-guess. The
               # collector must expose Fluent Bit's metrics API (default :2020); the
-              # maxWaitSeconds cap is only a backstop, not the expected wait.
+              # maxWaitSeconds cap is a bounded backstop, not the expected wait.
+              # Assumes a SINGLE input and a SINGLE output (it sums records across
+              # all inputs/outputs); a multi-output collector would satisfy the
+              # condition before every output drained.
               __spartan_drain() {
                 _url="{{ $drain.metricsUrl | default "http://localhost:2020/api/v1/metrics" }}"
-                _i=0
+                _i=0; _prev=-1
                 while [ "$_i" -lt {{ $drain.maxWaitSeconds | default 60 }} ]; do
-                  _m=$(curl -s "$_url" 2>/dev/null)
+                  _m=$(curl -s --max-time 5 "$_url" 2>/dev/null)
                   _in=0; for _n in $(printf '%s' "$_m" | grep -oE '"records":[0-9]+' | grep -oE '[0-9]+'); do _in=$((_in+_n)); done
                   _out=0; for _n in $(printf '%s' "$_m" | grep -oE '"proc_records":[0-9]+' | grep -oE '[0-9]+'); do _out=$((_out+_n)); done
-                  if [ "$_in" -gt 0 ] && [ "$_out" -ge "$_in" ]; then break; fi
-                  _i=$((_i+1)); sleep 1
+                  # break only when the input count is STABLE across two polls (tail has
+                  # finished reading an incrementally-written log) AND output shipped it all
+                  if [ "$_in" -gt 0 ] && [ "$_in" -eq "$_prev" ] && [ "$_out" -ge "$_in" ]; then break; fi
+                  _prev="$_in"; _i=$((_i+1)); sleep 1
                 done
+                [ "$_i" -ge {{ $drain.maxWaitSeconds | default 60 }} ] && echo "spartan drain: cap reached (in=$_in out=$_out); collector logs may be incomplete" >&2
                 pkill {{ $drain.signal | default "fluent-bit" }} || true
               }
               trap __spartan_drain EXIT
