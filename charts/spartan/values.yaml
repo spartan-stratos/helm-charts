@@ -470,6 +470,14 @@ sidecars: []
 #    extraEnvs:
 #      - name: SERVICE
 #        value: sidecar
+#    # lifecycle (postStart/preStop) is passed through verbatim. A preStop sleep keeps
+#    # a fast-exiting sidecar (e.g. the datadog-agent) alive through the main app's
+#    # graceful-shutdown window, so the app's final DogStatsD/trace sends don't hit a
+#    # dead port on termination. Keep the sleep < terminationGracePeriodSeconds.
+#    lifecycle:
+#      preStop:
+#        exec:
+#          command: ["/bin/sleep", "15"]
 #  - name: log-collector
 #    image: fluent/fluent-bit:3.1.9
 #    # skipDeployment attaches this sidecar to hook Jobs only, never the Deployment.
