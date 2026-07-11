@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.8.0) (2026-07-11)
+
+### Features
+
+* Add `hooks[].logCollector.drain` for a deterministic hook log-collector shutdown, replacing the fixed-`sleep` guess in `stopCommand`
+  * Motivation: a short-lived hook (e.g. a Liquibase/Flyway migration) can finish and be torn down before a tailing collector has shipped its final records. The old pattern - `stopCommand: "sleep N && pkill <collector>"` - has to out-guess (migration-remaining-time + flush-latency), so `N` is inherently non-deterministic: too small drops logs, too large wastes deploy time
+  * When `drain.enabled: true`, the hook traps EXIT with a generated shell function that polls the collector's Fluent Bit metrics API (default `http://localhost:2020/api/v1/metrics`) and only stops the collector once its output has shipped every record its input read (`proc_records >= records`), bounded by `drain.maxWaitSeconds` (default `60`) as a backstop only. Tunable: `drain.metricsUrl`, `drain.signal` (default `fluent-bit`), `drain.maxWaitSeconds`
+  * With `drain.enabled`, `logCollector.stopCommand` becomes optional for a non-`datadog-agent` collector (the drain function is the stop mechanism); the collector must expose the Fluent Bit HTTP metrics server
+  * Fully backward compatible: with `drain` unset, rendered manifests are byte-identical to 0.7.0 (the `stopCommand` trap path is unchanged, and it remains required for non-`datadog-agent` collectors)
+
 ## [0.7.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.7.0) (2026-07-09)
 
 ### Features
