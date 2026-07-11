@@ -1,13 +1,14 @@
 {{ define "spartan.hook" }}
 {{- $lc := .hook.logCollector | default dict }}
 {{- $lcName := $lc.sidecarName | default "datadog-agent" }}
+{{- $drain := $lc.drain | default dict }}
 {{- if and .hook.collectLog .hook.logCollector }}
 {{- $sidecarNames := list }}
 {{- range .Values.sidecars }}{{- $sidecarNames = append $sidecarNames .name }}{{- end }}
 {{- if not (has $lcName $sidecarNames) }}{{ fail (printf "spartan: hook %q log collector %q (logCollector.sidecarName, default \"datadog-agent\") does not match any configured sidecar (sidecars[].name: %v)" .hook.name $lcName $sidecarNames) }}{{- end }}
 {{- if ne $lcName "datadog-agent" }}
 {{- if not $lc.readyCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.readyCommand; a non-datadog-agent collector would hang on the default :8126 wait" .hook.name $lcName) }}{{- end }}
-{{- if not $lc.stopCommand }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.stopCommand; the default 'pkill agent' would never stop the collector and the Job would hang" .hook.name $lcName) }}{{- end }}
+{{- if and (not $lc.stopCommand) (not $drain.enabled) }}{{ fail (printf "spartan: hook %q sets logCollector.sidecarName=%q but no logCollector.stopCommand and logCollector.drain.enabled is not true; the default 'pkill agent' would never stop the collector and the Job would hang" .hook.name $lcName) }}{{- end }}
 {{- end }}
 {{- end }}
 apiVersion: batch/v1
@@ -71,13 +72,32 @@ spec:
             - -c
             - |
             {{- if and (.hook.collectLog) (or .Values.datadog.enabled .hook.logCollector) }}
-            {{- if $lc.readyCommand }}
-              trap '{{ $lc.stopCommand | default "sleep 10 && pkill agent" }}' EXIT
-              set -o pipefail
-              {{ $lc.readyCommand }}
+            {{- if $drain.enabled }}
+              # Deterministic drain: on hook-container exit, wait until the log
+              # collector has SHIPPED every record it read (output proc_records >=
+              # input records) before stopping it - no fixed sleep to out-guess. The
+              # collector must expose Fluent Bit's metrics API (default :2020); the
+              # maxWaitSeconds cap is only a backstop, not the expected wait.
+              __spartan_drain() {
+                _url="{{ $drain.metricsUrl | default "http://localhost:2020/api/v1/metrics" }}"
+                _i=0
+                while [ "$_i" -lt {{ $drain.maxWaitSeconds | default 60 }} ]; do
+                  _m=$(curl -s "$_url" 2>/dev/null)
+                  _in=0; for _n in $(printf '%s' "$_m" | grep -oE '"records":[0-9]+' | grep -oE '[0-9]+'); do _in=$((_in+_n)); done
+                  _out=0; for _n in $(printf '%s' "$_m" | grep -oE '"proc_records":[0-9]+' | grep -oE '[0-9]+'); do _out=$((_out+_n)); done
+                  if [ "$_in" -gt 0 ] && [ "$_out" -ge "$_in" ]; then break; fi
+                  _i=$((_i+1)); sleep 1
+                done
+                pkill {{ $drain.signal | default "fluent-bit" }} || true
+              }
+              trap __spartan_drain EXIT
             {{- else }}
               trap '{{ $lc.stopCommand | default "sleep 10 && pkill agent" }}' EXIT
+            {{- end }}
               set -o pipefail
+            {{- if $lc.readyCommand }}
+              {{ $lc.readyCommand }}
+            {{- else }}
               if [ ! `which curl` ]; then sleep 300; else while ! curl -Ns localhost:8126; do sleep 1 && echo "Waiting for datadog agent to start...."; done; fi
             {{- end }}
             {{- end }}
