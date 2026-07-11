@@ -322,7 +322,7 @@ tests:
           pattern: "proc_records"
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
-          pattern: "pkill fluent-bit"
+          pattern: 'pkill "?fluent-bit"?'
       # no fixed-sleep stop and no leftover datadog-agent wiring
       - notMatchRegex:
           path: spec.template.spec.containers[0].command[2]
@@ -357,7 +357,7 @@ tests:
             drain:
               enabled: true
               metricsUrl: "http://localhost:9999/metrics"
-              signal: my-collector
+              processName: my-collector
               maxWaitSeconds: 30
     asserts:
       - matchRegex:
@@ -365,7 +365,7 @@ tests:
           pattern: "localhost:9999/metrics"
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
-          pattern: "pkill my-collector"
+          pattern: 'pkill "?my-collector"?'
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
-          pattern: "-lt 30"
+          pattern: "_max=30"
