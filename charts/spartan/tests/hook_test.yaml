@@ -331,7 +331,34 @@ tests:
           path: spec.template.spec.containers[0].command[2]
           pattern: "localhost:8126"
 
-  - it: "honors custom drain metricsUrl, signal and maxWaitSeconds"
+  - it: "fails fast when drain.enabled is set on the datadog-agent collector"
+    set:
+      datadog:
+        enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: public.ecr.aws/datadog/agent:latest
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          logCollector:
+            drain:
+              enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "drain.enabled with the datadog-agent collector"
+
+  - it: "honors custom drain metricsUrl, processName and maxWaitSeconds"
     set:
       datadog:
         enabled: false
