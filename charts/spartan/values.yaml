@@ -395,14 +395,29 @@ hooks:
 #    # Optional: swap the log-collector sidecar used when collectLog is true.
 #    # Defaults reproduce the Datadog Agent behavior; override for a lightweight
 #    # collector (e.g. Fluent Bit) to avoid pulling the ~1GB agent image on the hook.
-#    # When sidecarName is NOT "datadog-agent", BOTH readyCommand and stopCommand are
-#    # required (template fails otherwise) - the datadog-agent defaults (:8126 wait,
-#    # pkill agent) would otherwise hang against a different collector. readyCommand /
-#    # stopCommand are shell snippets run verbatim; do not embed single quotes.
+#    # When sidecarName is NOT "datadog-agent", readyCommand is required, and so is
+#    # stopCommand UNLESS logCollector.drain.enabled is true (drain is then the stop
+#    # mechanism - see below). Without either, the datadog-agent defaults (:8126 wait,
+#    # pkill agent) would hang against a different collector. readyCommand / stopCommand
+#    # are shell snippets run verbatim; do not embed single quotes.
 #    logCollector:
 #      sidecarName: log-collector          # must match a sidecars[].name; default "datadog-agent"
 #      readyCommand: "while ! curl -Ns localhost:2020/api/v1/health; do sleep 1; done"
 #      stopCommand: "sleep 5 && pkill fluent-bit"
+#      # Preferred over a fixed-sleep stopCommand for short-lived hooks: instead of
+#      # guessing how long the collector needs to ship its final records, drain waits
+#      # until the input count is stable AND the collector's Fluent Bit output has
+#      # flushed every record its input read (proc_records >= records), then stops it.
+#      # Requires the collector to expose the Fluent Bit HTTP metrics server
+#      # (HTTP_Server On). When enabled, stopCommand is optional (drain is the stop
+#      # mechanism). Only valid for a SINGLE input + SINGLE output: records/proc_records
+#      # are summed across all inputs/outputs, so with multiple outputs drain can stop
+#      # before every output has flushed.
+#      drain:
+#        enabled: true
+#        metricsUrl: "http://localhost:2020/api/v1/metrics"   # Fluent Bit JSON metrics endpoint
+#        processName: fluent-bit                               # pkill process-name pattern to stop the collector once drained
+#        maxWaitSeconds: 60                                    # bounded backstop cap, not the expected wait
 
 ## cronjobs specifies list of cronjobs
 cronjobs: []
