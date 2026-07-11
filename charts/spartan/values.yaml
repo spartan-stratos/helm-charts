@@ -403,6 +403,17 @@ hooks:
 #      sidecarName: log-collector          # must match a sidecars[].name; default "datadog-agent"
 #      readyCommand: "while ! curl -Ns localhost:2020/api/v1/health; do sleep 1; done"
 #      stopCommand: "sleep 5 && pkill fluent-bit"
+#      # Preferred over a fixed-sleep stopCommand for short-lived hooks: instead of
+#      # guessing how long the collector needs to ship its final records, drain waits
+#      # until the collector's Fluent Bit output has flushed every record its input
+#      # read (proc_records >= records), then stops it. Requires the collector to
+#      # expose the Fluent Bit HTTP metrics server (HTTP_Server On). When enabled,
+#      # stopCommand is optional (drain is the stop mechanism).
+#      drain:
+#        enabled: true
+#        metricsUrl: "http://localhost:2020/api/v1/metrics"   # Fluent Bit JSON metrics endpoint
+#        signal: fluent-bit                                    # process name to pkill once drained
+#        maxWaitSeconds: 60                                    # backstop cap, not the expected wait
 
 ## cronjobs specifies list of cronjobs
 cronjobs: []
