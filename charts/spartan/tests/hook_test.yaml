@@ -281,3 +281,91 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "does not match any configured sidecar"
+
+  - it: "drains deterministically until the collector flushes, without a fixed sleep or a stopCommand"
+    set:
+      datadog:
+        enabled: false
+      sidecars:
+        - name: log-collector
+          image: fluent/fluent-bit:3.1.9
+          sharedVolume:
+            mountPath: /var/log/application/
+      hooks:
+        - name: migration
+          hookTypes: pre-install,pre-upgrade
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          # no stopCommand: drain.enabled is the stop mechanism
+          logCollector:
+            sidecarName: log-collector
+            readyCommand: "while ! curl -Ns localhost:2020/api/v1/health; do sleep 1; done"
+            drain:
+              enabled: true
+    asserts:
+      - isKind:
+          of: Job
+      # deterministic drain wiring: trap the generated function, poll flush state, then pkill
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "trap __spartan_drain EXIT"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "proc_records"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "pkill fluent-bit"
+      # no fixed-sleep stop and no leftover datadog-agent wiring
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "pkill agent"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "localhost:8126"
+
+  - it: "honors custom drain metricsUrl, signal and maxWaitSeconds"
+    set:
+      datadog:
+        enabled: false
+      sidecars:
+        - name: log-collector
+          image: fluent/fluent-bit:3.1.9
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          shell: /bin/sh
+          commands:
+            - flyway migrate
+          resources: {}
+          customImage:
+            enabled: true
+            image: migration-image:test
+          restartPolicy: Never
+          backoffLimit: 0
+          collectLog: true
+          logCollector:
+            sidecarName: log-collector
+            readyCommand: "test -f /x"
+            drain:
+              enabled: true
+              metricsUrl: "http://localhost:9999/metrics"
+              signal: my-collector
+              maxWaitSeconds: 30
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "localhost:9999/metrics"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "pkill my-collector"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "-lt 30"
