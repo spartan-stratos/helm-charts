@@ -90,9 +90,11 @@ spec:
                   _m=$(curl -s --max-time 5 "$_url" 2>/dev/null)
                   _in=0; for _n in $(printf '%s' "$_m" | grep -oE '"records":[0-9]+' | grep -oE '[0-9]+'); do _in=$((_in+_n)); done
                   _out=0; for _n in $(printf '%s' "$_m" | grep -oE '"proc_records":[0-9]+' | grep -oE '[0-9]+'); do _out=$((_out+_n)); done
-                  # break only when the input count is STABLE across two polls (tail has
-                  # finished reading an incrementally-written log) AND output shipped it all
-                  if [ "$_in" -gt 0 ] && [ "$_in" -eq "$_prev" ] && [ "$_out" -ge "$_in" ]; then break; fi
+                  # break when the input count is STABLE across two polls (tail finished
+                  # reading): either it read + shipped everything, or it is genuinely empty
+                  # after a short warmup (so a zero-record hook does not spin to maxWaitSeconds)
+                  if [ "$_in" -eq "$_prev" ] && [ "$_in" -gt 0 ] && [ "$_out" -ge "$_in" ]; then break; fi
+                  if [ "$_in" -eq "$_prev" ] && [ "$_in" -eq 0 ] && [ "$_i" -ge 3 ]; then break; fi
                   _prev="$_in"; _i=$((_i+1)); sleep 1
                 done
                 [ "$_i" -ge "$_max" ] && echo "spartan drain: cap reached (in=$_in out=$_out); collector logs may be incomplete" >&2
