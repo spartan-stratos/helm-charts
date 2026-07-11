@@ -410,7 +410,9 @@ hooks:
 #      # flushed every record its input read (proc_records >= records), then stops it.
 #      # Requires the collector to expose the Fluent Bit HTTP metrics server
 #      # (HTTP_Server On). When enabled, stopCommand is optional (drain is the stop
-#      # mechanism). Assumes a SINGLE input + SINGLE output (records are summed).
+#      # mechanism). Only valid for a SINGLE input + SINGLE output: records/proc_records
+#      # are summed across all inputs/outputs, so with multiple outputs drain can stop
+#      # before every output has flushed.
 #      drain:
 #        enabled: true
 #        metricsUrl: "http://localhost:2020/api/v1/metrics"   # Fluent Bit JSON metrics endpoint
