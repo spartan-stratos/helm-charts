@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.1) (2026-07-14)
+
+### Bug Fixes
+
+* CronJob: skip `sidecars[].skipDeployment` sidecars on the cronjob pod, matching the Deployment
+  * `deployment.yaml` already filters `skipDeployment` sidecars out of both the shared-volume mount loop (`if and .sharedVolume (not .skipDeployment)`) and the sidecar-container injection loop (`if not $sidecar.skipDeployment`); `_cronjob.tpl` did not, so a `skipDeployment` sidecar (e.g. a hook-only `log-collector`) was still injected into the cronjob pod and its `sharedVolume` still mounted on the cronjob container
+  * Impact: a service with BOTH a cronjob AND two sidecars whose `sharedVolume.mountPath` collide (e.g. `datadog-agent` + a Fluent Bit `log-collector` both at `/var/log/application/`) rendered a cronjob container with duplicate `volumeMounts` for that path. `helm template` does not validate it, but Kubernetes server-side apply rejects it (`failed to create typed patch object ... duplicate entries for key [mountPath=...]`), which breaks ArgoCD's server-side diff and stalls the sync. Now the cronjob excludes hook-only sidecars, matching the documented `skipDeployment` intent ("attach to hook Jobs only")
+  * Backward compatible: sidecars without `skipDeployment` (e.g. `datadog-agent`) are unchanged on the cronjob; only `skipDeployment: true` sidecars change (now excluded, as on the Deployment)
+
 ## [0.9.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.0) (2026-07-11)
 
 ### Features
