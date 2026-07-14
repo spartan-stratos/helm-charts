@@ -161,7 +161,7 @@ spec:
                   mountPath: {{ .mountPath }}
               {{- end }}
               {{- range .Values.sidecars }}
-              {{- if .sharedVolume }}
+              {{- if and .sharedVolume (not .skipDeployment) }}
                 - name: sidecar-volume
                   readOnly: false
                   mountPath: {{ .sharedVolume.mountPath }}
@@ -169,7 +169,9 @@ spec:
               {{- end }}
               {{- end }}
             {{- range $sidecar := .Values.sidecars }}
+            {{- if not $sidecar.skipDeployment }}
             {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 12 }}
+            {{- end }}
             {{- end }}
           {{- with .Values.nodeSelector }}
           nodeSelector:
