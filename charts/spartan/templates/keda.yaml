@@ -25,6 +25,14 @@ spec:
   pollingInterval: {{ .Values.keda.pollingInterval }}
   scaleTargetRef:
     name: {{ $fullName }}
+  {{- with .Values.keda.fallback }}
+  fallback:
+    failureThreshold: {{ .failureThreshold }}
+    replicas: {{ .replicas }}
+    {{- with .behavior }}
+    behavior: {{ . }}
+    {{- end }}
+  {{- end }}
   {{- if .Values.autoscaling.enabled }}
   advanced:
     horizontalPodAutoscalerConfig:

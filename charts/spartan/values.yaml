@@ -213,6 +213,19 @@ keda:
   maxReplicas: 10
   ## pollingInterval specifies internal of polling the metrics
   pollingInterval: 30
+
+  ## fallback holds the replica count while the scaler cannot fetch metrics.
+  ## Without it a persistently failing trigger leaves the workload wherever it
+  ## was, with no way back up once it reaches zero.
+  ## Requires every trigger to use metricType AverageValue.
+  ## https://keda.sh/docs/latest/reference/scaledobject-spec/#fallback
+  fallback: {}
+  #  ## consecutive metric-fetch failures before the fallback engages
+  #  failureThreshold: 3
+  #  ## replica count to hold while the scaler is failing
+  #  replicas: 1
+  #  ## static | currentReplicas | currentReplicasIfHigher | currentReplicasIfLower
+  #  behavior: static
   ## controls the authentication between KEDA and the service it's autoscaling
   authentication: []
   #  - name: aws-irsa
