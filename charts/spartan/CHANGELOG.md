@@ -10,9 +10,7 @@ All notable changes to this project will be documented in this file.
   * Motivation: a KEDA trigger scoped to something that can disappear — a Temporal worker deployment version, a queue, a stream — fails closed. Observed on a `temporal` trigger pinned to a build id: the workers scaled to zero, the new build never registered that version, the scaler then returned `Worker Deployment Version not found` on every poll, and the HPA refuses to scale a Deployment that is already at zero. Nothing recovers it, and if the consumer also tells Argo CD to ignore `/spec/replicas` there is no second line of defence either. `fallback` holds a known-good replica count instead of leaving the workload where it fell
   * `keda.fallback` is unset by default. Set `failureThreshold` and `replicas` to enable it; `behavior` is optional and accepts the values KEDA supports (`static`, `currentReplicas`, `currentReplicasIfHigher`, `currentReplicasIfLower`). Time to engage is `failureThreshold` multiplied by the metric sync interval, not a duration — there is no timeout field
   * KEDA only honours `fallback` when every trigger uses `metricType: AverageValue`; a ScaledObject mixing in a `Utilization` trigger silently gets no fallback
-  * Fully backward compatible: with `keda.fallback` unset, rendered manifests are byte-identical to 0.9.2
-
-## [0.9.2](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.2) (2026-09-03)
+  * Fully backward compatible: with `keda.fallback` unset, rendered manifests are byte-identical to 0.9.1
 
 ### Bug Fixes
 
