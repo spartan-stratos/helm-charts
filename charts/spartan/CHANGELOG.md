@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.2](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.2) (2026-09-03)
+
+### Bug Fixes
+
+* Deployment: omit `spec.replicas` when `keda.enabled` is true, not only when `autoscaling.enabled` is true
+  * `deployment.yaml` gated the field on `if not .Values.autoscaling.enabled` alone, so a KEDA-only setup (`autoscaling.enabled: false` + `keda.enabled: true`) still rendered a hardcoded `replicas: {{ .Values.replicaCount }}`. The `keda` feature has shipped since 0.1.8 and 0.1.9 added `scaledobject.keda.sh/transfer-hpa-ownership`, but only the `autoscaling.enabled: true` path was covered; the KEDA-only path was never exercised
+  * Impact: with a hardcoded `replicas` in the desired state, ArgoCD `selfHeal: true` treats every KEDA scale-up as drift and reverts the Deployment to `replicaCount`, while the HPA that KEDA owns immediately rescales - an endless fight. Observed on an EKS dev cluster: the HPA logged `SuccessfulRescale ... New size: 4` 19 times in 4m44s and the Deployment reported `1 current / 4 desired`, yet the pod count never left 1. The ScaledObject and its external metric were healthy throughout (`ScalingActive=True (ValidMetricFound)`), so the scaler was never the problem
+  * Backward compatible: with `keda.enabled` false (the default) rendered manifests are byte-identical to 0.9.1, and the `autoscaling.enabled: true` path is unchanged
+
 ## [0.9.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.1) (2026-07-14)
 
 ### Bug Fixes
