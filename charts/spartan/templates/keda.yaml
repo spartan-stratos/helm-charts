@@ -26,12 +26,7 @@ spec:
   scaleTargetRef:
     name: {{ $fullName }}
   {{- with .Values.keda.fallback }}
-  fallback:
-    failureThreshold: {{ .failureThreshold }}
-    replicas: {{ .replicas }}
-    {{- with .behavior }}
-    behavior: {{ . }}
-    {{- end }}
+  {{- include "spartan.kedaFallback" (dict "fallback" . "triggers" $.Values.keda.triggers "path" "keda.fallback") | nindent 2 }}
   {{- end }}
   {{- if .Values.autoscaling.enabled }}
   advanced:
