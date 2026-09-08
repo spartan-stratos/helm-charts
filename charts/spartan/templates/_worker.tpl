@@ -7,7 +7,9 @@ metadata:
     {{- include "spartan.labels" $ | nindent 4 }}
     tier: "worker"
 spec:
+  {{- if not (include "spartan.workerScaled" .worker) }}
   replicas: {{ .worker.replicaCount | default 1 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "spartan.workerLabels" $ | nindent 6 }}
