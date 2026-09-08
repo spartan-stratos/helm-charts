@@ -217,7 +217,8 @@ keda:
   ## fallback holds the replica count while the scaler cannot fetch metrics.
   ## Without it a persistently failing trigger leaves the workload wherever it
   ## was, with no way back up once it reaches zero.
-  ## Requires every trigger to use metricType AverageValue.
+  ## KEDA skips cpu and memory triggers here, so at least one other trigger is
+  ## required; the chart fails to render otherwise.
   ## https://keda.sh/docs/latest/reference/scaledobject-spec/#fallback
   fallback: {}
   #  ## consecutive metric-fetch failures before the fallback engages
@@ -225,6 +226,7 @@ keda:
   #  ## replica count to hold while the scaler is failing
   #  replicas: 1
   #  ## static | currentReplicas | currentReplicasIfHigher | currentReplicasIfLower
+  #  ## Needs KEDA 2.17.0+; an older CRD prunes the field without an error.
   #  behavior: static
   ## controls the authentication between KEDA and the service it's autoscaling
   authentication: []
@@ -379,6 +381,11 @@ workers: []
 #      minReplicas: 1
 #      maxReplicas: 10
 #      pollingInterval: 30
+#      ## same shape and rules as the top-level keda.fallback above
+#      fallback: {}
+#      #  failureThreshold: 3
+#      #  replicas: 1
+#      #  behavior: static
 #      authentication: []
 #      triggers: []
 #    extraEnvs:
