@@ -20,9 +20,9 @@ tests:
       keda.fallback.failureThreshold: 3
       keda.fallback.replicas: 2
       keda.triggers:
-        - type: cpu
+        - type: temporal
           metadata:
-            value: "80"
+            endpoint: temporal.example:7233
     asserts:
       - equal:
           path: spec.fallback.failureThreshold
@@ -40,10 +40,81 @@ tests:
       keda.fallback.replicas: 2
       keda.fallback.behavior: currentReplicasIfHigher
       keda.triggers:
-        - type: cpu
+        - type: temporal
           metadata:
-            value: "80"
+            endpoint: temporal.example:7233
     asserts:
       - equal:
           path: spec.fallback.behavior
           value: currentReplicasIfHigher
+
+  # A cpu trigger alongside an external one is fine; KEDA skips it for fallback.
+  - it: "renders fallback when an external trigger is mixed with cpu"
+    set:
+      keda.enabled: true
+      keda.fallback.failureThreshold: 3
+      keda.fallback.replicas: 2
+      keda.triggers:
+        - type: temporal
+          metadata:
+            endpoint: temporal.example:7233
+        - type: cpu
+          metricType: Utilization
+          metadata:
+            value: "80"
+    asserts:
+      - equal:
+          path: spec.fallback.replicas
+          value: 2
+
+  - it: "fails when fallback omits failureThreshold"
+    set:
+      keda.enabled: true
+      keda.fallback.replicas: 2
+      keda.triggers:
+        - type: temporal
+          metadata:
+            endpoint: temporal.example:7233
+    asserts:
+      - failedTemplate:
+          errorMessage: "keda.fallback.failureThreshold is required when keda.fallback is set"
+
+  - it: "fails when fallback omits replicas"
+    set:
+      keda.enabled: true
+      keda.fallback.failureThreshold: 3
+      keda.triggers:
+        - type: temporal
+          metadata:
+            endpoint: temporal.example:7233
+    asserts:
+      - failedTemplate:
+          errorMessage: "keda.fallback.replicas is required when keda.fallback is set"
+
+  - it: "fails when fallback sets only behavior"
+    set:
+      keda.enabled: true
+      keda.fallback.behavior: static
+      keda.triggers:
+        - type: temporal
+          metadata:
+            endpoint: temporal.example:7233
+    asserts:
+      - failedTemplate:
+          errorMessage: "keda.fallback.failureThreshold is required when keda.fallback is set"
+
+  - it: "fails when fallback is set and every trigger is cpu or memory"
+    set:
+      keda.enabled: true
+      keda.fallback.failureThreshold: 3
+      keda.fallback.replicas: 2
+      keda.triggers:
+        - type: cpu
+          metadata:
+            value: "80"
+        - type: memory
+          metadata:
+            value: "80"
+    asserts:
+      - failedTemplate:
+          errorMessage: "keda.fallback is set, but every trigger is cpu or memory. KEDA needs at least one other trigger for the fallback to apply."
