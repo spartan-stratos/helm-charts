@@ -25,6 +25,9 @@ spec:
   pollingInterval: {{ .worker.keda.pollingInterval }}
   scaleTargetRef:
     name: {{ include "spartan.fullname" $ }}-worker-{{ .worker.name }}
+  {{- with .worker.keda.fallback }}
+  {{- include "spartan.kedaFallback" (dict "fallback" . "triggers" $.worker.keda.triggers "path" (printf "workers[%s].keda.fallback" $.worker.name)) | nindent 2 }}
+  {{- end }}
   {{- if and .worker.autoscaling (hasKey .worker.autoscaling "enabled") .worker.autoscaling.enabled }}
   advanced:
     horizontalPodAutoscalerConfig:

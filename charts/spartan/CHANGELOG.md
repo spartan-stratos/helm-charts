@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.10.0) (2026-09-03)
+
+### Features
+
+* Render `keda.fallback` and `workers[].keda.fallback` on the ScaledObject, so a workload has a floor to fall back to when its scaler cannot fetch metrics
+  * Motivation: a KEDA trigger scoped to something that can disappear (a Temporal worker deployment version, a queue, a stream) fails closed. Observed on a `temporal` trigger pinned to a build id: the workers scaled to zero, the new build never registered that version, the scaler then returned `Worker Deployment Version not found` on every poll, and the HPA refuses to scale a Deployment that is already at zero. Nothing recovers it, and if the consumer also tells Argo CD to ignore `/spec/replicas` there is no second line of defence either. `fallback` holds a known-good replica count instead of leaving the workload where it fell
+  * `fallback` is unset by default. Set `failureThreshold` and `replicas` to enable it; `behavior` is optional and accepts the values KEDA supports (`static`, `currentReplicas`, `currentReplicasIfHigher`, `currentReplicasIfLower`). Time to engage is `failureThreshold` multiplied by the metric sync interval, not a duration; there is no timeout field
+  * `behavior` needs KEDA 2.17.0 or newer. An older CRD prunes the field without raising an error and the fallback quietly reverts to `static`, so check `kubectl get scaledobject <name> -o yaml` after the first apply if you are unsure of the cluster's version
+  * KEDA skips `cpu` and `memory` triggers when applying a fallback and rejects a ScaledObject whose triggers are all of that kind, so the chart fails at render with a message naming the key rather than letting the sync go red. Mixing a `cpu` trigger in alongside an external one is fine
+  * Both `failureThreshold` and `replicas` are required `int32` on the CRD. A partial `fallback` map now fails at render too, instead of emitting nulls that `helm lint` and `helm unittest` accept and the apiserver rejects
+  * Fully backward compatible: with `fallback` unset, rendered manifests are byte-identical to 0.9.1
+
+### Bug Fixes
+
+* Deployment and workers: omit `spec.replicas` when a scaler owns the replica count
+* PDB: decide on the scaler's replica floor, not `replicaCount`
+  * `pdb.yaml` and `worker-pdb.yaml` asked whether `replicaCount > 1` on the non-HPA path, which the KEDA-only path now makes meaningless: a `replicaCount: 6` workload with `keda.minReplicas: 1` rendered a PDB for a Deployment that settles at one pod, so every node drain blocks. The reverse also failed — `replicaCount: 1` with `keda.minReplicas: 3` rendered no PDB at all
+  * Both templates now take the floor from whichever scaler is enabled, KEDA first since it owns the HPA when both are set
+  * `deployment.yaml` gated the field on `if not .Values.autoscaling.enabled` alone, so a KEDA-only setup (`autoscaling.enabled: false` + `keda.enabled: true`) still rendered a hardcoded `replicas: {{ .Values.replicaCount }}`. The `keda` feature has shipped since 0.1.8 and 0.1.9 added `scaledobject.keda.sh/transfer-hpa-ownership`, but only the `autoscaling.enabled: true` path was covered; the KEDA-only path was never exercised
+  * `_worker.tpl` had no gate at all, so a worker pinned `replicas` on both the HPA path and the KEDA path, even though `worker-hpa.yaml` renders a scaler for each. The repo's own `test/values.yaml` hits this: `worker-1` and `worker-2` both enable a scaler and both rendered `replicas: 1`
+  * Impact: with a hardcoded `replicas` in the desired state, ArgoCD `selfHeal: true` treats every scale-up as drift and reverts the Deployment to `replicaCount`, while the HPA immediately rescales, an endless fight. Observed on an EKS dev cluster: the HPA logged `SuccessfulRescale ... New size: 4` 19 times in 4m44s and the Deployment reported `1 current / 4 desired`, yet the pod count never left 1. The ScaledObject and its external metric were healthy throughout (`ScalingActive=True (ValidMetricFound)`), so the scaler was never the problem
+  * Backward compatible on render: with no scaler enabled, output is byte-identical to 0.9.1. See the upgrade note below for what changes at apply time
+
+### Upgrade notes
+
+* Consumers already running a scaler will see `spec.replicas` disappear from the Deployment. Under Argo CD's default client-side apply the 3-way merge drops the key and the apiserver defaults it to 1, so a workload sitting above its floor takes a one-time dip ([Kubernetes docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#migrating-deployments-and-statefulsets-to-horizontal-autoscaling))
+  * The HPA restores the floor on its next sync without needing a metric, so anything at `minReplicas: 2` or higher self-heals in seconds; `minReplicas: 1` stays at 1 until its trigger scales it
+  * Not affected: apps where another field manager already owns `spec.replicas` (normally the KEDA-managed HPA) and that sync with `ServerSideApply=true`, or apps with `ignoreDifferences` on `/spec/replicas` plus `RespectIgnoreDifferences=true`
+
 ## [0.9.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.1) (2026-07-14)
 
 ### Bug Fixes

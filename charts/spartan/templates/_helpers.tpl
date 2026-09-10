@@ -234,3 +234,33 @@ Merge extraEnvs
   {{- end -}}
   {{- toYaml $merged }}
 {{- end -}}
+
+{{- /* True when an HPA or ScaledObject owns the worker's replicas. Mirrors worker-hpa.yaml. */}}
+{{- define "spartan.workerScaled" -}}
+  {{- $autoscaling := dig "autoscaling" false . -}}
+  {{- $keda := dig "keda" false . -}}
+  {{- if or (and $autoscaling $autoscaling.enabled) (and $keda $keda.enabled) -}}
+true
+  {{- end -}}
+{{- end -}}
+
+{{- /* Renders spec.fallback from dict "fallback" "triggers" "path". Fails at render on what KEDA rejects at apply. */}}
+{{- define "spartan.kedaFallback" -}}
+  {{- $path := .path -}}
+  {{- $fallback := .fallback -}}
+  {{- $external := false -}}
+  {{- range .triggers -}}
+    {{- if not (has .type (list "cpu" "memory")) -}}
+      {{- $external = true -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $external -}}
+    {{- fail (printf "%s is set, but every trigger is cpu or memory. KEDA needs at least one other trigger for the fallback to apply." $path) -}}
+  {{- end -}}
+fallback:
+  failureThreshold: {{ required (printf "%s.failureThreshold is required when %s is set" $path $path) $fallback.failureThreshold }}
+  replicas: {{ required (printf "%s.replicas is required when %s is set" $path $path) $fallback.replicas }}
+  {{- with $fallback.behavior }}
+  behavior: {{ . }}
+  {{- end }}
+{{- end -}}

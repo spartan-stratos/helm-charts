@@ -1,0 +1,203 @@
+suite: "Worker template tests"
+
+tests:
+  - it: "pins replicas on a worker with no scaler"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: plain
+          command: "echo plain"
+          replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: "defaults replicas to 1 when replicaCount is unset"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: plain
+          command: "echo plain"
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: "omits replicas when the worker has an HPA"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: hpa
+          command: "echo hpa"
+          replicaCount: 3
+          autoscaling:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 5
+            targetCPUUtilizationPercentage: 80
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: "omits replicas when the worker has a ScaledObject"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: keda
+          command: "echo keda"
+          replicaCount: 3
+          keda:
+            enabled: true
+            minReplicas: 0
+            maxReplicas: 5
+            pollingInterval: 30
+            triggers:
+              - type: temporal
+                metadata:
+                  endpoint: temporal.example:7233
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: "pins replicas when the worker scalers are present but disabled"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: off
+          command: "echo off"
+          replicaCount: 3
+          autoscaling:
+            enabled: false
+          keda:
+            enabled: false
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: "renders fallback on a worker ScaledObject"
+    template: "templates/worker-hpa.yaml"
+    set:
+      workers:
+        - name: keda
+          command: "echo keda"
+          keda:
+            enabled: true
+            minReplicas: 0
+            maxReplicas: 5
+            pollingInterval: 30
+            fallback:
+              failureThreshold: 3
+              replicas: 1
+              behavior: currentReplicasIfHigher
+            triggers:
+              - type: temporal
+                metadata:
+                  endpoint: temporal.example:7233
+    asserts:
+      - equal:
+          path: spec.fallback.failureThreshold
+          value: 3
+      - equal:
+          path: spec.fallback.replicas
+          value: 1
+      - equal:
+          path: spec.fallback.behavior
+          value: currentReplicasIfHigher
+
+  - it: "omits fallback on a worker ScaledObject when unset"
+    template: "templates/worker-hpa.yaml"
+    set:
+      workers:
+        - name: keda
+          command: "echo keda"
+          keda:
+            enabled: true
+            minReplicas: 0
+            maxReplicas: 5
+            pollingInterval: 30
+            triggers:
+              - type: temporal
+                metadata:
+                  endpoint: temporal.example:7233
+    asserts:
+      - notExists:
+          path: spec.fallback
+
+  - it: "fails when a worker fallback omits failureThreshold"
+    template: "templates/worker-hpa.yaml"
+    set:
+      workers:
+        - name: keda
+          command: "echo keda"
+          keda:
+            enabled: true
+            minReplicas: 0
+            maxReplicas: 5
+            pollingInterval: 30
+            fallback:
+              replicas: 1
+            triggers:
+              - type: temporal
+                metadata:
+                  endpoint: temporal.example:7233
+    asserts:
+      - failedTemplate:
+          errorMessage: "workers[keda].keda.fallback.failureThreshold is required when workers[keda].keda.fallback is set"
+
+  - it: "fails when a worker fallback has only cpu and memory triggers"
+    template: "templates/worker-hpa.yaml"
+    set:
+      workers:
+        - name: keda
+          command: "echo keda"
+          keda:
+            enabled: true
+            minReplicas: 0
+            maxReplicas: 5
+            pollingInterval: 30
+            fallback:
+              failureThreshold: 3
+              replicas: 1
+            triggers:
+              - type: cpu
+                metadata:
+                  value: "80"
+    asserts:
+      - failedTemplate:
+          errorMessage: "workers[keda].keda.fallback is set, but every trigger is cpu or memory. KEDA needs at least one other trigger for the fallback to apply."
+
+  - it: "omits the worker pdb when keda scales it down to one"
+    template: "templates/worker-pdb.yaml"
+    set:
+      workers:
+        - name: keda
+          command: "echo keda"
+          replicaCount: 3
+          pdb:
+            enabled: true
+            minAvailable: 2
+          keda:
+            enabled: true
+            minReplicas: 1
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "renders the worker pdb when keda holds more than one replica"
+    template: "templates/worker-pdb.yaml"
+    set:
+      workers:
+        - name: keda
+          command: "echo keda"
+          replicaCount: 1
+          pdb:
+            enabled: true
+            minAvailable: 2
+          keda:
+            enabled: true
+            minReplicas: 3
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget

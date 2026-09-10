@@ -25,6 +25,9 @@ spec:
   pollingInterval: {{ .Values.keda.pollingInterval }}
   scaleTargetRef:
     name: {{ $fullName }}
+  {{- with .Values.keda.fallback }}
+  {{- include "spartan.kedaFallback" (dict "fallback" . "triggers" $.Values.keda.triggers "path" "keda.fallback") | nindent 2 }}
+  {{- end }}
   {{- if .Values.autoscaling.enabled }}
   advanced:
     horizontalPodAutoscalerConfig:

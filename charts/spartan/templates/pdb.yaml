@@ -1,6 +1,11 @@
-{{- $replicaCount := int .Values.replicaCount }}
-{{- $autoscalingMinReplica := int .Values.autoscaling.minReplicas }}
-{{- if and .Values.pdb.enabled (or (and (gt $replicaCount 1) (not .Values.autoscaling.enabled)) (and .Values.autoscaling.enabled (gt $autoscalingMinReplica 1))) }}
+{{- /* Lowest pod count the workload settles at; KEDA owns the HPA when both are on. */ -}}
+{{- $floor := int .Values.replicaCount }}
+{{- if .Values.keda.enabled }}
+{{- $floor = int .Values.keda.minReplicas }}
+{{- else if .Values.autoscaling.enabled }}
+{{- $floor = int .Values.autoscaling.minReplicas }}
+{{- end }}
+{{- if and .Values.pdb.enabled (gt $floor 1) }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
