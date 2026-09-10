@@ -235,10 +235,7 @@ Merge extraEnvs
   {{- toYaml $merged }}
 {{- end -}}
 
-{{- /*
-True when an HPA or a ScaledObject owns a worker's replica count, so the
-Deployment must not pin spec.replicas. Mirrors the gates in worker-hpa.yaml.
-*/}}
+{{- /* True when an HPA or ScaledObject owns the worker's replicas. Mirrors worker-hpa.yaml. */}}
 {{- define "spartan.workerScaled" -}}
   {{- $autoscaling := dig "autoscaling" false . -}}
   {{- $keda := dig "keda" false . -}}
@@ -247,13 +244,7 @@ true
   {{- end -}}
 {{- end -}}
 
-{{- /*
-Renders the ScaledObject spec.fallback block.
-Args: dict "fallback" <map> "triggers" <list> "path" <values key, for messages>
-KEDA rejects a fallback whose triggers are all cpu/memory, and both
-failureThreshold and replicas are required int32 on the CRD, so both cases
-fail at render rather than at apply.
-*/}}
+{{- /* Renders spec.fallback from dict "fallback" "triggers" "path". Fails at render on what KEDA rejects at apply. */}}
 {{- define "spartan.kedaFallback" -}}
   {{- $path := .path -}}
   {{- $fallback := .fallback -}}

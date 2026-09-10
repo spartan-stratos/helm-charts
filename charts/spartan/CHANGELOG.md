@@ -27,9 +27,9 @@ All notable changes to this project will be documented in this file.
 
 ### Upgrade notes
 
-* Consumers already running a scaler will see `spec.replicas` disappear from the rendered Deployment. That is not a no-op at apply time under Argo CD's default client-side apply: the 3-way merge sees the key in `kubectl.kubernetes.io/last-applied-configuration` and absent from the new manifest, emits a patch removing it, and the apiserver then defaults the field to 1. Kubernetes documents this in [Migrating Deployments and StatefulSets to horizontal autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#migrating-deployments-and-statefulsets-to-horizontal-autoscaling): "removal of `spec.replicas` may incur a one-time degradation of Pod counts as the default value of this key is 1". A service sitting at 6 pods drops to 1 on the upgrade sync and recovers only after the next poll plus HPA reconcile plus pod start
-  * Not affected: apps syncing with `ServerSideApply=true`, which carries no last-applied annotation, and apps with `ignoreDifferences` on `/spec/replicas` plus `RespectIgnoreDifferences=true`, which keeps the live value
-  * Otherwise, either add one of those two settings before upgrading, run `kubectl apply edit-last-applied deployment/<name>` to drop `replicas` from the annotation first, or take the upgrade in a low-traffic window
+* Consumers already running a scaler will see `spec.replicas` disappear from the Deployment. Under Argo CD's default client-side apply the 3-way merge drops the key and the apiserver defaults it to 1, so a workload sitting above its floor takes a one-time dip ([Kubernetes docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#migrating-deployments-and-statefulsets-to-horizontal-autoscaling))
+  * The HPA restores the floor on its next sync without needing a metric, so anything at `minReplicas: 2` or higher self-heals in seconds; `minReplicas: 1` stays at 1 until its trigger scales it
+  * Not affected: apps where another field manager already owns `spec.replicas` (normally the KEDA-managed HPA) and that sync with `ServerSideApply=true`, or apps with `ignoreDifferences` on `/spec/replicas` plus `RespectIgnoreDifferences=true`
 
 ## [0.9.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.1) (2026-07-14)
 

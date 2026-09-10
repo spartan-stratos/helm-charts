@@ -1,4 +1,4 @@
-{{- /* Lowest pod count the workload settles at. KEDA owns the HPA when enabled, so its floor wins. */ -}}
+{{- /* Lowest pod count the workload settles at; KEDA owns the HPA when both are on. */ -}}
 {{- $floor := int .Values.replicaCount }}
 {{- if .Values.keda.enabled }}
 {{- $floor = int .Values.keda.minReplicas }}
