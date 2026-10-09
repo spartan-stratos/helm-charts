@@ -17,14 +17,8 @@ spec:
       annotations:
         checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") $ | sha256sum }}
-        {{- if .worker.podAnnotations }}
-        {{- with .worker.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-        {{- else }}
-        {{- with $.Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        {{- with include "spartan.observability.mergeAnnotations" (dict "Values" .Values "annotations" (.worker.podAnnotations | default .Values.podAnnotations)) }}
+        {{- . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "spartan.workerLabels" $ | nindent 8 }}
@@ -39,7 +33,8 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       terminationGracePeriodSeconds: {{ .worker.terminationGracePeriodSeconds | default 180 }}
-      {{- if .Values.datadog.enabled }}
+      {{- /* The operator also forces this for Go, set it here so the pod spec shows it. */}}
+      {{- if or .Values.datadog.enabled (and .Values.observability.enabled (eq .Values.observability.autoInstrumentation "go")) }}
       shareProcessNamespace: true
       {{- end }}
       containers:
@@ -101,8 +96,9 @@ spec:
               value: ""
             {{- end }}
           {{- end }}
-          {{- if or .Values.extraEnvs .worker.extraEnvs }}
-          {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .worker.extraEnvs)) | nindent 12 }}
+          {{- $otelEnvs := include "spartan.observability.env" (dict "Values" .Values "Chart" .Chart "Release" .Release "serviceName" (printf "%s-%s" (include "spartan.observability.serviceName" .) .worker.name)) | fromYamlArray }}
+          {{- if or $otelEnvs .Values.extraEnvs .worker.extraEnvs }}
+          {{- include "spartan.extraEnvs" (dict "lists" (list $otelEnvs .Values.extraEnvs .worker.extraEnvs)) | nindent 12 }}
           {{- end }}
           volumeMounts:
           {{- if .Values.secret.asFile.enabled }}

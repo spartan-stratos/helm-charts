@@ -40,16 +40,9 @@ spec:
       {{- end }}
       template:
         metadata:
-          {{- if .cronjob.podAnnotations }}
-          {{- with .cronjob.podAnnotations }}
+          {{- with include "spartan.observability.mergeAnnotations" (dict "Values" .Values "job" true "annotations" (.cronjob.podAnnotations | default .Values.podAnnotations)) }}
           annotations:
-              {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- else }}
-          {{- with .Values.podAnnotations }}
-          annotations:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- . | nindent 12 }}
           {{- end }}
           labels:
             {{- include "spartan.cronjobLabels" $ | nindent 12 }}
@@ -132,8 +125,9 @@ spec:
                   value: ""
                 {{- end }}
               {{- end }}
-              {{- if or .Values.extraEnvs .cronjob.extraEnvs }}
-                {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .cronjob.extraEnvs)) | nindent 16 }}
+              {{- $otelEnvs := include "spartan.observability.env" (dict "Values" .Values "Chart" .Chart "Release" .Release "serviceName" (printf "%s-%s" (include "spartan.observability.serviceName" .) .cronjob.name)) | fromYamlArray }}
+              {{- if or $otelEnvs .Values.extraEnvs .cronjob.extraEnvs }}
+                {{- include "spartan.extraEnvs" (dict "lists" (list $otelEnvs .Values.extraEnvs .cronjob.extraEnvs)) | nindent 16 }}
               {{- end }}
               volumeMounts:
               {{- if .Values.secret.asFile.enabled }}
