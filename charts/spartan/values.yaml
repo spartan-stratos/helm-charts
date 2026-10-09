@@ -525,6 +525,40 @@ datadog:
   ## deadline exceeded". Default true keeps the current behavior (no env added).
   cloudProviderMetadataEnabled: true
 
+## observability wires the pod into the OTel/LGTM stack (Alloy + OTel Operator).
+## Mutually exclusive with datadog.enabled: a project picks one.
+observability:
+  enabled: false
+  ## serviceName overrides OTEL_SERVICE_NAME; default appNameLabel, else the fullname.
+  ## Workers, cronjobs and hooks get "<serviceName>-<name>".
+  serviceName: ""
+  ## environment sets deployment.environment.name, e.g. dev, staging, prod. Omitted when empty.
+  environment: ""
+  otlp:
+    ## enabled renders OTEL_EXPORTER_OTLP_* and sampler env vars
+    enabled: true
+    endpoint: http://alloy.monitoring.svc.cluster.local:4318
+    protocol: http/protobuf
+    ## tracesSampleRatio is the parentbased_traceidratio argument (0.0 - 1.0)
+    tracesSampleRatio: "1.0"
+  ## serviceMonitor scrapes the main Service (needs the monitoring.coreos.com CRDs)
+  serviceMonitor:
+    enabled: false
+    ## port is the Service port name
+    port: http
+    path: /prometheus
+    interval: 30s
+    labels: {}
+  ## autoInstrumentation adds the OTel Operator inject annotation: java | python | go | "" (none).
+  ## Go is not injected on cronjob and hook pods: the eBPF sidecar never exits, so the Job never completes.
+  autoInstrumentation: ""
+  ## instrumentationRef is the Instrumentation CR as <namespace>/<name>
+  instrumentationRef: monitoring/default
+  ## goTargetExe is the binary path in the image, required when autoInstrumentation is go
+  goTargetExe: ""
+  ## resourceAttributes are extra OTEL_RESOURCE_ATTRIBUTES, e.g. team: payments
+  resourceAttributes: {}
+
 ## StrategyType configuration
 ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
 ## Can be set to RollingUpdate or OnDelete

@@ -1,0 +1,23 @@
+{{- $o := .Values.observability }}
+{{- if and $o.enabled $o.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "spartan.fullname" . }}
+  labels:
+    {{- include "spartan.labels" . | nindent 4 }}
+    {{- with $o.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "spartan.selectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: {{ $o.serviceMonitor.port }}
+      path: {{ $o.serviceMonitor.path }}
+      interval: {{ $o.serviceMonitor.interval }}
+{{- end }}

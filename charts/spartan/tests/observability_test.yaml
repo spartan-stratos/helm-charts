@@ -1,0 +1,319 @@
+suite: "Observability (OTel) tests"
+
+templates:
+  - "templates/deployment.yaml"
+  - "templates/worker.yaml"
+  - "templates/cronjob.yaml"
+  - "templates/hook.yaml"
+  - "templates/servicemonitor.yaml"
+  - "templates/configmap.yaml"
+  - "templates/secret.yaml"
+
+tests:
+  - it: "renders no OTEL env, annotation or ServiceMonitor when disabled"
+    set:
+      observability.serviceMonitor.enabled: true
+      observability.autoInstrumentation: java
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value: null
+        template: "templates/deployment.yaml"
+      - notExists:
+          path: spec.template.metadata.annotations["instrumentation.opentelemetry.io/inject-java"]
+        template: "templates/deployment.yaml"
+      - hasDocuments:
+          count: 0
+        template: "templates/servicemonitor.yaml"
+
+  - it: "renders OTEL env on the main deployment when enabled"
+    template: "templates/deployment.yaml"
+    release:
+      name: orders
+    set:
+      fullnameOverride: orders-api
+      image.tag: "1.4.2"
+      observability.enabled: true
+      observability.environment: dev
+      observability.resourceAttributes:
+        team: payments
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SERVICE_NAME
+            value: orders-api
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_RESOURCE_ATTRIBUTES
+            value: deployment.environment.name=dev,k8s.namespace.name=$(OTEL_K8S_NAMESPACE_NAME),k8s.pod.name=$(OTEL_K8S_POD_NAME),service.version=1.4.2,team=payments
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: http://alloy.monitoring.svc.cluster.local:4318
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_TRACES_SAMPLER
+            value: parentbased_traceidratio
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_TRACES_SAMPLER_ARG
+            value: "1.0"
+      - notExists:
+          path: spec.template.spec.shareProcessNamespace
+
+  - it: "omits OTLP exporter env when otlp.enabled is false"
+    template: "templates/deployment.yaml"
+    set:
+      observability.enabled: true
+      observability.otlp.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: http://alloy.monitoring.svc.cluster.local:4318
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SERVICE_NAME
+            value: RELEASE-NAME-spartan
+
+  - it: "extraEnvs override chart OTEL env without duplicating the name"
+    template: "templates/deployment.yaml"
+    set:
+      observability.enabled: true
+      extraEnvs:
+        - name: OTEL_TRACES_SAMPLER_ARG
+          value: "0.1"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_TRACES_SAMPLER_ARG
+            value: "0.1"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_TRACES_SAMPLER_ARG
+            value: "1.0"
+
+  - it: "adds the java inject annotation next to user podAnnotations"
+    template: "templates/deployment.yaml"
+    set:
+      podAnnotations:
+        custom.io/foo: bar
+      observability.enabled: true
+      observability.autoInstrumentation: java
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["instrumentation.opentelemetry.io/inject-java"]
+          value: monitoring/default
+      - equal:
+          path: spec.template.metadata.annotations["custom.io/foo"]
+          value: bar
+      - exists:
+          path: spec.template.metadata.annotations["checksum/configmap"]
+
+  - it: "adds the go inject + target exe annotations and shares the process namespace"
+    template: "templates/deployment.yaml"
+    set:
+      observability.enabled: true
+      observability.autoInstrumentation: go
+      observability.goTargetExe: /app/server
+      observability.instrumentationRef: monitoring/go
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["instrumentation.opentelemetry.io/inject-go"]
+          value: monitoring/go
+      - equal:
+          path: spec.template.metadata.annotations["instrumentation.opentelemetry.io/otel-go-auto-target-exe"]
+          value: /app/server
+      - equal:
+          path: spec.template.spec.shareProcessNamespace
+          value: true
+
+  - it: "fails when go is selected without goTargetExe"
+    template: "templates/deployment.yaml"
+    set:
+      observability.enabled: true
+      observability.autoInstrumentation: go
+    asserts:
+      - failedTemplate:
+          errorPattern: "needs observability.goTargetExe"
+
+  - it: "fails on an unknown autoInstrumentation language"
+    template: "templates/deployment.yaml"
+    set:
+      observability.enabled: true
+      observability.autoInstrumentation: ruby
+    asserts:
+      - failedTemplate:
+          errorPattern: "must be one of java, python, go"
+
+  - it: "fails when datadog and observability are both enabled"
+    template: "templates/deployment.yaml"
+    set:
+      datadog.enabled: true
+      observability.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "datadog.enabled and observability.enabled are both true"
+
+  - it: "renders the ServiceMonitor against the main Service"
+    template: "templates/servicemonitor.yaml"
+    release:
+      name: orders
+      namespace: payments
+    set:
+      observability.enabled: true
+      observability.serviceMonitor.enabled: true
+      observability.serviceMonitor.labels:
+        release: prometheus
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: apiVersion
+          value: monitoring.coreos.com/v1
+      - equal:
+          path: metadata.labels.release
+          value: prometheus
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: orders
+      - equal:
+          path: spec.namespaceSelector.matchNames[0]
+          value: payments
+      - equal:
+          path: spec.endpoints[0]
+          value:
+            port: http
+            path: /prometheus
+            interval: 30s
+
+  - it: "renders no ServiceMonitor unless observability is enabled"
+    template: "templates/servicemonitor.yaml"
+    set:
+      observability.serviceMonitor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "worker gets OTEL env with its own service name and the inject annotation"
+    template: "templates/worker.yaml"
+    set:
+      fullnameOverride: orders-api
+      observability.enabled: true
+      observability.autoInstrumentation: python
+      workers:
+        - name: consumer
+          command: "python consume.py"
+          extraEnvs:
+            - name: WORKER_ENV
+              value: w
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["instrumentation.opentelemetry.io/inject-python"]
+          value: monitoring/default
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SERVICE_NAME
+            value: orders-api-consumer
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WORKER_ENV
+            value: w
+
+  - it: "cronjob gets OTEL env and the java inject annotation"
+    template: "templates/cronjob.yaml"
+    set:
+      fullnameOverride: orders-api
+      observability.enabled: true
+      observability.autoInstrumentation: java
+      cronjobs:
+        - name: cleanup
+          commands: ["java -jar app.jar cleanup"]
+          customImage:
+            enabled: false
+          resources: {}
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.annotations["instrumentation.opentelemetry.io/inject-java"]
+          value: monitoring/default
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SERVICE_NAME
+            value: orders-api-cleanup
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: OTEL_EXPORTER_OTLP_PROTOCOL
+            value: http/protobuf
+
+  - it: "cronjob skips go injection because the eBPF sidecar would never exit"
+    template: "templates/cronjob.yaml"
+    set:
+      observability.enabled: true
+      observability.autoInstrumentation: go
+      observability.goTargetExe: /app/server
+      cronjobs:
+        - name: cleanup
+          commands: ["/app/server cleanup"]
+          customImage:
+            enabled: false
+          resources: {}
+    asserts:
+      - notExists:
+          path: spec.jobTemplate.spec.template.metadata.annotations
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SERVICE_NAME
+            value: RELEASE-NAME-spartan-cleanup
+
+  - it: "hook gets OTEL env and keeps its hook extraEnvs"
+    template: "templates/hook.yaml"
+    set:
+      fullnameOverride: orders-api
+      observability.enabled: true
+      observability.autoInstrumentation: java
+      hooks:
+        - name: migration
+          hookTypes: pre-install,pre-upgrade
+          commands: ["java -jar migrate.jar"]
+          customImage:
+            enabled: false
+          resources: {}
+          extraEnvs:
+            - name: HOOK_ENV
+              value: hook
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["instrumentation.opentelemetry.io/inject-java"]
+          value: monitoring/default
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SERVICE_NAME
+            value: orders-api-migration
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HOOK_ENV
+            value: hook

@@ -234,3 +234,80 @@ Merge extraEnvs
   {{- end -}}
   {{- toYaml $merged }}
 {{- end -}}
+
+{{- /* Fails on observability settings the chart or the OTel Operator would reject. */}}
+{{- define "spartan.observability.validate" -}}
+  {{- $o := .Values.observability -}}
+  {{- if and $o.enabled .Values.datadog.enabled -}}
+    {{- fail "spartan: datadog.enabled and observability.enabled are both true. A project picks one: the Datadog agent or OTel (LGTM). Disable one of them" -}}
+  {{- end -}}
+  {{- with $o.autoInstrumentation -}}
+    {{- if not (has . (list "java" "python" "go")) -}}
+      {{- fail (printf "spartan: observability.autoInstrumentation must be one of java, python, go or empty (got %q)" .) -}}
+    {{- end -}}
+    {{- if and (eq . "go") (not $o.goTargetExe) -}}
+      {{- fail "spartan: observability.autoInstrumentation=go needs observability.goTargetExe (path of the binary in the image); the operator skips Go injection without it" -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Base OTEL_SERVICE_NAME: observability.serviceName, else appNameLabel, else fullname. */}}
+{{- define "spartan.observability.serviceName" -}}
+{{- .Values.observability.serviceName | default .Values.appNameLabel | default (include "spartan.fullname" .) -}}
+{{- end -}}
+
+{{- /* Operator annotations as YAML, from dict "Values" "job". Go is skipped on Job pods: its sidecar never exits. */}}
+{{- define "spartan.observability.podAnnotations" -}}
+  {{- $o := .Values.observability -}}
+  {{- if and $o.enabled $o.autoInstrumentation (not (and .job (eq $o.autoInstrumentation "go"))) }}
+instrumentation.opentelemetry.io/inject-{{ $o.autoInstrumentation }}: {{ $o.instrumentationRef | quote }}
+    {{- if eq $o.autoInstrumentation "go" }}
+instrumentation.opentelemetry.io/otel-go-auto-target-exe: {{ $o.goTargetExe | quote }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
+{{- /* Pod template annotations: user annotations win over the operator ones. Args: dict "Values" "job" "annotations". */}}
+{{- define "spartan.observability.mergeAnnotations" -}}
+{{- $otel := include "spartan.observability.podAnnotations" . | fromYaml | default dict -}}
+{{- $merged := mergeOverwrite (dict) $otel (.annotations | default dict) -}}
+{{- with $merged }}{{ toYaml . }}{{ end -}}
+{{- end -}}
+
+{{- /* OTEL_* env list as YAML, from the root context plus "serviceName". Downward API vars come first so $(VAR) resolves. */}}
+{{- define "spartan.observability.env" -}}
+  {{- $o := .Values.observability -}}
+  {{- if $o.enabled -}}
+    {{- include "spartan.observability.validate" . -}}
+    {{- $attrs := dict "k8s.namespace.name" "$(OTEL_K8S_NAMESPACE_NAME)" "k8s.pod.name" "$(OTEL_K8S_POD_NAME)" -}}
+    {{- with $o.environment }}{{ $_ := set $attrs "deployment.environment.name" (toString .) }}{{ end -}}
+    {{- with .Values.image.tag }}{{ $_ := set $attrs "service.version" (toString .) }}{{ end -}}
+    {{- range $k, $v := $o.resourceAttributes }}{{ $_ := set $attrs $k (toString $v) }}{{ end -}}
+    {{- $pairs := list -}}
+    {{- range $k := keys $attrs | sortAlpha }}{{ $pairs = append $pairs (printf "%s=%s" $k (get $attrs $k)) }}{{ end }}
+- name: OTEL_K8S_NAMESPACE_NAME
+  valueFrom:
+    fieldRef:
+      apiVersion: v1
+      fieldPath: metadata.namespace
+- name: OTEL_K8S_POD_NAME
+  valueFrom:
+    fieldRef:
+      apiVersion: v1
+      fieldPath: metadata.name
+- name: OTEL_SERVICE_NAME
+  value: {{ .serviceName | quote }}
+- name: OTEL_RESOURCE_ATTRIBUTES
+  value: {{ join "," $pairs | quote }}
+    {{- if $o.otlp.enabled }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ $o.otlp.endpoint | quote }}
+- name: OTEL_EXPORTER_OTLP_PROTOCOL
+  value: {{ $o.otlp.protocol | quote }}
+- name: OTEL_TRACES_SAMPLER
+  value: "parentbased_traceidratio"
+- name: OTEL_TRACES_SAMPLER_ARG
+  value: {{ $o.otlp.tracesSampleRatio | toString | quote }}
+    {{- end }}
+  {{- end -}}
+{{- end -}}

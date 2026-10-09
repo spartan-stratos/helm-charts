@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.10.0) (2026-10-09)
+
+### Features
+
+* Add an `observability:` block that wires pods into the OTel/LGTM stack (Alloy + OpenTelemetry Operator), as the alternative to `datadog:`
+  * When `observability.enabled`, the main Deployment, workers, cronjobs and hooks get `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` (`deployment.environment.name`, `service.version` from `image.tag`, `k8s.namespace.name` / `k8s.pod.name` via the downward API, plus `resourceAttributes`) and, with `otlp.enabled`, `OTEL_EXPORTER_OTLP_ENDPOINT` / `_PROTOCOL` and a `parentbased_traceidratio` sampler
+  * Workers, cronjobs and hooks report as `<serviceName>-<name>`. `extraEnvs` still override any chart-set `OTEL_*` var, merged by name so no duplicate env entries are rendered
+  * `autoInstrumentation: java | python | go` adds the operator's `instrumentation.opentelemetry.io/inject-<lang>` annotation pointing at `instrumentationRef`. Go also needs `goTargetExe` and turns on `shareProcessNamespace`; it is not injected on cronjob and hook pods because the eBPF sidecar never exits and the Job would never complete
+  * Env vars set by the chart win over the operator: it only fills `OTEL_*` vars that are missing and appends to `OTEL_RESOURCE_ATTRIBUTES` without overriding keys already present. For Go the operator configures the injected sidecar, not the app container, so the Instrumentation CR is what applies there
+  * New `templates/servicemonitor.yaml` (`monitoring.coreos.com/v1`) behind `observability.enabled` and `observability.serviceMonitor.enabled`
+  * Rendering fails if `datadog.enabled` and `observability.enabled` are both true, if `autoInstrumentation` is not a supported language, or if Go is selected without `goTargetExe`
+  * Fully backward compatible: with `observability.enabled: false`, rendered manifests are byte-identical to 0.9.1
+
 ## [0.9.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.1) (2026-07-14)
 
 ### Bug Fixes

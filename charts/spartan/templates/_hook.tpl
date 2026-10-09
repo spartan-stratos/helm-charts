@@ -31,16 +31,9 @@ spec:
   backoffLimit: {{ .hook.backoffLimit | default 0 }}
   template:
     metadata:
-      {{- if .hook.podAnnotations }}
-      {{- with .hook.podAnnotations }}
+      {{- with include "spartan.observability.mergeAnnotations" (dict "Values" .Values "job" true "annotations" (.hook.podAnnotations | default .Values.podAnnotations)) }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- else }}
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- . | nindent 8 }}
       {{- end }}
       labels:
         {{- include "spartan.hookLabels" . | nindent 8 }}
@@ -157,8 +150,9 @@ spec:
               value: ""
             {{- end }}
           {{- end }}
-          {{- if or .Values.extraEnvs .hook.extraEnvs }}
-          {{- include "spartan.extraEnvs" (dict "lists" (list .Values.extraEnvs .hook.extraEnvs)) | nindent 12 }}
+          {{- $otelEnvs := include "spartan.observability.env" (dict "Values" .Values "Chart" .Chart "Release" .Release "serviceName" (printf "%s-%s" (include "spartan.observability.serviceName" .) .hook.name)) | fromYamlArray }}
+          {{- if or $otelEnvs .Values.extraEnvs .hook.extraEnvs }}
+          {{- include "spartan.extraEnvs" (dict "lists" (list $otelEnvs .Values.extraEnvs .hook.extraEnvs)) | nindent 12 }}
           {{- end }}
           volumeMounts:
             {{- if .Values.secret.asFile.enabled }}
