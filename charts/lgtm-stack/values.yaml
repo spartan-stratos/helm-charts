@@ -1,0 +1,132 @@
+# lgtm-stack renders one ArgoCD Application per LGTM Lite component (app of apps). Install it as an Application in the
+# ArgoCD namespace; the Applications it creates deploy the stack into `namespace` on the target cluster.
+
+# ArgoCD side
+argocd:
+  # Namespace the Application CRs are created in (where ArgoCD runs)
+  namespace: argocd
+  # AppProject the Applications belong to. Required
+  project: ""
+  # Target cluster: set name (a registered cluster) or server
+  destination:
+    name: ""
+    server: ""
+  # Prefix for the Application names, e.g. lgtm-grafana
+  namePrefix: lgtm-
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+# Where the addon Applications (plain manifests: rules, datasources, Instrumentation) pull this chart from.
+# Defaults to this chart's own version in the Spartan Helm repository; set path (and a git repoURL) to test a branch.
+self:
+  repoURL: https://spartan-stratos.github.io/helm-charts
+  chart: lgtm-stack
+  # Defaults to the version of this chart
+  targetRevision: ""
+  path: ""
+
+# Fixed: the presets wire components together through monitoring.svc.cluster.local URLs
+namespace: monitoring
+
+cluster:
+  # Cluster label on every metric and log line (Prometheus externalLabels, Alloy, Slack messages). Required
+  name: ""
+
+# Pins every pod of the stack, e.g. to a dedicated node:
+#   nodeSelector: { workload: lgtm }
+#   tolerations: [{ key: workload, operator: Equal, value: lgtm, effect: NoSchedule }]
+# Set nodeSelector as well as the toleration, or a Pending pod can make a node autoscaler launch a node for it.
+# With a nodeSelector, Alloy's Service routes OTLP across nodes (internalTrafficPolicy: Cluster).
+placement:
+  nodeSelector: {}
+  tolerations: []
+
+grafana:
+  # Sets grafana.ini server.root_url and the Ingress host
+  domain: ""
+  ingress:
+    enabled: false
+    className: alb
+    annotations: {}
+  # none | keycloak | github. Adds presets/grafana-sso-<provider>.yaml; the client secret is Secret grafana-oauth,
+  # key client-secret. Settings as in the preset, e.g. keycloak: { url, realm, clientId, admin: [], member: [] }
+  sso:
+    provider: none
+    keycloak: {}
+    github: {}
+
+alerting:
+  # AlertmanagerConfig sending warning and critical alerts to Slack. The webhook URL lives in a Secret created outside
+  # git; until it exists the operator skips the receiver and Alertmanager keeps running.
+  slack:
+    enabled: false
+    secretName: alert-slack
+    secretKey: webhook-url
+
+# One entry per component. enabled turns its Application off; values is merged over the preset (and over the
+# settings above), so anything the upstream chart accepts can be set here. ignoreDifferences is appended to the
+# built-in list.
+components:
+  prometheusOperatorCrds:
+    enabled: true
+    # Bump together with kube-prometheus-stack: 32.0.1 ships the CRDs for operator v0.94.1
+    chart: { repoURL: https://prometheus-community.github.io/helm-charts, name: prometheus-operator-crds, version: 32.0.1 }
+    values: {}
+    ignoreDifferences: []
+  kubePrometheusStack:
+    enabled: true
+    chart: { repoURL: https://prometheus-community.github.io/helm-charts, name: kube-prometheus-stack, version: 91.9.0 }
+    values: {}
+    ignoreDifferences: []
+  grafana:
+    enabled: true
+    chart: { repoURL: https://grafana-community.github.io/helm-charts, name: grafana, version: 13.2.6 }
+    values: {}
+    ignoreDifferences: []
+  loki:
+    enabled: true
+    chart: { repoURL: https://grafana-community.github.io/helm-charts, name: loki, version: 18.13.7 }
+    values: {}
+    ignoreDifferences: []
+  alloy:
+    enabled: true
+    chart: { repoURL: https://grafana.github.io/helm-charts, name: alloy, version: 1.13.0 }
+    values: {}
+    ignoreDifferences: []
+  tempo:
+    enabled: true
+    chart: { repoURL: https://grafana-community.github.io/helm-charts, name: tempo, version: 3.0.0 }
+    values: {}
+    ignoreDifferences: []
+  opentelemetryOperator:
+    enabled: true
+    chart: { repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts, name: opentelemetry-operator, version: 0.123.1 }
+    values: {}
+    ignoreDifferences: []
+
+# Plain manifests from files/manifests, each in its own Application
+addons:
+  clusterInfo:
+    enabled: true
+  pvcFillRules:
+    enabled: true
+  grafanaDatasources:
+    enabled: true
+  instrumentation:
+    enabled: true
+
+# Internal: set on the addon Applications, which render one addon's manifests instead of Applications
+mode: applications
+addon: ""

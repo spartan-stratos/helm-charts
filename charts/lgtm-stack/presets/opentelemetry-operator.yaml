@@ -1,0 +1,32 @@
+# OTel Operator: injects language agents into pods annotated with instrumentation.opentelemetry.io/inject-<lang>.
+fullnameOverride: opentelemetry-operator
+
+manager:
+  collectorImage:
+    repository: otel/opentelemetry-collector-k8s
+  # Renders --enable-go-instrumentation; inject-go is silently ignored without it.
+  # The Go sidecar is privileged, so Go namespaces also need the privileged PSA level.
+  autoInstrumentation:
+    go:
+      enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  serviceMonitor:
+    enabled: true
+  # The operator creates a NetworkPolicy for itself by default, and it blocked Prometheus from scraping the
+  # operator's metrics. NetworkPolicy is Enterprise hardening in the RFC; Lite runs without it.
+  featureGatesMap:
+    operator.networkpolicy: false
+
+admissionWebhooks:
+  pods:
+    # Never block app rollouts when the operator is down (the missing-agent alert covers that case)
+    failurePolicy: Ignore
+  certManager:
+    enabled: false
+  autoGenerateCert:
+    enabled: true

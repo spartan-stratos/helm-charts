@@ -1,0 +1,65 @@
+{{- if eq .Values.mode "applications" }}
+{{- $_ := required "argocd.project is required" .Values.argocd.project }}
+{{- $_ := required "cluster.name is required" .Values.cluster.name }}
+{{- $components := include "lgtm-stack.components" . | fromYaml }}
+{{- if hasKey $components "Error" }}{{ fail $components.Error }}{{ end }}
+{{- range $key, $c := $components }}
+{{- $cv := index $.Values.components $key }}
+{{- if $cv.enabled }}
+{{- $ignores := concat ($c.ignoreDifferences | default list) ($cv.ignoreDifferences | default list) }}
+---
+{{ include "lgtm-stack.applicationHeader" (list $ $c.app $c.wave) }}
+spec:
+  project: {{ $.Values.argocd.project }}
+  {{- include "lgtm-stack.destination" $ | nindent 2 }}
+  source:
+    repoURL: {{ $cv.chart.repoURL }}
+    chart: {{ $cv.chart.name }}
+    targetRevision: {{ $cv.chart.version | quote }}
+    helm:
+      releaseName: {{ $c.app }}
+      {{- $values := include "lgtm-stack.values" (list $ $key $c) }}
+      {{- if ne $values "{}" }}
+      valuesObject: {{- $values | nindent 8 }}
+      {{- end }}
+  {{- with $ignores }}
+  ignoreDifferences: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- include "lgtm-stack.syncPolicy" (list $ (gt (len $ignores) 0)) | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- $addons := include "lgtm-stack.addons" . | fromYaml }}
+{{- range $key, $a := $addons }}
+{{- $enabled := false }}
+{{- if eq $key "alertmanagerConfig" }}
+{{- $enabled = $.Values.alerting.slack.enabled }}
+{{- else }}
+{{- $enabled = (index $.Values.addons $key).enabled }}
+{{- end }}
+{{- if $enabled }}
+---
+{{ include "lgtm-stack.applicationHeader" (list $ $a.app $a.wave) }}
+spec:
+  project: {{ $.Values.argocd.project }}
+  {{- include "lgtm-stack.destination" $ | nindent 2 }}
+  source:
+    repoURL: {{ $.Values.self.repoURL }}
+    {{- if $.Values.self.path }}
+    path: {{ $.Values.self.path }}
+    targetRevision: {{ required "self.targetRevision is required with self.path" $.Values.self.targetRevision | quote }}
+    {{- else }}
+    chart: {{ $.Values.self.chart }}
+    targetRevision: {{ $.Values.self.targetRevision | default $.Chart.Version | quote }}
+    {{- end }}
+    helm:
+      releaseName: {{ printf "%s%s" $.Values.argocd.namePrefix $a.app }}
+      valuesObject:
+        mode: addon
+        addon: {{ $key }}
+        namespace: {{ $.Values.namespace }}
+        cluster: {{- toYaml $.Values.cluster | nindent 10 }}
+        alerting: {{- toYaml $.Values.alerting | nindent 10 }}
+  {{- include "lgtm-stack.syncPolicy" (list $ false) | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,40 @@
+# Optional layer on top of grafana.yaml: GitHub OAuth login with preset roles, login form off.
+# A project only sets sso.github: the org, the OAuth App client id, and which teams are admin / member.
+# The client secret comes from Secret grafana-oauth (key client-secret).
+# OAuth App callback URL: <root_url>/login/github
+sso:
+  github:
+    organization: CHANGE_ME
+    clientId: CHANGE_ME
+    # GitHub team slugs in that org. admin -> Grafana Admin, member -> Editor; anyone else is refused
+    admin: []
+    member: []
+
+envValueFrom:
+  GF_AUTH_GITHUB_CLIENT_SECRET:
+    secretKeyRef:
+      name: grafana-oauth
+      key: client-secret
+
+# The chart runs every grafana.ini string through tpl, so the role rule is built from sso.github
+grafana.ini:
+  auth:
+    # Break-glass: the admin user still works over API basic auth
+    disable_login_form: true
+  auth.github:
+    enabled: true
+    allow_sign_up: true
+    auto_login: false
+    client_id: "{{ .Values.sso.github.clientId }}"
+    client_secret: $__env{GF_AUTH_GITHUB_CLIENT_SECRET}
+    scopes: user:email,read:org
+    allowed_organizations: "{{ .Values.sso.github.organization }}"
+    role_attribute_strict: true
+    # Grafana sees teams as @<org>/<team-slug>
+    role_attribute_path: >-
+      {{- $g := .Values.sso.github -}}
+      {{- $admin := list -}}{{- range $g.admin -}}{{- $admin = append $admin (printf "contains(groups[*], '@%s/%s')" $g.organization .) -}}{{- end -}}
+      {{- $member := list -}}{{- range $g.member -}}{{- $member = append $member (printf "contains(groups[*], '@%s/%s')" $g.organization .) -}}{{- end -}}
+      {{- if $admin -}}({{ join " || " $admin }}) && 'Admin' || {{ end -}}
+      {{- if $member -}}({{ join " || " $member }}) && 'Editor' || {{ end -}}
+      ''

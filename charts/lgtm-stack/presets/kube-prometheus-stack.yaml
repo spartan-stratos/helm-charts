@@ -1,0 +1,121 @@
+# Lite preset: single Prometheus + Alertmanager on PVCs. Grafana is a separate release.
+# Stable object names so other presets can hard-code the endpoints.
+fullnameOverride: kube-prometheus-stack
+cleanPrometheusOperatorObjectNames: true
+
+# CRDs ship in their own Application (prometheus-operator-crds) so they can sync first
+crds:
+  enabled: false
+
+grafana:
+  enabled: false
+  # Still ship the Kubernetes dashboards as ConfigMaps; the separate Grafana loads them by label
+  forceDeployDashboards: true
+  sidecar:
+    dashboards:
+      annotations:
+        grafana_folder: Kubernetes
+
+# EKS does not expose these control-plane endpoints
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+
+kube-state-metrics:
+  prometheus:
+    monitor:
+      http:
+        # Without it namespace/pod come out as exported_namespace/exported_pod
+        honorLabels: true
+  # Needed by the "annotated for injection but no agent" alert
+  metricAnnotationsAllowList:
+    - pods=[instrumentation.opentelemetry.io/inject-java,instrumentation.opentelemetry.io/inject-python,instrumentation.opentelemetry.io/inject-go,instrumentation.opentelemetry.io/inject-nodejs,instrumentation.opentelemetry.io/inject-dotnet]
+
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 60d
+    # Below the PVC size so the TSDB trims itself before the disk fills
+    retentionSize: 85GB
+    # Select every ServiceMonitor / PodMonitor / PrometheusRule, no release label needed
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+    # Tempo metrics-generator remote-writes span metrics here
+    enableRemoteWriteReceiver: true
+    # App OTLP metrics arrive from Alloy
+    enableOTLPReceiver: true
+    otlp:
+      # http_server_request_duration_seconds_*, no quoting needed in PromQL
+      translationStrategy: UnderscoreEscapingWithSuffixes
+      promoteResourceAttributes:
+        - service.name
+        - service.namespace
+        - deployment.environment.name
+        - k8s.namespace.name
+        - k8s.pod.name
+        - team
+    externalLabels:
+      # Set from cluster.name
+      cluster: ""
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        memory: 4Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3-enc-retain
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 100Gi
+
+alertmanager:
+  # The chart's inhibit rules, plus persistentvolumeclaim in `equal`: every stack PVC shares namespace and alertname,
+  # so without it a critical on one PVC would hide the warning on another. Alerts without the label behave as before
+  config:
+    inhibit_rules:
+      - source_matchers: ['severity = critical']
+        target_matchers: ['severity =~ warning|info']
+        equal: [namespace, alertname, persistentvolumeclaim]
+      - source_matchers: ['severity = warning']
+        target_matchers: ['severity = info']
+        equal: [namespace, alertname, persistentvolumeclaim]
+      - source_matchers: ['alertname = InfoInhibitor']
+        target_matchers: ['severity = info']
+        equal: [namespace]
+      - target_matchers: ['alertname = InfoInhibitor']
+  alertmanagerSpec:
+    replicas: 1
+    retention: 120h
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3-enc-retain
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 10Gi

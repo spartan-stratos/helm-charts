@@ -1,0 +1,35 @@
+# One per cluster. Services opt in with instrumentation.opentelemetry.io/inject-<lang>: "monitoring/default".
+# Chart env on the pod wins over these defaults.
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: default
+  namespace: monitoring
+spec:
+  exporter:
+    endpoint: http://alloy.monitoring.svc.cluster.local:4318
+  propagators: [tracecontext, baggage]
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1"
+  java:
+    env:
+      - name: OTEL_LOGS_EXPORTER
+        value: otlp
+      - name: OTEL_METRICS_EXPORTER
+        value: otlp
+      - name: OTEL_EXPORTER_OTLP_PROTOCOL
+        value: http/protobuf
+  python:
+    env:
+      - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
+        value: "true"
+      - name: OTEL_LOGS_EXPORTER
+        value: none
+      # Stable HTTP semconv so Python metric names match Java
+      - name: OTEL_SEMCONV_STABILITY_OPT_IN
+        value: http
+  go:
+    env:
+      - name: OTEL_EXPORTER_OTLP_PROTOCOL
+        value: http/protobuf

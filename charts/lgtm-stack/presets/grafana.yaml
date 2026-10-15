@@ -1,0 +1,90 @@
+# Lite preset: one Grafana replica, SQLite on a PVC. Secrets grafana-admin and grafana-secret-key come from the project.
+# grafana.sso.provider adds grafana-sso-<provider>.yaml on top to turn on SSO and switch the login form off.
+fullnameOverride: grafana
+replicas: 1
+
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+envValueFrom:
+  GF_SECURITY_SECRET_KEY:
+    secretKeyRef:
+      name: grafana-secret-key
+      key: secret-key
+
+persistence:
+  enabled: true
+  storageClassName: gp3-enc-retain
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: grafana
+  periodSeconds: 5
+
+serviceMonitor:
+  enabled: true
+
+grafana.ini:
+  server:
+    # Set from grafana.domain
+    root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+  security:
+    secret_key: $__env{GF_SECURITY_SECRET_KEY}
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+  # On only to show alerts: Prometheus evaluates the rules (PrometheusRule CRs) and Alertmanager routes them.
+  # Grafana lists them read-only and manages silences on the real Alertmanager. Do not create Grafana-managed
+  # rules; rules live in code.
+  unified_alerting:
+    enabled: true
+
+# Dashboards and datasources come from ConfigMaps in this namespace, so each component adds its own:
+# kube-prometheus-stack ships the Kubernetes dashboards, the grafanaDatasources addon adds Loki and Tempo
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folderAnnotation: grafana_folder
+    provider:
+      foldersFromFilesStructure: true
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+
+# Fixed UIDs so dashboards and links survive a rebuild
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+        jsonData:
+          exemplarTraceIdDestinations:
+            - name: trace_id
+              datasourceUid: tempo
+      # The real Alertmanager: firing alerts, silences and notification history in Grafana's Alerting pages
+      - name: Alertmanager
+        uid: alertmanager
+        type: alertmanager
+        url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+        jsonData:
+          implementation: prometheus
+          # Grafana-managed alerts (there should be none) stay in Grafana's own Alertmanager
+          handleGrafanaManagedAlerts: false

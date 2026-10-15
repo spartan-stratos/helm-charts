@@ -1,0 +1,64 @@
+# Baked-in safeguard for the stack's own PVCs (Lite has no backups and fixed-size disks).
+# Fixed tiers on top of kube-prometheus-stack's KubePersistentVolumeFillingUp, which only fires at 3% free or on a
+# 4-day prediction. Alertmanager's inhibit rules (preset kube-prometheus-stack.yaml) keep one tier per PVC.
+# Runbook: README.md "PVC-fill alerts". Tests: files/tests/pvc-fill-rules.test.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lgtm-pvc-fill
+  namespace: monitoring
+spec:
+  groups:
+    - name: lgtm-pvc-fill
+      rules:
+        - alert: LgtmPvcFilling
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="monitoring"}
+              / kubelet_volume_stats_capacity_bytes{namespace="monitoring"} > 0.75
+          for: 15m
+          labels:
+            severity: info
+          annotations: &bytes_annotations
+            summary: "PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
+            description: >-
+              {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is over its fill threshold. Expand the
+              PVC (the StorageClass allows it) or shorten the component's retention.
+            runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#pvc-fill-alerts
+        - alert: LgtmPvcFilling
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="monitoring"}
+              / kubelet_volume_stats_capacity_bytes{namespace="monitoring"} > 0.90
+          for: 10m
+          labels:
+            severity: warning
+          annotations: *bytes_annotations
+        - alert: LgtmPvcFilling
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="monitoring"}
+              / kubelet_volume_stats_capacity_bytes{namespace="monitoring"} > 0.95
+          for: 5m
+          labels:
+            severity: critical
+          annotations: *bytes_annotations
+        # Loki and Tempo write many small files, so inodes can run out before bytes do
+        - alert: LgtmPvcInodesFilling
+          expr: |
+            kubelet_volume_stats_inodes_used{namespace="monitoring"}
+              / kubelet_volume_stats_inodes{namespace="monitoring"} > 0.90
+          for: 10m
+          labels:
+            severity: warning
+          annotations: &inode_annotations
+            summary: "PVC {{ $labels.persistentvolumeclaim }} has used {{ $value | humanizePercentage }} of its inodes"
+            description: >-
+              {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is running out of inodes. Expanding the
+              PVC adds inodes; shortening retention removes files.
+            runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#pvc-fill-alerts
+        - alert: LgtmPvcInodesFilling
+          expr: |
+            kubelet_volume_stats_inodes_used{namespace="monitoring"}
+              / kubelet_volume_stats_inodes{namespace="monitoring"} > 0.95
+          for: 5m
+          labels:
+            severity: critical
+          annotations: *inode_annotations

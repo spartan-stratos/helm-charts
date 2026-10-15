@@ -1,0 +1,12 @@
+{{- /* Addon mode: the manifests of one addon, copied verbatim apart from the __PLACEHOLDERS__ (their own {{ }} are Prometheus and Alertmanager templates) */}}
+{{- if eq .Values.mode "addon" }}
+{{- $a := index (include "lgtm-stack.addons" . | fromYaml) .Values.addon }}
+{{- if not $a }}{{ fail (printf "unknown addon %q" .Values.addon) }}{{ end }}
+{{- range $a.files }}
+---
+{{ $.Files.Get (printf "files/manifests/%s" .)
+  | replace "__CLUSTER_NAME__" (required "cluster.name is required" $.Values.cluster.name)
+  | replace "__SLACK_SECRET_NAME__" $.Values.alerting.slack.secretName
+  | replace "__SLACK_SECRET_KEY__" $.Values.alerting.slack.secretKey }}
+{{- end }}
+{{- end }}
