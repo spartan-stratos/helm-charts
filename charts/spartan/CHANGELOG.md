@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.2](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.2) (2026-10-16)
+## [0.10.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.10.0) (2026-10-16)
 
 ### Bug Fixes
 
@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 Only releases that set BOTH a non-empty `hooks` AND one of `configMap.asFile/asEnv` or `secret.asFile/asEnv` need anything here. Everyone else can bump straight across.
 
+* **This is a minor bump, not a patch, on purpose.** For a plain `helm upgrade` consumer the upgrade needs a flag and possibly a manual annotation strip, so it is not a drop-in patch. A consumer pinned to `~0.9.x` would otherwise adopt it automatically and fail on `invalid ownership metadata` with no warning.
 * **One rolling restart is expected.** `configmap.yaml` and `secret.yaml` changed content, and `deployment.yaml` checksums both files whole, so the pod template annotation changes once on this bump. The twins are deliberately outside that checksum
 * **ArgoCD consumers:** a plain sync removes the stale annotations from the live objects. Verify by reading the live object, never by reading the sync status - a successful sync is exactly what would lie here:
 
