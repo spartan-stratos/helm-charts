@@ -49,6 +49,12 @@ helm upgrade <release_name> [--install] spartan/spartan --version <version> -n <
 
 `--install`: Tell Helm to install the chart if the specified release does not exist.
 
+> **Upgrading to 0.10.0 or later from 0.9.x**, on a release that uses `hooks` together with any
+> `asFile` / `asEnv` flag, needs a one-time migration: the ConfigMaps and Secrets were previously
+> created as hook resources and carry no release-ownership metadata. A plain `helm upgrade` stops
+> with `invalid ownership metadata`. See the CHANGELOG entry for 0.10.0 for the exact steps and the
+> measured behaviour per Helm version.
+
 ## Uninstalling the Chart
 
 To uninstall/delete the `<release_name>` deployment from the `<namespace>`:
@@ -257,3 +263,31 @@ The following table lists the configurable parameters of the **spartan chart** a
 ### Hook Delete Policy
 
 Use `hooks[].deletePolicy` for named hooks that must rerun on every Argo CD sync. For migration hooks, set `before-hook-creation` so Argo CD recreates the Job before each sync instead of leaving the previous named Job in place.
+
+### Hook-scoped ConfigMaps and Secrets
+
+When `hooks` is non-empty and any of the `asFile` / `asEnv` flags is enabled, the chart renders each
+object **twice**: a permanent copy that the Deployment mounts, and a disposable twin that the hook
+Job mounts.
+
+| Object | Rendered name | Annotations | Mounted by |
+|---|---|---|---|
+| permanent | `<fullname>-cm-as-file`, `-cm-as-env`, `-secret-as-file`, `-secret-as-env` | none | Deployment, worker, cronjob |
+| hook twin | the same names with a `-hook` suffix | `helm.sh/hook`, `hook-weight`, `hook-delete-policy: before-hook-creation` | the hook Job and any log-collector sidecar attached to it |
+
+A hook resource is transient and a Deployment is permanent, so a Deployment must never mount one:
+once the hook phase collects the object, no new pod can start and the pod stays in `FailedMount`.
+Splitting the two keeps the Deployment's mount always satisfiable while the hook still gets values
+during `pre-install`, before the main manifest exists.
+
+Notes:
+
+- Twins render only when at least one `hooks` entry has `commands`, matching the condition that
+  renders the Job itself. A release with no hooks, or with no `asFile` / `asEnv` flag, renders no
+  twins and is unaffected.
+- Twins carry `hook-weight` of the lowest hook weight minus one, so they are always created before
+  the earliest Job that mounts them.
+- A hook Job's volume keeps its ordinary pod-local name and takes its content from the twin, so a
+  log collector sharing the pod mounts the same volume name in either context.
+- `helm.sh/resource-policy: keep` is deliberately absent from the twins. They are meant to be
+  replaced on each hook phase; the permanent copies are what persists.
