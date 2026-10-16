@@ -290,3 +290,50 @@ tests:
       - equal:
           path: spec.template.spec.containers[1].envFrom[1].configMapRef.name
           value: RELEASE-NAME-spartan-cm-as-env
+
+  # The Job cannot start unless its twin already exists, so the twin's weight must be strictly
+  # lower than EVERY hook Job's. lowestHookWeight returns min-1, which guarantees it without
+  # relying on Helm's same-weight kind ordering. Nothing else asserts that, and this fix depends
+  # on it in a way the pre-split chart did not.
+  - it: "orders every twin strictly before the earliest hook job"
+    templates:
+      - templates/hook-configmap.yaml
+      - templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: early
+          hookTypes: pre-install
+          hookWeight: -5
+          commands: ["echo early"]
+          customImage:
+            enabled: false
+        - name: later
+          hookTypes: pre-install
+          hookWeight: 3
+          commands: ["echo later"]
+          customImage:
+            enabled: false
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-6"
+
+  - it: "renders no twins when every asFile and asEnv flag is off"
+    templates:
+      - templates/hook-configmap.yaml
+      - templates/hook-secret.yaml
+    set:
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands: ["echo hi"]
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
