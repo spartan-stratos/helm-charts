@@ -10,9 +10,10 @@
   - while ! [ -f /tmp/kill_me ]; do {{ .sidecar.command }}; done;
   {{- end }}
   envFrom:
+    {{- /* A pre-install hook runs before the main manifest exists, so a hook pod must read the hook-scoped twins. */}}
     {{- if .Values.secret.asEnv.enabled }}
     - secretRef:
-        name: {{ include "spartan.secretAsEnv" . }}
+        name: {{ if .hookScoped }}{{ include "spartan.secretAsEnvHook" . }}{{ else }}{{ include "spartan.secretAsEnv" . }}{{ end }}
     {{- end }}
     {{- if .Values.secret.externalSecretEnv.enabled }}
     - secretRef:
@@ -20,7 +21,7 @@
     {{- end }}
     {{- if .Values.configMap.asEnv.enabled }}
     - configMapRef:
-        name: {{ include "spartan.configMapAsEnv" . }}
+        name: {{ if .hookScoped }}{{ include "spartan.configMapAsEnvHook" . }}{{ else }}{{ include "spartan.configMapAsEnv" . }}{{ end }}
     {{- end }}
     {{- if .Values.configMap.externalConfigMapEnv.enabled }}
     - configMapRef:

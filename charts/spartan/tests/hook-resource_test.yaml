@@ -5,6 +5,7 @@ templates:
   - templates/secret.yaml
   - templates/hook-configmap.yaml
   - templates/hook-secret.yaml
+  - templates/deployment.yaml
 tests:
   - it: "wires hook jobs to disposable twins"
     template: templates/hook.yaml
@@ -36,16 +37,16 @@ tests:
           value: RELEASE-NAME-spartan-cm-as-env-hook
       - equal:
           path: spec.template.spec.volumes[0].name
-          value: RELEASE-NAME-spartan-secret-as-file-hook
+          value: RELEASE-NAME-spartan-secret-as-file
       - equal:
           path: spec.template.spec.containers[0].volumeMounts[0].name
-          value: RELEASE-NAME-spartan-secret-as-file-hook
+          value: RELEASE-NAME-spartan-secret-as-file
       - equal:
           path: spec.template.spec.volumes[1].name
-          value: RELEASE-NAME-spartan-cm-as-file-hook
+          value: RELEASE-NAME-spartan-cm-as-file
       - equal:
           path: spec.template.spec.containers[0].volumeMounts[1].name
-          value: RELEASE-NAME-spartan-cm-as-file-hook
+          value: RELEASE-NAME-spartan-cm-as-file
 
   - it: "keeps permanent configmap documents free of hook annotations"
     template: templates/configmap.yaml
@@ -184,3 +185,108 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: "collector pod mounts only volumes it declares and reads twin env sources"
+    template: templates/hook.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent:7
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          collectLog: true
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: RELEASE-NAME-spartan-secret-as-file-hook
+      - equal:
+          path: spec.template.spec.volumes[1].configMap.name
+          value: RELEASE-NAME-spartan-cm-as-file-hook
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[0].secretRef.name
+          value: RELEASE-NAME-spartan-secret-as-env-hook
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[1].configMapRef.name
+          value: RELEASE-NAME-spartan-cm-as-env-hook
+
+  - it: "keeps volume names within 63 chars for a long fullname"
+    template: templates/hook.yaml
+    set:
+      fullnameOverride: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuv
+      secret.asFile.enabled: true
+      configMap.asFile.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent:7
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          collectLog: true
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.volumes[0].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.volumes[1].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[1].volumeMounts[0].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[1].volumeMounts[1].name
+          pattern: ^.{1,63}$
+
+  - it: "deployment sidecar still reads the permanent env objects"
+    template: templates/deployment.yaml
+    set:
+      secret.asEnv.enabled: true
+      configMap.asEnv.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent:7
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[0].secretRef.name
+          value: RELEASE-NAME-spartan-secret-as-env
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[1].configMapRef.name
+          value: RELEASE-NAME-spartan-cm-as-env

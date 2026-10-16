@@ -162,7 +162,7 @@ spec:
           {{- end }}
           volumeMounts:
             {{- if .Values.secret.asFile.enabled }}
-            - name: {{ include "spartan.secretAsFileHook" . }}
+            - name: {{ include "spartan.secretAsFile" . }}
               readOnly: true
               mountPath: {{ .Values.secret.asFile.mountPath | quote }}
             {{- end }}
@@ -172,7 +172,7 @@ spec:
               mountPath: {{ .Values.secret.externalSecretFile.mountPath | quote }}
             {{- end }}
             {{- if .Values.configMap.asFile.enabled }}
-            - name: {{ include "spartan.configMapAsFileHook" . }}
+            - name: {{ include "spartan.configMapAsFile" . }}
               readOnly: true
               mountPath: {{ .Values.configMap.asFile.mountPath | quote }}
             {{- end }}
@@ -192,7 +192,7 @@ spec:
         {{- $hook := .hook }}
         {{- range $sidecar := .Values.sidecars }}
           {{- if and (eq $sidecar.name $lcName) ($hook.collectLog) }}
-            {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
+            {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release "hookScoped" true) | indent 8 }}
           {{- end }}
         {{- end }}
       {{- with .Values.nodeSelector }}
@@ -209,7 +209,7 @@ spec:
         {{- end }}
       volumes:
         {{- if .Values.secret.asFile.enabled }}
-        - name: {{ include "spartan.secretAsFileHook" . }}
+        - name: {{ include "spartan.secretAsFile" . }}
           secret:
             secretName: {{ include "spartan.secretAsFileHook" . }}
         {{- end }}
@@ -219,7 +219,7 @@ spec:
             secretName: {{ .Values.secret.externalSecretFile.name }}
         {{- end }}
         {{- if .Values.configMap.asFile.enabled }}
-        - name: {{ include "spartan.configMapAsFileHook" . }}
+        - name: {{ include "spartan.configMapAsFile" . }}
           configMap:
             name: {{ include "spartan.configMapAsFileHook" . }}
         {{- end }}
