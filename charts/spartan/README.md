@@ -54,6 +54,8 @@ helm upgrade <release_name> [--install] spartan/spartan --version <version> -n <
 > created as hook resources and carry no release-ownership metadata. A plain `helm upgrade` stops
 > with `invalid ownership metadata`. See the CHANGELOG entry for 0.10.0 for the exact steps and the
 > measured behaviour per Helm version.
+>
+> There is **no supported rollback to 0.9.x** - on 0.9.x these objects are hook resources and are absent from the release manifest, so a `helm rollback` deletes them and the Deployment cannot start. Roll forward rather than back.
 
 ## Uninstalling the Chart
 
@@ -291,3 +293,4 @@ Notes:
   log collector sharing the pod mounts the same volume name in either context.
 - `helm.sh/resource-policy: keep` is deliberately absent from the twins. They are meant to be
   replaced on each hook phase; the permanent copies are what persists.
+- A twin is replaced on each hook phase but is never deleted, and `helm uninstall` does not remove hook resources. A secret twin therefore outlives the Job and survives decommission holding a copy of the credential, and it stops being refreshed if `hooks` is later emptied. Remove the `-hook` objects by hand when decommissioning a release or dropping hooks from it.

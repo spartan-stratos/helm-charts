@@ -34,7 +34,9 @@ Only releases that set BOTH a non-empty `hooks` AND one of `configMap.asFile/asE
   | helm 3.17.0 | helm 3.17.0 | deployed, rev 2 | still present |
   | helm 3.17.0 | helm 4.1.0 | deployed, rev 2 | still present |
 
-  The variable is which helm INSTALLED the release, not which one runs the upgrade. In all three rows ownership transferred and the release reported `deployed`, so a helm 3 consumer would see a clean upgrade and remain fully exposed to the original defect with no signal of any kind.
+  The variable is which helm INSTALLED the release, not which one runs the upgrade. In all three rows ownership transferred and the release reported `deployed`, so a helm 3 consumer sees a clean upgrade with no signal that the annotations are still there.
+
+  What the residual annotations DO cost is a desired-versus-live difference that never converges: the rendered manifest no longer carries them, the live object does, and a client-side apply cannot remove a field absent from `last-applied-configuration`. Under ArgoCD self-heal that is a permanently OutOfSync resource being reconciled forever. It is NOT established that the original defect recurs - both Helm and ArgoCD decide whether a resource is a hook from the rendered manifest, not from the live object's annotations, so a de-hooked manifest should stop the collection that caused it. That has not been measured, so strip the annotations to converge the diff rather than on the assumption that the defect is still armed.
 * **Why, and why the manual strip is the general fix rather than a lucky result.** helm 4 applies server-side: an applier that stops claiming a field it owned has that field removed by the API server, so the de-hooked manifest clears the annotations as a consequence of ownership semantics. helm 3 applies client-side with a three-way merge, which can only delete a field present in the OLD manifest - and a hook-created object is stored in the release's `hooks`, not its `manifest`, so no delete directive is ever generated. Nothing in the release wants those annotations back, and `kubectl annotate ...-` edits live state directly, which is the one path that bypasses the merge that cannot delete them. This predicts the strip holds on any helm 3.x, and is unnecessary on helm 4
 * **Remediation on a helm-3-installed release**, after the upgrade:
 
@@ -46,7 +48,8 @@ Only releases that set BOTH a non-empty `hooks` AND one of `configMap.asFile/asE
   done
   ```
 
-  Strip all three keys. Removing only `resource-policy` leaves the object hook-scoped, which is the half that causes the defect.
+  Strip all three keys, so the live object matches the rendered manifest. Removing only `resource-policy` leaves `helm.sh/hook` and `hook-weight` behind and the diff unconverged.
+* **There is no supported rollback to 0.9.x. Roll forward.** On 0.9.x the four objects are hook resources, so they sit in the release's `hooks` and NOT in its `manifest`; on 0.10.0 they are ordinary manifest resources with no `resource-policy: keep`. A `helm rollback` to a 0.9.x revision therefore diffs four objects against none and DELETES all four, and the rolled-back Deployment then mounts two that no longer exist and stops in `ContainerCreating`. The same applies to `helm upgrade --atomic` or `--cleanup-on-fail` if the upgrade fails after the main manifest applied. Reverting an ArgoCD `targetRevision` to 0.9.1 turns the tracked objects back into hook resources and, with auto-prune on, may prune them. Reasoned from Helm's manifest-diff semantics and the storage split measured above, not yet reproduced on a cluster. If you need to leave 0.10.0, recreate the four objects by hand before scaling the Deployment back up.
 * **Do not delete the objects to force a clean recreate.** Measured: deleting the ConfigMap wedges the release - the Deployment cannot start a pod and the next hook phase does not recover it.
 
 ## [0.9.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.1) (2026-07-14)
