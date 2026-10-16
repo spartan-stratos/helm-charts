@@ -119,7 +119,7 @@ spec:
           envFrom:
               {{- if .Values.secret.asEnv.enabled }}
             - secretRef:
-                name: {{ include "spartan.secretAsEnv" . }}
+                name: {{ include "spartan.secretAsEnvHook" . }}
               {{- end }}
               {{- if .Values.secret.externalSecretEnv.enabled }}
             - secretRef:
@@ -127,7 +127,7 @@ spec:
               {{- end }}
               {{- if .Values.configMap.asEnv.enabled }}
             - configMapRef:
-                name: {{ include "spartan.configMapAsEnv" . }}
+                name: {{ include "spartan.configMapAsEnvHook" . }}
               {{- end }}
               {{- if .Values.configMap.externalConfigMapEnv.enabled }}
             - configMapRef:
@@ -162,7 +162,7 @@ spec:
           {{- end }}
           volumeMounts:
             {{- if .Values.secret.asFile.enabled }}
-            - name: {{ include "spartan.secretAsFile" . }}
+            - name: {{ include "spartan.secretAsFileHook" . }}
               readOnly: true
               mountPath: {{ .Values.secret.asFile.mountPath | quote }}
             {{- end }}
@@ -172,7 +172,7 @@ spec:
               mountPath: {{ .Values.secret.externalSecretFile.mountPath | quote }}
             {{- end }}
             {{- if .Values.configMap.asFile.enabled }}
-            - name: {{ include "spartan.configMapAsFile" . }}
+            - name: {{ include "spartan.configMapAsFileHook" . }}
               readOnly: true
               mountPath: {{ .Values.configMap.asFile.mountPath | quote }}
             {{- end }}
@@ -209,9 +209,9 @@ spec:
         {{- end }}
       volumes:
         {{- if .Values.secret.asFile.enabled }}
-        - name: {{ include "spartan.secretAsFile" . }}
+        - name: {{ include "spartan.secretAsFileHook" . }}
           secret:
-            secretName: {{ include "spartan.secretAsFile" . }}
+            secretName: {{ include "spartan.secretAsFileHook" . }}
         {{- end }}
         {{- if .Values.secret.externalSecretFile.enabled }}
         - name: {{ .Values.secret.externalSecretFile.name }}
@@ -219,9 +219,9 @@ spec:
             secretName: {{ .Values.secret.externalSecretFile.name }}
         {{- end }}
         {{- if .Values.configMap.asFile.enabled }}
-        - name: {{ include "spartan.configMapAsFile" . }}
+        - name: {{ include "spartan.configMapAsFileHook" . }}
           configMap:
-            name: {{ include "spartan.configMapAsFile" . }}
+            name: {{ include "spartan.configMapAsFileHook" . }}
         {{- end }}
         {{- if .Values.configMap.externalConfigMapFile.enabled }}
         - name: {{ .Values.configMap.externalConfigMapFile.name }}

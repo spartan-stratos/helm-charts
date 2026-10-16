@@ -5,12 +5,6 @@ metadata:
   name: {{ include "spartan.configMapAsFile" . }}
   labels:
     {{- include "spartan.labels" . | nindent 4 }}
-  {{- if .Values.hooks }}
-  annotations:
-    "helm.sh/hook": {{ include "spartan.combineHookTypes" . | quote }}
-    "helm.sh/hook-weight": {{ include "spartan.lowestHookWeight" . | default 0 | quote }}
-    "helm.sh/resource-policy": keep
-  {{- end }}
 data:
   {{- toYaml .Values.configMap.asFile.data | nindent 2 }}
 {{- end }}
@@ -22,12 +16,6 @@ metadata:
   name: {{ include "spartan.configMapAsEnv" . }}
   labels:
     {{- include "spartan.labels" . | nindent 4 }}
-  {{- if .Values.hooks }}
-  annotations:
-    "helm.sh/hook": {{include "spartan.combineHookTypes" . | quote }}
-    "helm.sh/hook-weight": {{include "spartan.lowestHookWeight" . | default 0 | quote }}
-    "helm.sh/resource-policy": keep
-  {{- end }}
 data:
   {{- toYaml .Values.configMap.asEnv.data | nindent 2 }}
 {{- end }}

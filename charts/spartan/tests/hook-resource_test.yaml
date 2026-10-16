@@ -1,0 +1,186 @@
+suite: "Hook resource tests"
+templates:
+  - templates/hook.yaml
+  - templates/configmap.yaml
+  - templates/secret.yaml
+  - templates/hook-configmap.yaml
+  - templates/hook-secret.yaml
+tests:
+  - it: "wires hook jobs to disposable twins"
+    template: templates/hook.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: RELEASE-NAME-spartan-secret-as-file-hook
+      - equal:
+          path: spec.template.spec.volumes[1].configMap.name
+          value: RELEASE-NAME-spartan-cm-as-file-hook
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: RELEASE-NAME-spartan-secret-as-env-hook
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].configMapRef.name
+          value: RELEASE-NAME-spartan-cm-as-env-hook
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: RELEASE-NAME-spartan-secret-as-file-hook
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: RELEASE-NAME-spartan-secret-as-file-hook
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: RELEASE-NAME-spartan-cm-as-file-hook
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: RELEASE-NAME-spartan-cm-as-file-hook
+
+  - it: "keeps permanent configmap documents free of hook annotations"
+    template: templates/configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - notExists:
+          path: metadata.annotations["helm.sh/hook"]
+
+  - it: "renders disposable configmap twins"
+    template: templates/hook-configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - notExists:
+          path: metadata.annotations["helm.sh/resource-policy"]
+
+  - it: "omits configmap twins without commands"
+    template: templates/hook-configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: [{name: migration, hookTypes: pre-install}, {name: other, commands: []}]
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "omits configmap twins without hooks"
+    template: templates/hook-configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: []
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "keeps permanent secret documents free of hook annotations"
+    template: templates/secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - notExists:
+          path: metadata.annotations["helm.sh/hook"]
+
+  - it: "renders disposable secret twins"
+    template: templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - notExists:
+          path: metadata.annotations["helm.sh/resource-policy"]
+
+  - it: "omits secret twins without commands"
+    template: templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: [{name: migration, hookTypes: pre-install}, {name: other, commands: []}]
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "omits secret twins without hooks"
+    template: templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: []
+    asserts:
+      - hasDocuments:
+          count: 0

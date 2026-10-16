@@ -128,11 +128,19 @@ Secret as files
 {{- printf "%s-%s" (include "spartan.fullname" .) "secret-as-file" }}
 {{- end }}
 
+{{- define "spartan.secretAsFileHook" -}}
+{{- printf "%s-%s" (include "spartan.fullname" .) "secret-as-file-hook" }}
+{{- end }}
+
 {{- /*
 Secret as environment variables
 */}}
 {{- define "spartan.secretAsEnv" -}}
 {{- printf "%s-%s" (include "spartan.fullname" .) "secret-as-env" }}
+{{- end }}
+
+{{- define "spartan.secretAsEnvHook" -}}
+{{- printf "%s-%s" (include "spartan.fullname" .) "secret-as-env-hook" }}
 {{- end }}
 
 {{- /*
@@ -142,11 +150,19 @@ ConfigMap as files
 {{- printf "%s-%s" (include "spartan.fullname" .) "cm-as-file" }}
 {{- end }}
 
+{{- define "spartan.configMapAsFileHook" -}}
+{{- printf "%s-%s" (include "spartan.fullname" .) "cm-as-file-hook" }}
+{{- end }}
+
 {{- /*
 ConfigMap as files
 */}}
 {{- define "spartan.configMapAsEnv" -}}
 {{- printf "%s-%s" (include "spartan.fullname" .) "cm-as-env" }}
+{{- end }}
+
+{{- define "spartan.configMapAsEnvHook" -}}
+{{- printf "%s-%s" (include "spartan.fullname" .) "cm-as-env-hook" }}
 {{- end }}
 
 {{- /*
@@ -234,3 +250,9 @@ Merge extraEnvs
   {{- end -}}
   {{- toYaml $merged }}
 {{- end -}}
+
+{{- define "spartan.hasHookCommands" -}}
+{{- range .Values.hooks }}
+{{- if .commands }}true{{- end }}
+{{- end }}
+{{- end }}
