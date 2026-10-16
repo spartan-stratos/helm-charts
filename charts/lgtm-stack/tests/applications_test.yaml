@@ -72,7 +72,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.1.0
+          value: 0.1.1
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
@@ -107,6 +107,18 @@ tests:
         documentSelector:
           path: metadata.name
           value: lgtm-alloy
+
+  - it: "opts Prometheus and Alertmanager out of Reloader's auto-reload"
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus.annotations["reloader.stakater.com/auto"]
+          value: "false"
+      - equal:
+          path: spec.source.helm.valuesObject.alertmanager.annotations["reloader.stakater.com/auto"]
+          value: "false"
 
   - it: "lets component values override presets with false and empty strings"
     set:
