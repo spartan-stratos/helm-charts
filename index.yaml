@@ -37,6 +37,17 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/kafka-users-0.1.0/kafka-users-0.1.0.tgz
     version: 0.1.0
+  lgtm-stack:
+  - apiVersion: v2
+    created: "2026-10-16T07:14:20.673562302Z"
+    description: LGTM Lite (Prometheus, Alertmanager, Grafana, Loki, Alloy, Tempo,
+      OTel Operator) as ArgoCD Applications
+    digest: 8fce4260c091ffc0e3813c25f2a7a35e1f76f1400f7dd214b6ec451ab2b6daab
+    name: lgtm-stack
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/lgtm-stack-0.1.0/lgtm-stack-0.1.0.tgz
+    version: 0.1.0
   schema-registry:
   - apiVersion: v2
     appVersion: 7.6.1
@@ -540,4 +551,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-07-14T06:46:54.148681481Z"
+generated: "2026-10-16T07:14:20.6736574Z"
