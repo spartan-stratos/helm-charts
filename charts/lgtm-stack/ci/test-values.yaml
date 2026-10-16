@@ -1,0 +1,7 @@
+# Minimal values for CI (helm-check); the required fields only
+argocd:
+  project: example
+  destination:
+    name: example-cluster
+cluster:
+  name: example-cluster

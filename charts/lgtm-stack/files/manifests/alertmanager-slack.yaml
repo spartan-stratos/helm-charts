@@ -1,0 +1,33 @@
+# Sends warning and critical alerts from the real Alertmanager to Slack. Info stays in Grafana; Watchdog has no severity.
+# The webhook URL comes from the Secret named in alerting.slack, created outside git. Until it exists the operator skips
+# this config and Alertmanager keeps running with the null receiver; once it exists, the operator picks it up.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: slack
+  namespace: monitoring
+spec:
+  route:
+    receiver: slack
+    groupBy: [alertname, namespace]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    matchers:
+      - name: severity
+        matchType: "=~"
+        value: warning|critical
+  receivers:
+    - name: slack
+      slackConfigs:
+        - apiURL:
+            name: __SLACK_SECRET_NAME__
+            key: __SLACK_SECRET_KEY__
+          sendResolved: true
+          title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          text: |-
+            {{ range .Alerts }}*{{ .Annotations.summary }}*{{ if .Annotations.message }}*{{ .Annotations.message }}*{{ end }}
+            {{ .Annotations.description }}
+            `cluster=__CLUSTER_NAME__ namespace={{ .Labels.namespace }}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.persistentvolumeclaim }} pvc={{ .Labels.persistentvolumeclaim }}{{ end }}{{ if .Labels.job_name }} job={{ .Labels.job_name }}{{ end }}`
+            {{ if .Annotations.runbook_url }}<{{ .Annotations.runbook_url }}|Runbook>{{ end }}
+            {{ end }}

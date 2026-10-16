@@ -1,0 +1,41 @@
+# Lite preset: Tempo single binary, local backend on a PVC.
+fullnameOverride: tempo
+
+tempo:
+  retention: 168h # 7d
+  reportingEnabled: false
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+  # Span metrics + service graph, remote-written to Prometheus (receiver enabled in kube-prometheus-stack)
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+  overrides:
+    defaults:
+      metrics_generator:
+        processors: [service-graphs, span-metrics, local-blocks]
+        processor:
+          # Gives traces_spanmetrics_calls_total an http_response_status_code label for 5xx alerts
+          span_metrics:
+            dimensions: [http.response.status_code, http.request.method, http.route]
+          service_graphs:
+            dimensions: [http.request.method]
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+persistence:
+  enabled: true
+  storageClassName: gp3-enc-retain
+  size: 100Gi
+
+serviceMonitor:
+  enabled: true

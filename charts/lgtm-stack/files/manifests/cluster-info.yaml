@@ -1,0 +1,8 @@
+# Read by Alloy (envFrom) for the cluster label on logs and metrics
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-cluster-info
+  namespace: monitoring
+data:
+  CLUSTER_NAME: __CLUSTER_NAME__

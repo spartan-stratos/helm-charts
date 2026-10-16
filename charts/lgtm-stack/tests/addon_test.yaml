@@ -1,0 +1,47 @@
+suite: "Addon mode"
+
+templates:
+  - "templates/addon.yaml"
+
+set:
+  mode: addon
+  cluster.name: example-cluster
+
+tests:
+  - it: "renders cluster-info with the cluster name"
+    set:
+      addon: clusterInfo
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data.CLUSTER_NAME
+          value: example-cluster
+
+  - it: "renders the Slack AlertmanagerConfig with the Secret reference and keeps Alertmanager templates"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.secretName: my-slack
+    asserts:
+      - isKind:
+          of: AlertmanagerConfig
+      - equal:
+          path: spec.receivers[0].slackConfigs[0].apiURL.name
+          value: my-slack
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: 'cluster=example-cluster namespace=\{\{ \.Labels\.namespace \}\}'
+
+  - it: "renders both datasources"
+    set:
+      addon: grafanaDatasources
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: "fails on an unknown addon"
+    set:
+      addon: nope
+    asserts:
+      - failedTemplate:
+          errorMessage: 'unknown addon "nope"'

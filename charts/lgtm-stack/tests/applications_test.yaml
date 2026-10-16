@@ -1,0 +1,148 @@
+suite: "Applications"
+
+templates:
+  - "templates/applications.yaml"
+
+set:
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+
+tests:
+  - it: "renders one Application per component and addon"
+    asserts:
+      - hasDocuments:
+          count: 11
+      - isKind:
+          of: Application
+
+  - it: "fails without argocd.project"
+    set:
+      argocd.project: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "argocd.project is required"
+
+  - it: "fails without a destination"
+    set:
+      argocd.destination.name: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "argocd.destination.name or argocd.destination.server is required"
+
+  - it: "adds the Slack AlertmanagerConfig Application and the matcher strategy when Slack is on"
+    set:
+      alerting.slack.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 12
+      - equal:
+          path: metadata.name
+          value: lgtm-alertmanager-config
+        documentSelector:
+          path: metadata.name
+          value: lgtm-alertmanager-config
+      - equal:
+          path: spec.source.helm.valuesObject.alertmanager.alertmanagerSpec.alertmanagerConfigMatcherStrategy.type
+          value: None
+        documentSelector:
+          path: metadata.name
+          value: lgtm-kube-prometheus-stack
+
+  - it: "drops a disabled component"
+    set:
+      components.tempo.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 10
+
+  - it: "sets the cluster label and points addons at this chart version"
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus.prometheusSpec.externalLabels.cluster
+          value: example-cluster
+        documentSelector:
+          path: metadata.name
+          value: lgtm-kube-prometheus-stack
+      - equal:
+          path: spec.source.chart
+          value: lgtm-stack
+        documentSelector:
+          path: metadata.name
+          value: lgtm-cluster-info
+      - equal:
+          path: spec.source.targetRevision
+          value: 0.1.0
+        documentSelector:
+          path: metadata.name
+          value: lgtm-cluster-info
+
+  - it: "applies placement to every pod path of kube-prometheus-stack and routes Alloy across nodes"
+    set:
+      placement:
+        nodeSelector: { workload: lgtm }
+        tolerations: [{ key: workload, operator: Equal, value: lgtm, effect: NoSchedule }]
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.prometheusOperator.admissionWebhooks.patch.nodeSelector.workload
+          value: lgtm
+        documentSelector:
+          path: metadata.name
+          value: lgtm-kube-prometheus-stack
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus-node-exporter.tolerations[0].value
+          value: lgtm
+        documentSelector:
+          path: metadata.name
+          value: lgtm-kube-prometheus-stack
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.nodeSelector.workload
+          value: lgtm
+        documentSelector:
+          path: metadata.name
+          value: lgtm-loki
+      - equal:
+          path: spec.source.helm.valuesObject.service.internalTrafficPolicy
+          value: Cluster
+        documentSelector:
+          path: metadata.name
+          value: lgtm-alloy
+
+  - it: "lets component values override presets with false and empty strings"
+    set:
+      grafana.sso.provider: keycloak
+      grafana.sso.keycloak: { url: https://auth.example.com, realm: main, clientId: grafana, admin: [sre], member: [] }
+      components.grafana.values:
+        admin: { existingSecret: "" }
+        grafana.ini: { auth: { disable_login_form: false } }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.admin.existingSecret
+          value: ""
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"].auth.disable_login_form
+          value: false
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].enabled
+          value: true
+      - equal:
+          path: spec.source.helm.valuesObject.sso.keycloak.realm
+          value: main
+      - contains:
+          path: spec.syncPolicy.syncOptions
+          content: RespectIgnoreDifferences=true
+
+  - it: "keeps the OTel webhook cert out of Helm hooks"
+    documentSelector:
+      path: metadata.name
+      value: lgtm-opentelemetry-operator
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.admissionWebhooks.secretAnnotations
+          value: { helm.sh/hook: null, helm.sh/hook-delete-policy: null }
+      - lengthEqual:
+          path: spec.ignoreDifferences
+          count: 3

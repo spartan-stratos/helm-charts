@@ -1,0 +1,96 @@
+# Lite preset: Loki single binary, filesystem on a PVC. Single tenant, no S3.
+deploymentMode: Monolithic
+fullnameOverride: loki
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  storage:
+    type: filesystem
+  distributor:
+    otlp_config:
+      # The built-in list indexes k8s.pod.name / replicaset / service.instance.id; override it
+      default_resource_attributes_as_index_labels:
+        - service.name
+        - service.namespace
+        - deployment.environment
+        - deployment.environment.name
+        # cluster / namespace / container are indexed under the stdout names below, not as k8s_*
+        - k8s.deployment.name
+        - k8s.statefulset.name
+        - k8s.daemonset.name
+        - k8s.cronjob.name
+        - k8s.job.name
+  limits_config:
+    retention_period: 336h # 14d; bounded by the PVC size
+    allow_structured_metadata: true
+    volume_enabled: true
+    # Keep heavy queries from starving ingestion on one pod
+    query_timeout: 2m
+    max_query_length: 721h
+    max_query_series: 5000
+    otlp_config:
+      resource_attributes:
+        attributes_config:
+          # Same stream labels as the stdout path; Alloy sets cluster / namespace / container on OTLP logs
+          - action: index_label
+            attributes: [team, cluster, namespace, container]
+          - action: structured_metadata
+            attributes: [k8s.pod.name, k8s.replicaset.name, service.instance.id, k8s.pod.uid]
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+  pattern_ingester:
+    enabled: true
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  persistence:
+    enabled: true
+    storageClass: gp3-enc-retain
+    size: 50Gi
+
+# Chart defaults still give the scalable targets replicas
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+gateway:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
+minio:
+  enabled: false
+# No ruler in Lite; the sidecar was OOM-killed in the spike
+sidecar:
+  rules:
+    enabled: false
+
+monitoring:
+  serviceMonitor:
+    enabled: true

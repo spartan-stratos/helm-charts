@@ -1,0 +1,89 @@
+# promtool unit tests for files/manifests/pvc-fill-rules.yaml; run files/tests/test-rules.sh.
+# rule_files names the manifest; the script extracts its PrometheusRule spec before calling promtool.
+rule_files:
+  - pvc-fill-rules.yaml
+evaluation_interval: 1m
+
+tests:
+  # capacity 100; loki at 80%, tempo at 92%, prometheus at 97%, grafana at 10%
+  - interval: 1m
+    input_series:
+      - series: 'kubelet_volume_stats_capacity_bytes{namespace="monitoring",persistentvolumeclaim="storage-loki-0"}'
+        values: '100x30'
+      - series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="storage-loki-0"}'
+        values: '80x30'
+      - series: 'kubelet_volume_stats_capacity_bytes{namespace="monitoring",persistentvolumeclaim="storage-tempo-0"}'
+        values: '100x30'
+      - series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="storage-tempo-0"}'
+        values: '92x30'
+      - series: 'kubelet_volume_stats_capacity_bytes{namespace="monitoring",persistentvolumeclaim="prometheus-db"}'
+        values: '100x30'
+      - series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="prometheus-db"}'
+        values: '97x30'
+      - series: 'kubelet_volume_stats_capacity_bytes{namespace="monitoring",persistentvolumeclaim="grafana"}'
+        values: '100x30'
+      - series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="grafana"}'
+        values: '10x30'
+      # another namespace is out of scope
+      - series: 'kubelet_volume_stats_capacity_bytes{namespace="other",persistentvolumeclaim="data"}'
+        values: '100x30'
+      - series: 'kubelet_volume_stats_used_bytes{namespace="other",persistentvolumeclaim="data"}'
+        values: '99x30'
+    alert_rule_test:
+      # before each tier's "for" has passed, nothing fires
+      - eval_time: 4m
+        alertname: LgtmPvcFilling
+        exp_alerts: []
+      # 6m: only the 95% tier (for 5m) has fired
+      - eval_time: 6m
+        alertname: LgtmPvcFilling
+        exp_alerts:
+          - exp_labels: { severity: critical, namespace: monitoring, persistentvolumeclaim: prometheus-db }
+            exp_annotations:
+              summary: "PVC prometheus-db is 97% full"
+              description: "prometheus-db in monitoring is over its fill threshold. Expand the PVC (the StorageClass allows it) or shorten the component's retention."
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#pvc-fill-alerts
+      # 16m: every tier each PVC crosses; Alertmanager inhibition keeps only the highest per PVC
+      - eval_time: 16m
+        alertname: LgtmPvcFilling
+        exp_alerts:
+          - exp_labels: { severity: info, namespace: monitoring, persistentvolumeclaim: storage-loki-0 }
+            exp_annotations: &a_loki
+              summary: "PVC storage-loki-0 is 80% full"
+              description: "storage-loki-0 in monitoring is over its fill threshold. Expand the PVC (the StorageClass allows it) or shorten the component's retention."
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#pvc-fill-alerts
+          - exp_labels: { severity: info, namespace: monitoring, persistentvolumeclaim: storage-tempo-0 }
+            exp_annotations: &a_tempo
+              summary: "PVC storage-tempo-0 is 92% full"
+              description: "storage-tempo-0 in monitoring is over its fill threshold. Expand the PVC (the StorageClass allows it) or shorten the component's retention."
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#pvc-fill-alerts
+          - exp_labels: { severity: warning, namespace: monitoring, persistentvolumeclaim: storage-tempo-0 }
+            exp_annotations: *a_tempo
+          - exp_labels: { severity: info, namespace: monitoring, persistentvolumeclaim: prometheus-db }
+            exp_annotations: &a_prom
+              summary: "PVC prometheus-db is 97% full"
+              description: "prometheus-db in monitoring is over its fill threshold. Expand the PVC (the StorageClass allows it) or shorten the component's retention."
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#pvc-fill-alerts
+          - exp_labels: { severity: warning, namespace: monitoring, persistentvolumeclaim: prometheus-db }
+            exp_annotations: *a_prom
+          - exp_labels: { severity: critical, namespace: monitoring, persistentvolumeclaim: prometheus-db }
+            exp_annotations: *a_prom
+
+  # inodes: 96% used on loki
+  - interval: 1m
+    input_series:
+      - series: 'kubelet_volume_stats_inodes{namespace="monitoring",persistentvolumeclaim="storage-loki-0"}'
+        values: '1000x20'
+      - series: 'kubelet_volume_stats_inodes_used{namespace="monitoring",persistentvolumeclaim="storage-loki-0"}'
+        values: '960x20'
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: LgtmPvcInodesFilling
+        exp_alerts:
+          - exp_labels: { severity: warning, namespace: monitoring, persistentvolumeclaim: storage-loki-0 }
+            exp_annotations: &a_inode
+              summary: "PVC storage-loki-0 has used 96% of its inodes"
+              description: "storage-loki-0 in monitoring is running out of inodes. Expanding the PVC adds inodes; shortening retention removes files."
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#pvc-fill-alerts
+          - exp_labels: { severity: critical, namespace: monitoring, persistentvolumeclaim: storage-loki-0 }
+            exp_annotations: *a_inode
