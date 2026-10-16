@@ -1,0 +1,339 @@
+suite: "Hook resource tests"
+templates:
+  - templates/hook.yaml
+  - templates/configmap.yaml
+  - templates/secret.yaml
+  - templates/hook-configmap.yaml
+  - templates/hook-secret.yaml
+  - templates/deployment.yaml
+tests:
+  - it: "wires hook jobs to disposable twins"
+    template: templates/hook.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: RELEASE-NAME-spartan-secret-as-file-hook
+      - equal:
+          path: spec.template.spec.volumes[1].configMap.name
+          value: RELEASE-NAME-spartan-cm-as-file-hook
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: RELEASE-NAME-spartan-secret-as-env-hook
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].configMapRef.name
+          value: RELEASE-NAME-spartan-cm-as-env-hook
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+
+  - it: "keeps permanent configmap documents free of hook annotations"
+    template: templates/configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - notExists:
+          path: metadata.annotations["helm.sh/hook"]
+
+  - it: "renders disposable configmap twins"
+    template: templates/hook-configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - notExists:
+          path: metadata.annotations["helm.sh/resource-policy"]
+
+  - it: "omits configmap twins without commands"
+    template: templates/hook-configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: [{name: migration, hookTypes: pre-install}, {name: other, commands: []}]
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "omits configmap twins without hooks"
+    template: templates/hook-configmap.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: []
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "keeps permanent secret documents free of hook annotations"
+    template: templates/secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - notExists:
+          path: metadata.annotations["helm.sh/hook"]
+
+  - it: "renders disposable secret twins"
+    template: templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - notExists:
+          path: metadata.annotations["helm.sh/resource-policy"]
+
+  - it: "omits secret twins without commands"
+    template: templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: [{name: migration, hookTypes: pre-install}, {name: other, commands: []}]
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "omits secret twins without hooks"
+    template: templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks: []
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "collector pod mounts only volumes it declares and reads twin env sources"
+    template: templates/hook.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent:7
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          collectLog: true
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: RELEASE-NAME-spartan-secret-as-file
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: RELEASE-NAME-spartan-cm-as-file
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: RELEASE-NAME-spartan-secret-as-file-hook
+      - equal:
+          path: spec.template.spec.volumes[1].configMap.name
+          value: RELEASE-NAME-spartan-cm-as-file-hook
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[0].secretRef.name
+          value: RELEASE-NAME-spartan-secret-as-env-hook
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[1].configMapRef.name
+          value: RELEASE-NAME-spartan-cm-as-env-hook
+
+  - it: "keeps volume names within 63 chars for a long fullname"
+    template: templates/hook.yaml
+    set:
+      fullnameOverride: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuv
+      secret.asFile.enabled: true
+      configMap.asFile.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent:7
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          collectLog: true
+          commands:
+            - echo hi
+          customImage:
+            enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.volumes[0].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.volumes[1].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[1].volumeMounts[0].name
+          pattern: ^.{1,63}$
+      - matchRegex:
+          path: spec.template.spec.containers[1].volumeMounts[1].name
+          pattern: ^.{1,63}$
+
+  - it: "deployment sidecar still reads the permanent env objects"
+    template: templates/deployment.yaml
+    set:
+      secret.asEnv.enabled: true
+      configMap.asEnv.enabled: true
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent:7
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[0].secretRef.name
+          value: RELEASE-NAME-spartan-secret-as-env
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[1].configMapRef.name
+          value: RELEASE-NAME-spartan-cm-as-env
+
+  # The Job cannot start unless its twin already exists, so the twin's weight must be strictly
+  # lower than EVERY hook Job's. lowestHookWeight returns min-1, which guarantees it without
+  # relying on Helm's same-weight kind ordering. Nothing else asserts that, and this fix depends
+  # on it in a way the pre-split chart did not.
+  - it: "orders every twin strictly before the earliest hook job"
+    templates:
+      - templates/hook-configmap.yaml
+      - templates/hook-secret.yaml
+    set:
+      secret.asFile.enabled: true
+      secret.asEnv.enabled: true
+      configMap.asFile.enabled: true
+      configMap.asEnv.enabled: true
+      hooks:
+        - name: early
+          hookTypes: pre-install
+          hookWeight: -5
+          commands: ["echo early"]
+          customImage:
+            enabled: false
+        - name: later
+          hookTypes: pre-install
+          hookWeight: 3
+          commands: ["echo later"]
+          customImage:
+            enabled: false
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-6"
+
+  - it: "renders no twins when every asFile and asEnv flag is off"
+    templates:
+      - templates/hook-configmap.yaml
+      - templates/hook-secret.yaml
+    set:
+      hooks:
+        - name: migration
+          hookTypes: pre-install
+          hookWeight: -1
+          commands: ["echo hi"]
+          customImage:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

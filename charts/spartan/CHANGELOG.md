@@ -2,6 +2,56 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.10.0) (2026-10-16)
+
+### Bug Fixes
+
+* ConfigMap / Secret: render a permanent copy and a disposable hook twin, so the Deployment never mounts a hook-scoped object
+  * `configmap.yaml` and `secret.yaml` stamped `helm.sh/hook`, `helm.sh/hook-weight` and `helm.sh/resource-policy: keep` onto all four objects whenever `.Values.hooks` was non-empty. The Deployment mounts two of them (`cm-as-file`, `secret-as-file`) and injects the other two via `envFrom`. A hook resource is transient while the Deployment is permanent, so once the object was collected no new pod could start: `MountVolume.SetUp failed for volume "<fullname>-cm-as-file": configmap "<fullname>-cm-as-file" not found`. `resource-policy: keep` was present and did not prevent this under ArgoCD
+  * The permanent copy keeps its existing name and carries no hook annotations, so the Deployment's mount is unchanged and always satisfiable. A new `-hook`-suffixed twin (`<fullname>-cm-as-file-hook` and the other three) carries the hook annotations plus `helm.sh/hook-delete-policy: before-hook-creation` and no `resource-policy`, and the hook Job references the twin in `envFrom`, `volumeMounts` and `volumes`. Twins render only when some entry of `hooks` actually has `.commands`, matching the gate `hook.yaml` already applies to the Job
+  * The twins live in new `hook-configmap.yaml` / `hook-secret.yaml` because `deployment.yaml` checksums `configmap.yaml` and `secret.yaml` whole; a twin inside those files would churn the pod template on every hook-only change
+  * Unaffected: a release with no `hooks`, or with no `asFile`/`asEnv` flag set, rendered no hook annotations before and renders no twins now
+
+### Upgrade notes
+
+Only releases that set BOTH a non-empty `hooks` AND one of `configMap.asFile/asEnv` or `secret.asFile/asEnv` need anything here. Everyone else can bump straight across.
+
+* **This is a minor bump, not a patch, on purpose.** For a plain `helm upgrade` consumer the upgrade needs a flag and possibly a manual annotation strip, so it is not a drop-in patch. A consumer pinned to `~0.9.x` would otherwise adopt it automatically and fail on `invalid ownership metadata` with no warning.
+* **One rolling restart is expected.** `configmap.yaml` and `secret.yaml` changed content, and `deployment.yaml` checksums both files whole, so the pod template annotation changes once on this bump. The twins are deliberately outside that checksum
+* **ArgoCD consumers:** a plain sync removes the stale annotations from the live objects. Verify by reading the live object, never by reading the sync status - a successful sync is exactly what would lie here:
+
+  ```
+  kubectl -n <ns> get cm <fullname>-cm-as-file -o jsonpath='{.metadata.annotations}'
+  ```
+
+  Acceptance is that `helm.sh/hook`, `helm.sh/hook-weight` and `helm.sh/resource-policy` are GONE.
+* **Plain `helm upgrade` consumers:** the four objects exist in the cluster but were created as hook resources, so they carry no release-ownership metadata and `helm upgrade` refuses them with `exists and cannot be imported into the current release: invalid ownership metadata`. Use `--take-ownership`, which requires **helm >= 3.17** (3.16.4 does not have the flag and has no in-band remedy).
+* **`--take-ownership` alone does not finish the job on a release that helm 3 installed.** Measured on k3d v1.31.5+k3s1, fresh install then upgrade onto the patched chart, reading the live ConfigMap back:
+
+  | installed by | upgraded by | upgrade result | `helm.sh/hook` afterwards |
+  |---|---|---|---|
+  | helm 4.1.0 | helm 4.1.0 | deployed, rev 2 | gone |
+  | helm 3.17.0 | helm 3.17.0 | deployed, rev 2 | still present |
+  | helm 3.17.0 | helm 4.1.0 | deployed, rev 2 | still present |
+
+  The variable is which helm INSTALLED the release, not which one runs the upgrade. In all three rows ownership transferred and the release reported `deployed`, so a helm 3 consumer sees a clean upgrade with no signal that the annotations are still there.
+
+  What the residual annotations DO cost is a desired-versus-live difference that never converges: the rendered manifest no longer carries them, the live object does, and a client-side apply cannot remove a field absent from `last-applied-configuration`. Under ArgoCD self-heal that is a permanently OutOfSync resource being reconciled forever. It is NOT established that the original defect recurs - both Helm and ArgoCD decide whether a resource is a hook from the rendered manifest, not from the live object's annotations, so a de-hooked manifest should stop the collection that caused it. That has not been measured, so strip the annotations to converge the diff rather than on the assumption that the defect is still armed.
+* **Why, and why the manual strip is the general fix rather than a lucky result.** helm 4 applies server-side: an applier that stops claiming a field it owned has that field removed by the API server, so the de-hooked manifest clears the annotations as a consequence of ownership semantics. helm 3 applies client-side with a three-way merge, which can only delete a field present in the OLD manifest - and a hook-created object is stored in the release's `hooks`, not its `manifest`, so no delete directive is ever generated. Nothing in the release wants those annotations back, and `kubectl annotate ...-` edits live state directly, which is the one path that bypasses the merge that cannot delete them. This predicts the strip holds on any helm 3.x, and is unnecessary on helm 4
+* **Remediation on a helm-3-installed release**, after the upgrade:
+
+  ```
+  for o in cm/<fullname>-cm-as-file cm/<fullname>-cm-as-env \
+           secret/<fullname>-secret-as-file secret/<fullname>-secret-as-env; do
+    kubectl -n <ns> annotate "$o" \
+      helm.sh/hook- helm.sh/hook-weight- helm.sh/resource-policy- --overwrite
+  done
+  ```
+
+  Strip all three keys, so the live object matches the rendered manifest. Removing only `resource-policy` leaves `helm.sh/hook` and `hook-weight` behind and the diff unconverged.
+* **There is no supported rollback to 0.9.x. Roll forward.** On 0.9.x the four objects are hook resources, so they sit in the release's `hooks` and NOT in its `manifest`; on 0.10.0 they are ordinary manifest resources with no `resource-policy: keep`. A `helm rollback` to a 0.9.x revision therefore diffs four objects against none and DELETES all four, and the rolled-back Deployment then mounts two that no longer exist and stops in `ContainerCreating`. The same applies to `helm upgrade --atomic` or `--cleanup-on-fail` if the upgrade fails after the main manifest applied. Reverting an ArgoCD `targetRevision` to 0.9.1 turns the tracked objects back into hook resources and, with auto-prune on, may prune them. Reasoned from Helm's manifest-diff semantics and the storage split measured above, not yet reproduced on a cluster. If you need to leave 0.10.0, recreate the four objects by hand before scaling the Deployment back up.
+* **Do not delete the objects to force a clean recreate.** Measured: deleting the ConfigMap wedges the release - the Deployment cannot start a pod and the next hook phase does not recover it.
+
 ## [0.9.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.9.1) (2026-07-14)
 
 ### Bug Fixes

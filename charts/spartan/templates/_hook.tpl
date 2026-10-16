@@ -119,7 +119,7 @@ spec:
           envFrom:
               {{- if .Values.secret.asEnv.enabled }}
             - secretRef:
-                name: {{ include "spartan.secretAsEnv" . }}
+                name: {{ include "spartan.secretAsEnvHook" . }}
               {{- end }}
               {{- if .Values.secret.externalSecretEnv.enabled }}
             - secretRef:
@@ -127,7 +127,7 @@ spec:
               {{- end }}
               {{- if .Values.configMap.asEnv.enabled }}
             - configMapRef:
-                name: {{ include "spartan.configMapAsEnv" . }}
+                name: {{ include "spartan.configMapAsEnvHook" . }}
               {{- end }}
               {{- if .Values.configMap.externalConfigMapEnv.enabled }}
             - configMapRef:
@@ -192,7 +192,7 @@ spec:
         {{- $hook := .hook }}
         {{- range $sidecar := .Values.sidecars }}
           {{- if and (eq $sidecar.name $lcName) ($hook.collectLog) }}
-            {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
+            {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release "hookScoped" true) | indent 8 }}
           {{- end }}
         {{- end }}
       {{- with .Values.nodeSelector }}
@@ -211,7 +211,7 @@ spec:
         {{- if .Values.secret.asFile.enabled }}
         - name: {{ include "spartan.secretAsFile" . }}
           secret:
-            secretName: {{ include "spartan.secretAsFile" . }}
+            secretName: {{ include "spartan.secretAsFileHook" . }}
         {{- end }}
         {{- if .Values.secret.externalSecretFile.enabled }}
         - name: {{ .Values.secret.externalSecretFile.name }}
@@ -221,7 +221,7 @@ spec:
         {{- if .Values.configMap.asFile.enabled }}
         - name: {{ include "spartan.configMapAsFile" . }}
           configMap:
-            name: {{ include "spartan.configMapAsFile" . }}
+            name: {{ include "spartan.configMapAsFileHook" . }}
         {{- end }}
         {{- if .Values.configMap.externalConfigMapFile.enabled }}
         - name: {{ .Values.configMap.externalConfigMapFile.name }}
