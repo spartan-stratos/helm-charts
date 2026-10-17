@@ -18,7 +18,7 @@ name: lgtm-stack-<cluster>
 version: 1.0.0
 dependencies:
   - name: lgtm-stack
-    version: 0.1.0
+    version: 0.1.1
     repository: https://spartan-stratos.github.io/helm-charts
 ```
 

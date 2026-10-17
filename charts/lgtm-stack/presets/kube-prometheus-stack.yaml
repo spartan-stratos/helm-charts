@@ -44,6 +44,10 @@ kube-state-metrics:
     - pods=[instrumentation.opentelemetry.io/inject-java,instrumentation.opentelemetry.io/inject-python,instrumentation.opentelemetry.io/inject-go,instrumentation.opentelemetry.io/inject-nodejs,instrumentation.opentelemetry.io/inject-dotnet]
 
 prometheus:
+  # The operator copies these to the StatefulSet. Rule and config changes are hot-reloaded by config-reloader, so a
+  # Reloader running with --auto-reload-all must not restart the pod on every PrometheusRule change
+  annotations:
+    reloader.stakater.com/auto: "false"
   prometheusSpec:
     replicas: 1
     retention: 60d
@@ -102,6 +106,9 @@ alertmanager:
         target_matchers: ['severity = info']
         equal: [namespace]
       - target_matchers: ['alertname = InfoInhibitor']
+  # Same as prometheus.annotations: config-reloader already picks up AlertmanagerConfig changes
+  annotations:
+    reloader.stakater.com/auto: "false"
   alertmanagerSpec:
     replicas: 1
     retention: 120h
