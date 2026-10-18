@@ -120,12 +120,24 @@ components:
 addons:
   clusterInfo:
     enabled: true
+  # Shared dashboards from files/dashboards: Services/Service overview (RED), LGTM/LGTM Lite self-monitoring
+  dashboards:
+    enabled: true
   pvcFillRules:
     enabled: true
   grafanaDatasources:
     enabled: true
   instrumentation:
     enabled: true
+
+# The project's own dashboards: an Application syncing a folder of the project's GitOps repo into `namespace`. ArgoCD
+# detects the folder type (Helm chart, kustomize or plain YAML); it must render ConfigMaps labelled
+# grafana_dashboard: "1", with the folder in annotation grafana_folder. See the README.
+extraDashboards:
+  enabled: false
+  repoURL: ""
+  targetRevision: HEAD
+  path: ""
 
 # Internal: set on the addon Applications, which render one addon's manifests instead of Applications
 mode: applications

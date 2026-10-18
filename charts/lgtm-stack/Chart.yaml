@@ -2,4 +2,4 @@ apiVersion: v2
 name: lgtm-stack
 description: LGTM Lite (Prometheus, Alertmanager, Grafana, Loki, Alloy, Tempo, OTel Operator) as ArgoCD Applications
 type: application
-version: 0.1.1
+version: 0.2.0

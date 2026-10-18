@@ -62,4 +62,18 @@ spec:
   {{- include "lgtm-stack.syncPolicy" (list $ false) | nindent 2 }}
 {{- end }}
 {{- end }}
+{{- with .Values.extraDashboards }}
+{{- if .enabled }}
+---
+{{ include "lgtm-stack.applicationHeader" (list $ "extra-dashboards" 42) }}
+spec:
+  project: {{ $.Values.argocd.project }}
+  {{- include "lgtm-stack.destination" $ | nindent 2 }}
+  source:
+    repoURL: {{ required "extraDashboards.repoURL is required" .repoURL }}
+    targetRevision: {{ .targetRevision | quote }}
+    path: {{ required "extraDashboards.path is required" .path }}
+  {{- include "lgtm-stack.syncPolicy" (list $ false) | nindent 2 }}
+{{- end }}
+{{- end }}
 {{- end }}

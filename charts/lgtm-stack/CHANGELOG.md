@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.0) (2026-10-18)
+
+### Features
+
+* Dashboards addon (`addons.dashboards`, Application `lgtm-dashboards`): one ConfigMap per `files/dashboards/<folder>/*.json`,
+  loaded by the Grafana sidecar
+  * `Services/Service overview (RED)` from Tempo span metrics, with callers, dependencies, error traces and logs
+  * `LGTM/LGTM Lite self-monitoring`: node and pod usage, PVCs, Prometheus, Loki, Tempo and Alloy
+* `extraDashboards`: an Application syncing a dashboards folder (Helm, kustomize or plain YAML) from the project's repo
+
 ## [0.1.1](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.1.1) (2026-10-16)
 
 ### Bug Fixes

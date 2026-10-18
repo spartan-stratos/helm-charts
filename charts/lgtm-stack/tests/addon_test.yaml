@@ -39,6 +39,36 @@ tests:
       - hasDocuments:
           count: 2
 
+  - it: "renders one dashboard ConfigMap per JSON file, labelled for the Grafana sidecar with its folder"
+    set:
+      addon: dashboards
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+      - equal:
+          path: metadata.annotations.grafana_folder
+          value: Services
+        documentSelector:
+          path: metadata.name
+          value: lgtm-dashboard-service-red
+      - matchRegex:
+          path: data["service-red.json"]
+          pattern: '"uid": "lgtm-service-red"'
+        documentSelector:
+          path: metadata.name
+          value: lgtm-dashboard-service-red
+      - equal:
+          path: metadata.annotations.grafana_folder
+          value: LGTM
+        documentSelector:
+          path: metadata.name
+          value: lgtm-dashboard-lgtm-self-monitoring
+
   - it: "fails on an unknown addon"
     set:
       addon: nope
