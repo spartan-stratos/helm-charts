@@ -12,7 +12,7 @@ tests:
   - it: "renders one Application per component and addon"
     asserts:
       - hasDocuments:
-          count: 12
+          count: 14
       - isKind:
           of: Application
 
@@ -35,7 +35,7 @@ tests:
       alerting.slack.enabled: true
     asserts:
       - hasDocuments:
-          count: 13
+          count: 15
       - equal:
           path: metadata.name
           value: lgtm-alertmanager-config
@@ -54,7 +54,7 @@ tests:
       components.tempo.enabled: false
     asserts:
       - hasDocuments:
-          count: 11
+          count: 13
 
   - it: "sets the cluster label and points addons at this chart version"
     asserts:
@@ -120,32 +120,42 @@ tests:
           path: spec.source.helm.valuesObject.alertmanager.annotations["reloader.stakater.com/auto"]
           value: "false"
 
-  - it: "adds the project's dashboards folder as its own Application"
+  - it: "drops a rule bundle that is turned off"
     set:
-      extraDashboards:
+      alerting.rules.workloads.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 13
+      - notEqual:
+          path: metadata.name
+          value: lgtm-workload-rules
+
+  - it: "adds the project folder as its own Application"
+    set:
+      project:
         enabled: true
         repoURL: https://github.com/example/argocd-observability.git
-        path: dashboards
+        path: observability
     documentSelector:
       path: metadata.name
-      value: lgtm-extra-dashboards
+      value: lgtm-project
     asserts:
       - equal:
           path: spec.source
           value:
             repoURL: https://github.com/example/argocd-observability.git
             targetRevision: HEAD
-            path: dashboards
+            path: observability
       - equal:
           path: spec.destination.namespace
           value: monitoring
 
-  - it: "requires a path for the project's dashboards"
+  - it: "requires a path for the project folder"
     set:
-      extraDashboards: { enabled: true, repoURL: https://github.com/example/argocd-observability.git }
+      project: { enabled: true, repoURL: https://github.com/example/argocd-observability.git }
     asserts:
       - failedTemplate:
-          errorMessage: extraDashboards.path is required
+          errorMessage: project.path is required
 
   - it: "lets component values override presets with false and empty strings"
     set:

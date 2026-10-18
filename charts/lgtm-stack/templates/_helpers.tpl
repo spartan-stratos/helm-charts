@@ -117,6 +117,15 @@ pvcFillRules:
   app: pvc-fill-rules
   wave: 31
   files: [pvc-fill-rules.yaml]
+# Rendered from alerting.rules.services / .workloads; need the PrometheusRule CRD
+serviceRules:
+  app: service-rules
+  wave: 33
+  rules: services
+workloadRules:
+  app: workload-rules
+  wave: 34
+  rules: workloads
 # Needs the AlertmanagerConfig CRD and the Alertmanager
 alertmanagerConfig:
   app: alertmanager-config

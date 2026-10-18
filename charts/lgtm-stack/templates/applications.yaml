@@ -33,6 +33,8 @@ spec:
 {{- $enabled := false }}
 {{- if eq $key "alertmanagerConfig" }}
 {{- $enabled = $.Values.alerting.slack.enabled }}
+{{- else if $a.rules }}
+{{- $enabled = (index $.Values.alerting.rules $a.rules).enabled }}
 {{- else }}
 {{- $enabled = (index $.Values.addons $key).enabled }}
 {{- end }}
@@ -62,17 +64,17 @@ spec:
   {{- include "lgtm-stack.syncPolicy" (list $ false) | nindent 2 }}
 {{- end }}
 {{- end }}
-{{- with .Values.extraDashboards }}
+{{- with .Values.project }}
 {{- if .enabled }}
 ---
-{{ include "lgtm-stack.applicationHeader" (list $ "extra-dashboards" 42) }}
+{{ include "lgtm-stack.applicationHeader" (list $ "project" 42) }}
 spec:
   project: {{ $.Values.argocd.project }}
   {{- include "lgtm-stack.destination" $ | nindent 2 }}
   source:
-    repoURL: {{ required "extraDashboards.repoURL is required" .repoURL }}
+    repoURL: {{ required "project.repoURL is required" .repoURL }}
     targetRevision: {{ .targetRevision | quote }}
-    path: {{ required "extraDashboards.path is required" .path }}
+    path: {{ required "project.path is required" .path }}
   {{- include "lgtm-stack.syncPolicy" (list $ false) | nindent 2 }}
 {{- end }}
 {{- end }}

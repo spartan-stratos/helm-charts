@@ -1,0 +1,78 @@
+# promtool unit tests for the workloads bundle (rendered with rules-values.yaml); run files/tests/test-rules.sh.
+rule_files:
+  - workload-rules.yaml
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      # web-1 cannot pull its image; web-2 is only starting
+      - series: 'kube_pod_container_status_waiting_reason{namespace="app",pod="web-1",container="web",reason="ImagePullBackOff"}'
+        values: '1x20'
+      - series: 'kube_pod_container_status_waiting_reason{namespace="app",pod="web-2",container="web",reason="ContainerCreating"}'
+        values: '1x20'
+      # worker-1 restarted after an OOM kill; worker-2 restarted for another reason
+      - series: 'kube_pod_container_status_restarts_total{namespace="app",pod="worker-1",container="worker"}'
+        values: '0 0 0 1 1 1 1 1 1 1'
+      - series: 'kube_pod_container_status_last_terminated_reason{namespace="app",pod="worker-1",container="worker",reason="OOMKilled"}'
+        values: '0 0 0 1 1 1 1 1 1 1'
+      - series: 'kube_pod_container_status_restarts_total{namespace="app",pod="worker-2",container="worker"}'
+        values: '0 0 0 1 1 1 1 1 1 1'
+      - series: 'kube_pod_container_status_last_terminated_reason{namespace="app",pod="worker-2",container="worker",reason="Error"}'
+        values: '0 0 0 1 1 1 1 1 1 1'
+      # api-1 at 95% of its limit, api-2 at 50%
+      - series: 'container_memory_working_set_bytes{namespace="app",pod="api-1",container="api"}'
+        values: '95x20'
+      - series: 'kube_pod_container_resource_limits{namespace="app",pod="api-1",container="api",resource="memory",unit="byte"}'
+        values: '100x20'
+      - series: 'container_memory_working_set_bytes{namespace="app",pod="api-2",container="api"}'
+        values: '50x20'
+      - series: 'kube_pod_container_resource_limits{namespace="app",pod="api-2",container="api",resource="memory",unit="byte"}'
+        values: '100x20'
+      # orders-1 is annotated for Java but has no agent; orders-2 got its init container
+      - series: 'kube_pod_annotations{namespace="app",pod="orders-1",annotation_instrumentation_opentelemetry_io_inject_java="true"}'
+        values: '1x20'
+      - series: 'kube_pod_status_phase{namespace="app",pod="orders-1",phase="Running"}'
+        values: '1x20'
+      - series: 'kube_pod_annotations{namespace="app",pod="orders-2",annotation_instrumentation_opentelemetry_io_inject_java="true"}'
+        values: '1x20'
+      - series: 'kube_pod_status_phase{namespace="app",pod="orders-2",phase="Running"}'
+        values: '1x20'
+      - series: 'kube_pod_init_container_info{namespace="app",pod="orders-2",container="opentelemetry-auto-instrumentation-java"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: ContainerImagePullFailing
+        exp_alerts:
+          - exp_labels: { severity: warning, namespace: app, pod: web-1, container: web }
+            exp_annotations:
+              summary: Image pull failing for app/web-1 (web)
+              description: The container has been waiting on its image for 5 minutes. Check the image tag and the registry credentials.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+      - eval_time: 5m
+        alertname: ContainerOOMKilled
+        exp_alerts:
+          - exp_labels: { severity: warning, namespace: app, pod: worker-1, container: worker }
+            exp_annotations:
+              summary: app/worker-1 (worker) was OOM-killed
+              description: The container restarted after hitting its memory limit in the last 15 minutes. Raise the limit or find the leak.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+      - eval_time: 14m
+        alertname: ContainerMemoryNearLimit
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: ContainerMemoryNearLimit
+        exp_alerts:
+          - exp_labels: { severity: warning, namespace: app, pod: api-1, container: api }
+            exp_annotations:
+              summary: app/api-1 (api) uses 95% of its memory limit
+              description: Above 90% of the limit for 15 minutes; the next spike is an OOM kill.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+      - eval_time: 6m
+        alertname: PodMissingInstrumentation
+        exp_alerts:
+          - exp_labels: { severity: warning, namespace: app, pod: orders-1 }
+            exp_annotations:
+              summary: app/orders-1 runs without its OpenTelemetry agent
+              description: The pod asks for auto-instrumentation but has no agent, so it sends no traces. Restart it once the OTel Operator is up.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts

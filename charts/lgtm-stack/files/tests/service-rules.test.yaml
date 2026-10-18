@@ -1,0 +1,71 @@
+# promtool unit tests for the services bundle (rendered with rules-values.yaml); run files/tests/test-rules.sh.
+rule_files:
+  - service-rules.yaml
+evaluation_interval: 1m
+
+tests:
+  # 1 req/s per service unless noted
+  - interval: 1m
+    input_series:
+      # api: ~9% errors, p95 4.6s -> warning and critical for both alerts
+      - series: 'traces_spanmetrics_calls_total{service="api",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_UNSET"}'
+        values: '0+60x30'
+      - series: 'traces_spanmetrics_calls_total{service="api",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_ERROR"}'
+        values: '0+6x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="api",span_kind="SPAN_KIND_SERVER",le="1"}'
+        values: '0+33x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="api",span_kind="SPAN_KIND_SERVER",le="5"}'
+        values: '0+66x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="api",span_kind="SPAN_KIND_SERVER",le="+Inf"}'
+        values: '0+66x30'
+      # client spans of api are ignored
+      - series: 'traces_spanmetrics_calls_total{service="api",span_kind="SPAN_KIND_CLIENT",status_code="STATUS_CODE_ERROR"}'
+        values: '0+600x30'
+      # payments: ~1.6% errors -> only its tighter critical (1%), not the 2% warning
+      - series: 'traces_spanmetrics_calls_total{service="payments",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_UNSET"}'
+        values: '0+60x30'
+      - series: 'traces_spanmetrics_calls_total{service="payments",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_ERROR"}'
+        values: '0+1x30'
+      # quiet: 50% errors at 0.05 req/s, below minRequestRate
+      - series: 'traces_spanmetrics_calls_total{service="quiet",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_UNSET"}'
+        values: '0+1.5x30'
+      - series: 'traces_spanmetrics_calls_total{service="quiet",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_ERROR"}'
+        values: '0+1.5x30'
+      # batch.jobs: turned off by its override
+      - series: 'traces_spanmetrics_calls_total{service="batch.jobs",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_ERROR"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: ServiceErrorRateHigh
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ServiceErrorRateHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, service: api }
+            exp_annotations:
+              summary: Service api is failing 9.091% of requests
+              description: Server spans with status ERROR are above 2% for 10m. Open the Service overview (RED) dashboard and the error traces for this service.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+          - exp_labels: { severity: critical, service: api }
+            exp_annotations:
+              summary: Service api is failing 9.091% of requests
+              description: Server spans with status ERROR are above 5% for 10m. Open the Service overview (RED) dashboard and the error traces for this service.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+          - exp_labels: { severity: critical, service: payments }
+            exp_annotations:
+              summary: Service payments is failing 1.639% of requests
+              description: Server spans with status ERROR are above 1% for 10m. Open the Service overview (RED) dashboard and the error traces for this service.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+      - eval_time: 20m
+        alertname: ServiceLatencyHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, service: api }
+            exp_annotations:
+              summary: Service api p95 latency is 4.6s
+              description: p95 of server spans is above 1s for 10m. Check the slowest routes on the Service overview (RED) dashboard.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+          - exp_labels: { severity: critical, service: api }
+            exp_annotations:
+              summary: Service api p95 latency is 4.6s
+              description: p95 of server spans is above 3s for 10m. Check the slowest routes on the Service overview (RED) dashboard.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts

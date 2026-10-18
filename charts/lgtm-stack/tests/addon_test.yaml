@@ -69,6 +69,37 @@ tests:
           path: metadata.name
           value: lgtm-dashboard-lgtm-self-monitoring
 
+  - it: "renders the services rule bundle with per-service overrides"
+    set:
+      addon: serviceRules
+      alerting.rules.services.overrides:
+        payments: { errorRate: { critical: 0.01 } }
+        batch: { enabled: false }
+    asserts:
+      - isKind:
+          of: PrometheusRule
+      # four default alerts (minus the overridden services) and four for payments; batch gets none
+      - lengthEqual:
+          path: spec.groups[1].rules
+          count: 8
+      - matchRegex:
+          path: spec.groups[1].rules[0].expr
+          pattern: 'service!~`batch\|payments`'
+      - matchRegex:
+          path: spec.groups[1].rules[6].expr
+          pattern: 'service="payments"\} > 0.01'
+      - equal:
+          path: spec.groups[1].rules[0].annotations.summary
+          value: Service {{ $labels.service }} is failing {{ $value | humanizePercentage }} of requests
+
+  - it: "renders the workloads rule bundle"
+    set:
+      addon: workloadRules
+    asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 4
+
   - it: "fails on an unknown addon"
     set:
       addon: nope

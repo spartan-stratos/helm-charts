@@ -92,16 +92,17 @@ prometheus:
               storage: 100Gi
 
 alertmanager:
-  # The chart's inhibit rules, plus persistentvolumeclaim in `equal`: every stack PVC shares namespace and alertname,
-  # so without it a critical on one PVC would hide the warning on another. Alerts without the label behave as before
+  # The chart's inhibit rules, plus persistentvolumeclaim and service in `equal`: every stack PVC shares namespace and
+  # alertname, and the service RED alerts have no namespace, so without them a critical on one PVC or service would
+  # hide the warning on another. Alerts without these labels behave as before
   config:
     inhibit_rules:
       - source_matchers: ['severity = critical']
         target_matchers: ['severity =~ warning|info']
-        equal: [namespace, alertname, persistentvolumeclaim]
+        equal: [namespace, alertname, persistentvolumeclaim, service]
       - source_matchers: ['severity = warning']
         target_matchers: ['severity = info']
-        equal: [namespace, alertname, persistentvolumeclaim]
+        equal: [namespace, alertname, persistentvolumeclaim, service]
       - source_matchers: ['alertname = InfoInhibitor']
         target_matchers: ['severity = info']
         equal: [namespace]

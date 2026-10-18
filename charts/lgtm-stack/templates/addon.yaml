@@ -19,6 +19,10 @@ data:
   {{ $name }}.json: {{ $.Files.Get $path | quote }}
 {{- end }}
 {{- end }}
+{{- with $a.rules }}
+---
+{{ include (printf "lgtm-stack.rules.%s" .) $ }}
+{{- end }}
 {{- range $a.files }}
 ---
 {{ $.Files.Get (printf "files/manifests/%s" .)
