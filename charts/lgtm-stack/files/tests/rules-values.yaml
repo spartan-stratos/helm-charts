@@ -1,0 +1,9 @@
+# Values test-rules.sh renders the rule bundles with: one override that tightens, one that turns a service off
+cluster:
+  name: test
+alerting:
+  rules:
+    services:
+      overrides:
+        payments: { errorRate: { critical: 0.01 } }
+        batch.jobs: { enabled: false }

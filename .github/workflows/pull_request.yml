@@ -62,3 +62,7 @@ jobs:
           curl -sSL https://github.com/prometheus/prometheus/releases/download/v3.5.0/prometheus-3.5.0.linux-amd64.tar.gz \
             | sudo tar -xz --strip-components=1 -C /usr/local/bin prometheus-3.5.0.linux-amd64/promtool
           charts/lgtm-stack/files/tests/test-rules.sh
+
+      - name: Check bundled dashboards
+        if: matrix.chart == 'lgtm-stack' # jq is preinstalled on the runner
+        run: charts/lgtm-stack/files/tests/test-dashboards.sh

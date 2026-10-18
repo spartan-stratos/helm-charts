@@ -74,6 +74,22 @@ alerting:
     enabled: false
     secretName: alert-slack
     secretKey: webhook-url
+  # Shared PrometheusRule bundles. A project's own rules go in its project folder (see `project`)
+  rules:
+    # RED per service from Tempo span metrics (server spans). Thresholds per severity; drop one to skip that severity
+    services:
+      enabled: true
+      # Requests per second below which a service is not alerted on, so a quiet service does not page on one error
+      minRequestRate: 0.1
+      errorRate: { warning: 0.02, critical: 0.05, for: 10m }
+      # Seconds
+      latencyP95: { warning: 1, critical: 3, for: 10m }
+      # Per service, merged over the above, e.g. payments: { errorRate: { critical: 0.01 } } or batch: { enabled: false }
+      overrides: {}
+    # Image pull failures, OOM kills, memory near the limit, pods annotated for injection but without an agent
+    workloads:
+      enabled: true
+      memoryLimitRatio: 0.9
 
 # One entry per component. enabled turns its Application off; values is merged over the preset (and over the
 # settings above), so anything the upstream chart accepts can be set here. ignoreDifferences is appended to the
@@ -120,12 +136,24 @@ components:
 addons:
   clusterInfo:
     enabled: true
+  # Shared dashboards from files/dashboards: Services/Service overview (RED), LGTM/LGTM Lite self-monitoring
+  dashboards:
+    enabled: true
   pvcFillRules:
     enabled: true
   grafanaDatasources:
     enabled: true
   instrumentation:
     enabled: true
+
+# The project's own dashboards and alert rules: an Application syncing a folder of the project's GitOps repo into
+# `namespace`. ArgoCD detects the folder type (Helm chart, kustomize or plain YAML). Dashboards are ConfigMaps labelled
+# grafana_dashboard: "1" (folder in annotation grafana_folder); rules are PrometheusRules. See the README.
+project:
+  enabled: false
+  repoURL: ""
+  targetRevision: HEAD
+  path: ""
 
 # Internal: set on the addon Applications, which render one addon's manifests instead of Applications
 mode: applications

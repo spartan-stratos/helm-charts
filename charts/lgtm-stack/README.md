@@ -18,7 +18,7 @@ name: lgtm-stack-<cluster>
 version: 1.0.0
 dependencies:
   - name: lgtm-stack
-    version: 0.1.1
+    version: 0.2.0
     repository: https://spartan-stratos.github.io/helm-charts
 ```
 
@@ -71,7 +71,11 @@ Before the first sync, the target cluster needs the `gp3-enc-retain` StorageClas
 | `lgtm-kube-prometheus-stack` | 30 | `kube-prometheus-stack` + `presets/kube-prometheus-stack.yaml` |
 | `lgtm-pvc-fill-rules` | 31 | PrometheusRule `lgtm-pvc-fill` |
 | `lgtm-alertmanager-config` | 32 | AlertmanagerConfig `slack` (only with `alerting.slack.enabled`) |
+| `lgtm-service-rules` | 33 | PrometheusRule `lgtm-service-red` from `alerting.rules.services` |
+| `lgtm-workload-rules` | 34 | PrometheusRule `lgtm-workloads` from `alerting.rules.workloads` |
 | `lgtm-grafana` | 40 | `grafana` + `presets/grafana.yaml` (+ `grafana-sso-<provider>.yaml`) |
+| `lgtm-dashboards` | 41 | Dashboard ConfigMaps from `files/dashboards/` |
+| `lgtm-project` | 42 | The project folder: its dashboards and rules (only with `project.enabled`) |
 | `lgtm-loki` | 50 | `loki` + `presets/loki.yaml` |
 | `lgtm-grafana-datasources` | 51 | Loki and Tempo datasource ConfigMaps |
 | `lgtm-alloy` | 52 | `alloy` + `presets/alloy.yaml` |
@@ -115,7 +119,11 @@ default. Lists are replaced, not appended.
 | `components.<c>.chart` | pinned | Upstream chart repoURL, name and version |
 | `components.<c>.values` | `{}` | Any value of the upstream chart, merged last |
 | `components.<c>.ignoreDifferences` | `[]` | Appended to the built-in list |
-| `addons.<a>.enabled` | `true` | `clusterInfo`, `pvcFillRules`, `grafanaDatasources`, `instrumentation` |
+| `addons.<a>.enabled` | `true` | `clusterInfo`, `pvcFillRules`, `grafanaDatasources`, `instrumentation`, `dashboards` |
+| `alerting.rules.services.*` | on, see [Service alerts](#service-alerts) | RED alerts per service; thresholds, `minRequestRate`, `overrides.<service>` |
+| `alerting.rules.workloads.*` | on, `memoryLimitRatio: 0.9` | See [Workload alerts](#workload-alerts) |
+| `project.enabled` | `false` | Sync the project folder (dashboards and rules) from the project's repo, see [Project folder](#project-folder) |
+| `project.repoURL` / `.path` / `.targetRevision` | `""` / `""` / `HEAD` | Where that folder is. `repoURL` and `path` are required |
 | `self.*` | this chart's repo and version | Where the addon Applications pull this chart; set `repoURL` (git), `path` and `targetRevision` to test a branch |
 
 ### Secrets
@@ -143,14 +151,137 @@ GitHub (`provider: github`): `organization`, `clientId`, `admin` and `member` (t
 Both presets turn the login form off; set `components.grafana.values."grafana.ini".auth.disable_login_form: false` to
 keep it as break-glass.
 
+## Dashboards
+
+Grafana's sidecar loads every ConfigMap in `monitoring` labelled `grafana_dashboard: "1"` and files it in the folder
+named by annotation `grafana_folder`. Three sources use it:
+
+| Folder | Dashboards | From |
+|---|---|---|
+| `Kubernetes` | Cluster, node, workload and Prometheus dashboards | kube-prometheus-stack |
+| `Services` | **Service overview (RED)**: rate, errors and latency per service and route from Tempo span metrics (server spans), callers and dependencies, the service graph, recent error traces and logs | this chart |
+| `LGTM` | **LGTM Lite self-monitoring**: node and pod usage against the sizing thresholds, PVCs, Prometheus series and TSDB size, Loki, Tempo and Alloy throughput and drops | this chart |
+
+The RED dashboard is empty until a service sends traces (the `spartan` chart's `observability` block).
+
+A project's own dashboards go in its [project folder](#project-folder).
+
+### Changing a dashboard
+
+Provisioned dashboards cannot be saved from the UI. Edit in Grafana (or a copy of it), then Export → JSON with
+**Export for sharing externally off** so the datasource uids stay `prometheus`, `loki` and `tempo`, and commit the file.
+Keep the dashboard `uid` fixed: links and bookmarks use it.
+
+## Project folder
+
+A project keeps its own dashboards and alert rules in one folder of its GitOps repo, synced by `project`:
+
+```yaml
+lgtm-stack:
+  project:
+    enabled: true
+    repoURL: <this repo>
+    path: observability
+```
+
+```
+observability/
+  Chart.yaml
+  templates/dashboards.yaml   # dashboards/<folder>/<name>.json -> ConfigMap, <folder> is the Grafana folder
+  templates/rules.yaml        # rules/<name>.yaml (a Prometheus rule file: groups:) -> PrometheusRule <name>
+  dashboards/<folder>/<name>.json
+  rules/<name>.yaml
+```
+
+ArgoCD detects the folder type, so kustomize or plain YAML work too, as long as the output is the same ConfigMaps and
+PrometheusRules. The Helm chart below needs no list of files, and a rule file stays a plain Prometheus rule file, so
+`promtool check rules rules/*.yaml` and `promtool test rules` run on it directly. The scaffold is
+`templates/lgtm-stack/argocd/observability/` in spartan-sre-wiki.
+
+```yaml
+# observability/Chart.yaml
+apiVersion: v2
+name: observability
+version: 1.0.0
+```
+
+```yaml
+# observability/templates/dashboards.yaml
+{{- range $path, $_ := .Files.Glob "dashboards/*/*.json" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-{{ base $path | trimSuffix ".json" }}
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: {{ base (dir $path) | quote }}
+data:
+  {{ base $path }}: {{ $.Files.Get $path | quote }}
+{{- end }}
+```
+
+```yaml
+# observability/templates/rules.yaml
+{{- range $path, $_ := .Files.Glob "rules/*.yaml" }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ base $path | trimSuffix ".yaml" }}
+spec: {{- $.Files.Get $path | nindent 2 }}
+{{- end }}
+```
+
+Names share `monitoring` with the stack's objects: avoid the `lgtm-` prefix. Label rules with `severity` (`info`,
+`warning`, `critical`) for routing, and keep `{{ $labels.x }}` as is in annotations: Helm does not template the files.
+
 ## Alerting
 
-Prometheus evaluates the PrometheusRules (kube-prometheus-stack's defaults plus `lgtm-pvc-fill`) and Alertmanager
+Prometheus evaluates the PrometheusRules (kube-prometheus-stack's defaults, this chart's bundles below and the
+project folder's rules; every PrometheusRule in the cluster is selected) and Alertmanager
 routes them; Grafana shows them read-only. Grafana contact points do not receive these alerts: they belong to
 Grafana's own Alertmanager.
 
 With `alerting.slack.enabled`, AlertmanagerConfig `slack` sends `severity` warning and critical, grouped by alertname
 and namespace, repeated every 4h, with resolved notices. Info alerts stay in Grafana.
+
+To silence a noisy kube-prometheus-stack default, set
+`components.kubePrometheusStack.values.defaultRules.disabled.<AlertName>: true`.
+
+### Service alerts
+
+`alerting.rules.services` turns Tempo span metrics (server spans) into four recording rules per service
+(`service:traces_spanmetrics_{calls,errors,error_ratio,latency_p95}:rate5m`) and two alerts, each at warning and
+critical:
+
+| Alert | Fires when | Default warning / critical |
+|---|---|---|
+| `ServiceErrorRateHigh` | share of server spans with status ERROR is above the threshold for `errorRate.for` | 2% / 5%, 10m |
+| `ServiceLatencyHigh` | p95 of server spans is above the threshold (seconds) for `latencyP95.for` | 1s / 3s, 10m |
+
+Services below `minRequestRate` (0.1 req/s) are not alerted on. `overrides.<service>` is merged over the defaults for
+that service, e.g. `payments: { errorRate: { critical: 0.01 } }`, or `batch: { enabled: false }` to skip it; drop a
+severity's threshold to skip that severity. The alerts carry `service` (inhibition matches on it, so one service's
+critical does not hide another's warning) but no `namespace`, which span metrics do not have.
+
+When one fires: open the Service overview (RED) dashboard for the service, then its recent error traces or the slowest
+route, and the logs linked from the trace.
+
+### Workload alerts
+
+`alerting.rules.workloads` adds what kube-prometheus-stack's defaults leave out:
+
+| Alert | Fires when |
+|---|---|
+| `ContainerImagePullFailing` | a container waits on `ErrImagePull` / `ImagePullBackOff` / `InvalidImageName` for 5m |
+| `ContainerOOMKilled` | a container restarted in the last 15m and its last termination was `OOMKilled` |
+| `ContainerMemoryNearLimit` | working set above `memoryLimitRatio` (90%) of the memory limit for 15m |
+| `PodMissingInstrumentation` | a Running pod is annotated `instrumentation.opentelemetry.io/inject-*` but has no agent for 5m (it started while the OTel Operator was down; restart it) |
+
+All are `warning`. Crash loops, failed Jobs and not-ready pods come from the defaults (`KubePodCrashLooping`,
+`KubeJobFailed`, `KubePodNotReady`).
 
 ### PVC-fill alerts
 
@@ -162,7 +293,7 @@ Lite runs on fixed-size disks with no backups, so `lgtm-pvc-fill` watches the st
 | `LgtmPvcInodesFilling` | used inodes > 90% / 95% | 10m / 5m | warning / critical |
 
 They sit on top of kube-prometheus-stack's `KubePersistentVolumeFillingUp`, which waits until 3% free or a 4-day
-prediction. The preset's inhibit rules add `persistentvolumeclaim` to `equal`, so each PVC shows only its highest tier
+prediction. The preset's inhibit rules add `persistentvolumeclaim` and `service` to `equal`, so each PVC shows only its highest tier
 and one PVC's critical does not hide another's warning.
 
 When one fires:
@@ -186,9 +317,11 @@ When one fires:
 ```sh
 helm unittest charts/lgtm-stack
 helm template x charts/lgtm-stack -f charts/lgtm-stack/ci/test-values.yaml
-charts/lgtm-stack/files/tests/test-rules.sh   # promtool rule tests; needs yq and promtool
+charts/lgtm-stack/files/tests/test-rules.sh   # promtool rule tests, plain and rendered bundles; needs helm, yq and promtool
+charts/lgtm-stack/files/tests/test-dashboards.sh   # dashboard JSON, uids and datasource uids; needs jq
 ```
 
-To change a preset, edit `presets/` and bump the chart version. To bump an upstream chart, change
+To change a preset, edit `presets/` and bump the chart version. A new shared dashboard is one JSON file in
+`files/dashboards/<folder>/`. To bump an upstream chart, change
 `components.<c>.chart.version` in `values.yaml`; keep `prometheus-operator-crds` on the CRDs that match
 kube-prometheus-stack's operator.

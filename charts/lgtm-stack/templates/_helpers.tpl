@@ -101,17 +101,31 @@ opentelemetryOperator:
       jsonPointers: [/data]
 {{- end -}}
 
-{{/* Addons: Application name, sync wave, manifest files */}}
+{{/* Addons: Application name, sync wave, manifest files (or dashboards: ConfigMaps from files/dashboards) */}}
 {{- define "lgtm-stack.addons" -}}
 clusterInfo:
   app: cluster-info
   wave: 10
   files: [cluster-info.yaml]
+# One ConfigMap per files/dashboards/<folder>/<name>.json; the Grafana sidecar loads them, so no ordering is needed
+dashboards:
+  app: dashboards
+  wave: 41
+  dashboards: true
 # Needs the PrometheusRule CRD
 pvcFillRules:
   app: pvc-fill-rules
   wave: 31
   files: [pvc-fill-rules.yaml]
+# Rendered from alerting.rules.services / .workloads; need the PrometheusRule CRD
+serviceRules:
+  app: service-rules
+  wave: 33
+  rules: services
+workloadRules:
+  app: workload-rules
+  wave: 34
+  rules: workloads
 # Needs the AlertmanagerConfig CRD and the Alertmanager
 alertmanagerConfig:
   app: alertmanager-config

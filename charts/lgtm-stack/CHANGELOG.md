@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.0) (2026-10-18)
+
+### Features
+
+* Dashboards addon (`addons.dashboards`, Application `lgtm-dashboards`): one ConfigMap per `files/dashboards/<folder>/*.json`,
+  loaded by the Grafana sidecar
+  * `Services/Service overview (RED)` from Tempo span metrics, with callers, dependencies, error traces and logs
+  * `LGTM/LGTM Lite self-monitoring`: node and pod usage, PVCs, Prometheus, Loki, Tempo and Alloy
+* Alert rule bundles from `alerting.rules`, each its own Application
+  * `services` (`lgtm-service-rules`): `ServiceErrorRateHigh` and `ServiceLatencyHigh` per service from Tempo span
+    metrics, warning and critical, with `minRequestRate` and per-service `overrides`
+  * `workloads` (`lgtm-workload-rules`): `ContainerImagePullFailing`, `ContainerOOMKilled`, `ContainerMemoryNearLimit`,
+    `PodMissingInstrumentation`
+* `project`: an Application (`lgtm-project`) syncing the project folder of its GitOps repo, with its dashboards and
+  PrometheusRules (Helm, kustomize or plain YAML)
+
+### Bug Fixes
+
+* Alertmanager inhibit rules also match on `service`, so a critical on one service does not hide another's warning
+
 ## [0.1.1](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.1.1) (2026-10-16)
 
 ### Bug Fixes
