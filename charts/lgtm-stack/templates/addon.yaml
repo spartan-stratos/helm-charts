@@ -24,10 +24,17 @@ data:
 {{ include (printf "lgtm-stack.rules.%s" .) $ }}
 {{- end }}
 {{- range $a.files }}
----
-{{ $.Files.Get (printf "files/manifests/%s" .)
+{{- $m := $.Files.Get (printf "files/manifests/%s" .)
   | replace "__CLUSTER_NAME__" (required "cluster.name is required" $.Values.cluster.name)
   | replace "__SLACK_SECRET_NAME__" $.Values.alerting.slack.secretName
   | replace "__SLACK_SECRET_KEY__" $.Values.alerting.slack.secretKey }}
+{{- with $.Values.grafana.domain }}
+{{- $m = replace "__GRAFANA_URL__" (printf "https://%s" .) $m }}
+{{- else }}
+{{- /* No Grafana URL to link to: drop the lines that need one */}}
+{{- $m = regexReplaceAll "(?m)^.*__GRAFANA_URL__.*\n?" $m "" }}
+{{- end }}
+---
+{{ $m }}
 {{- end }}
 {{- end }}

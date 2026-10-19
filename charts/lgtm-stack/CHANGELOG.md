@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.1) (2026-10-19)
+
+### Bug Fixes
+
+* Alloy takes only `placement`'s tolerations, not its nodeSelector, so the DaemonSet runs on every node: with a
+  nodeSelector it ran only on the pinned node and missed the stdout of pods everywhere else
+* Alloy's `k8sattributes` no longer filters to its own node, so OTLP routed from another node (or from Fargate) still
+  gets Kubernetes attributes
+* Slack messages link to Grafana when `grafana.domain` is set: the title opens the alert rule (it pointed at
+  Alertmanager's in-cluster URL), plus `Dashboard` (from a rule's `dashboard_url`) and `Silence` links; the context line
+  shows `service` for alerts without a namespace, and messages are grouped by `service` too
+
+### Features
+
+* `stackRules` addon (`lgtm-stack-rules`): `LgtmLokiDiscardingLogs`, `LgtmTempoDiscardingSpans`,
+  `LgtmAlloyLokiWriteFailing`, `LgtmAlloyOtlpExportFailing`
+* The chart's rules carry `dashboard_url`: RED for service alerts, the Pod dashboard for workload alerts,
+  self-monitoring for PVC and stack alerts
+* AIX and macOS node dashboards are off
+
 ## [0.2.0](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.0) (2026-10-18)
 
 ### Features

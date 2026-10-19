@@ -49,6 +49,7 @@ tests:
               summary: Image pull failing for app/web-1 (web)
               description: The container has been waiting on its image for 5 minutes. Check the image tag and the registry credentials.
               runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+              dashboard_url: /d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace=app&var-pod=web-1
       - eval_time: 5m
         alertname: ContainerOOMKilled
         exp_alerts:
@@ -57,6 +58,7 @@ tests:
               summary: app/worker-1 (worker) was OOM-killed
               description: The container restarted after hitting its memory limit in the last 15 minutes. Raise the limit or find the leak.
               runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+              dashboard_url: /d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace=app&var-pod=worker-1
       - eval_time: 14m
         alertname: ContainerMemoryNearLimit
         exp_alerts: []
@@ -68,6 +70,7 @@ tests:
               summary: app/api-1 (api) uses 95% of its memory limit
               description: Above 90% of the limit for 15 minutes; the next spike is an OOM kill.
               runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+              dashboard_url: /d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace=app&var-pod=api-1
       - eval_time: 6m
         alertname: PodMissingInstrumentation
         exp_alerts:
@@ -76,3 +79,4 @@ tests:
               summary: app/orders-1 runs without its OpenTelemetry agent
               description: The pod asks for auto-instrumentation but has no agent, so it sends no traces. Restart it once the OTel Operator is up.
               runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+              dashboard_url: /d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace=app&var-pod=orders-1

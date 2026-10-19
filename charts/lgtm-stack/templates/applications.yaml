@@ -61,6 +61,8 @@ spec:
         namespace: {{ $.Values.namespace }}
         cluster: {{- toYaml $.Values.cluster | nindent 10 }}
         alerting: {{- toYaml $.Values.alerting | nindent 10 }}
+        grafana:
+          domain: {{ $.Values.grafana.domain | quote }}
   {{- include "lgtm-stack.syncPolicy" (list $ false) | nindent 2 }}
 {{- end }}
 {{- end }}

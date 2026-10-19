@@ -60,6 +60,7 @@ spec:
               Server spans with status ERROR are above {{ mulf . 100 | printf "%.4g" }}% for {{ $t.errorRate.for }}.
               Open the Service overview (RED) dashboard and the error traces for this service.
             runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+            dashboard_url: /d/lgtm-service-red/service-overview-red?var-service={{ $o }} $labels.service {{ $c }}
 {{- end }}
 {{- with index $t.latencyP95 $sev }}
         - alert: ServiceLatencyHigh
@@ -75,6 +76,7 @@ spec:
               p95 of server spans is above {{ . }}s for {{ $t.latencyP95.for }}.
               Check the slowest routes on the Service overview (RED) dashboard.
             runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+            dashboard_url: /d/lgtm-service-red/service-overview-red?var-service={{ $o }} $labels.service {{ $c }}
 {{- end }}
 {{- end }}
 {{- end }}
@@ -103,6 +105,7 @@ spec:
             summary: Image pull failing for {{ $o }} $labels.namespace {{ $c }}/{{ $o }} $labels.pod {{ $c }} ({{ $o }} $labels.container {{ $c }})
             description: The container has been waiting on its image for 5 minutes. Check the image tag and the registry credentials.
             runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+            dashboard_url: "/d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace={{ $o }} $labels.namespace {{ $c }}&var-pod={{ $o }} $labels.pod {{ $c }}"
         - alert: ContainerOOMKilled
           expr: |-
             max by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[15m])) > 0
@@ -113,6 +116,7 @@ spec:
             summary: "{{ $o }} $labels.namespace {{ $c }}/{{ $o }} $labels.pod {{ $c }} ({{ $o }} $labels.container {{ $c }}) was OOM-killed"
             description: The container restarted after hitting its memory limit in the last 15 minutes. Raise the limit or find the leak.
             runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+            dashboard_url: "/d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace={{ $o }} $labels.namespace {{ $c }}&var-pod={{ $o }} $labels.pod {{ $c }}"
         - alert: ContainerMemoryNearLimit
           expr: |-
             max by (namespace, pod, container) (container_memory_working_set_bytes{container!="",container!="POD"})
@@ -125,6 +129,7 @@ spec:
             summary: "{{ $o }} $labels.namespace {{ $c }}/{{ $o }} $labels.pod {{ $c }} ({{ $o }} $labels.container {{ $c }}) uses {{ $o }} $value | humanizePercentage {{ $c }} of its memory limit"
             description: Above {{ mulf $cfg.memoryLimitRatio 100 | printf "%.4g" }}% of the limit for 15 minutes; the next spike is an OOM kill.
             runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+            dashboard_url: "/d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace={{ $o }} $labels.namespace {{ $c }}&var-pod={{ $o }} $labels.pod {{ $c }}"
         # A pod annotated for auto-instrumentation that started while the OTel Operator was down runs without an agent
         - alert: PodMissingInstrumentation
           expr: |-
@@ -147,4 +152,5 @@ spec:
             summary: "{{ $o }} $labels.namespace {{ $c }}/{{ $o }} $labels.pod {{ $c }} runs without its OpenTelemetry agent"
             description: The pod asks for auto-instrumentation but has no agent, so it sends no traces. Restart it once the OTel Operator is up.
             runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#workload-alerts
+            dashboard_url: "/d/6581e46e4e5c7ba40a07646395ef7b23/kubernetes-compute-resources-pod?var-namespace={{ $o }} $labels.namespace {{ $c }}&var-pod={{ $o }} $labels.pod {{ $c }}"
 {{- end -}}

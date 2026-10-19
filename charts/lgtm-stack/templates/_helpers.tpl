@@ -72,11 +72,13 @@ loki:
   wave: 50
   presets: [loki.yaml]
   placement: [singleBinary]
+# The DaemonSet tails logs on its own node, so it must run on every node: it takes placement's tolerations
+# (generated below), never its nodeSelector
 alloy:
   app: alloy
   wave: 52
   presets: [alloy.yaml]
-  placement: [controller]
+  placement: []
 tempo:
   app: tempo
   wave: 60
@@ -117,6 +119,11 @@ pvcFillRules:
   app: pvc-fill-rules
   wave: 31
   files: [pvc-fill-rules.yaml]
+# Loki, Tempo or Alloy dropping data
+stackRules:
+  app: stack-rules
+  wave: 35
+  files: [stack-rules.yaml]
 # Rendered from alerting.rules.services / .workloads; need the PrometheusRule CRD
 serviceRules:
   app: service-rules
@@ -194,9 +201,13 @@ admissionWebhooks:
     helm.sh/hook: null
     helm.sh/hook-delete-policy: null
 {{- else if eq $key "alloy" }}
+{{- with $v.placement.tolerations }}
+controller:
+  tolerations: {{- toYaml . | nindent 4 }}
+{{- end }}
 {{- if $v.placement.nodeSelector }}
 service:
-  # Alloy runs only where placement allows, so OTLP from other nodes must route across nodes
+  # Clusters that pin the stack usually run Fargate too, and a Fargate pod has no Alloy on its node
   internalTrafficPolicy: Cluster
 {{- end }}
 {{- end }}
