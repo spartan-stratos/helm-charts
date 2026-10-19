@@ -12,7 +12,7 @@ tests:
   - it: "renders one Application per component and addon"
     asserts:
       - hasDocuments:
-          count: 14
+          count: 15
       - isKind:
           of: Application
 
@@ -35,7 +35,7 @@ tests:
       alerting.slack.enabled: true
     asserts:
       - hasDocuments:
-          count: 15
+          count: 16
       - equal:
           path: metadata.name
           value: lgtm-alertmanager-config
@@ -54,7 +54,7 @@ tests:
       components.tempo.enabled: false
     asserts:
       - hasDocuments:
-          count: 13
+          count: 14
 
   - it: "sets the cluster label and points addons at this chart version"
     asserts:
@@ -72,7 +72,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.2.0
+          value: 0.2.1
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
@@ -107,6 +107,18 @@ tests:
         documentSelector:
           path: metadata.name
           value: lgtm-alloy
+      # Alloy runs on every node: tolerations yes, nodeSelector no
+      - equal:
+          path: spec.source.helm.valuesObject.controller.tolerations[0].value
+          value: lgtm
+        documentSelector:
+          path: metadata.name
+          value: lgtm-alloy
+      - notExists:
+          path: spec.source.helm.valuesObject.controller.nodeSelector
+        documentSelector:
+          path: metadata.name
+          value: lgtm-alloy
 
   - it: "opts Prometheus and Alertmanager out of Reloader's auto-reload"
     documentSelector:
@@ -125,7 +137,7 @@ tests:
       alerting.rules.workloads.enabled: false
     asserts:
       - hasDocuments:
-          count: 13
+          count: 14
       - notEqual:
           path: metadata.name
           value: lgtm-workload-rules

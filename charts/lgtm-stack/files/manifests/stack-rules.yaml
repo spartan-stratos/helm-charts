@@ -1,0 +1,61 @@
+# The stack losing data it was sent: Loki or Tempo refusing writes, Alloy failing to deliver. The counters only exist
+# once something is dropped, so a healthy stack has no series here at all.
+# Runbook: README.md "Stack alerts". Tests: files/tests/stack-rules.test.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lgtm-stack
+  namespace: monitoring
+spec:
+  groups:
+    - name: lgtm-stack
+      rules:
+        - alert: LgtmLokiDiscardingLogs
+          expr: sum by (reason) (rate(loki_discarded_samples_total[10m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Loki is discarding log lines ({{ $labels.reason }})"
+            description: >-
+              Loki refused log lines for 10 minutes, so they are lost. The reason names the limit hit, e.g. rate_limited,
+              stream_limit, line_too_long or greater_than_max_sample_age.
+            runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+            dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring
+        - alert: LgtmTempoDiscardingSpans
+          expr: sum by (reason) (rate(tempo_discarded_spans_total[10m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Tempo is discarding spans ({{ $labels.reason }})"
+            description: Tempo refused spans for 10 minutes, so those traces are incomplete. The reason names the limit hit.
+            runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+            dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring
+        - alert: LgtmAlloyLokiWriteFailing
+          expr: sum by (pod) (rate(loki_write_dropped_entries_total[10m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.pod }} is dropping log lines on the way to Loki"
+            description: Alloy gave up on log batches for 10 minutes. Check that Loki is up and the Alloy pod's logs.
+            runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+            dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring
+        - alert: LgtmAlloyOtlpExportFailing
+          expr: |-
+            sum by (pod) (
+              rate(otelcol_exporter_send_failed_spans_total[10m])
+              or rate(otelcol_exporter_send_failed_metric_points_total[10m])
+              or rate(otelcol_exporter_send_failed_log_records_total[10m])
+            ) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.pod }} fails to export OTLP data"
+            description: >-
+              Alloy could not deliver traces, metrics or logs from apps to Tempo, Prometheus or Loki for 10 minutes.
+              Check those components and the Alloy pod's logs.
+            runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+            dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring

@@ -135,10 +135,8 @@ alloy:
         }
       }
 
+      // No node filter: with internalTrafficPolicy Cluster, OTLP reaches any node's Alloy, including from Fargate pods
       otelcol.processor.k8sattributes "default" {
-        filter {
-          node = sys.env("NODE_NAME")
-        }
         extract {
           metadata = ["k8s.namespace.name", "k8s.pod.name", "k8s.deployment.name", "k8s.node.name"]
           label {

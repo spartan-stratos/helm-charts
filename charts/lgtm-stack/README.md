@@ -18,7 +18,7 @@ name: lgtm-stack-<cluster>
 version: 1.0.0
 dependencies:
   - name: lgtm-stack
-    version: 0.2.0
+    version: 0.2.1
     repository: https://spartan-stratos.github.io/helm-charts
 ```
 
@@ -73,6 +73,7 @@ Before the first sync, the target cluster needs the `gp3-enc-retain` StorageClas
 | `lgtm-alertmanager-config` | 32 | AlertmanagerConfig `slack` (only with `alerting.slack.enabled`) |
 | `lgtm-service-rules` | 33 | PrometheusRule `lgtm-service-red` from `alerting.rules.services` |
 | `lgtm-workload-rules` | 34 | PrometheusRule `lgtm-workloads` from `alerting.rules.workloads` |
+| `lgtm-stack-rules` | 35 | PrometheusRule `lgtm-stack`: Loki, Tempo or Alloy dropping data |
 | `lgtm-grafana` | 40 | `grafana` + `presets/grafana.yaml` (+ `grafana-sso-<provider>.yaml`) |
 | `lgtm-dashboards` | 41 | Dashboard ConfigMaps from `files/dashboards/` |
 | `lgtm-project` | 42 | The project folder: its dashboards and rules (only with `project.enabled`) |
@@ -109,7 +110,7 @@ default. Lists are replaced, not appended.
 | `argocd.namePrefix` | `lgtm-` | Application name prefix |
 | `argocd.syncPolicy` | automated, retry 10 | Shared syncPolicy. `RespectIgnoreDifferences=true` is added where diffs are ignored |
 | `cluster.name` | `""` | `cluster` label on metrics, logs and Slack messages. Required |
-| `placement.nodeSelector` / `.tolerations` | `{}` / `[]` | Pin every pod, e.g. to a dedicated node. With a nodeSelector, Alloy's Service uses `internalTrafficPolicy: Cluster` |
+| `placement.nodeSelector` / `.tolerations` | `{}` / `[]` | Pin every pod, e.g. to a dedicated node. Alloy (a DaemonSet that tails each node's logs) takes only the tolerations, so it runs on every node; with a nodeSelector its Service uses `internalTrafficPolicy: Cluster` |
 | `grafana.domain` | `""` | `root_url` and Ingress host |
 | `grafana.ingress.enabled` / `.className` / `.annotations` | `false` / `alb` / `{}` | Grafana Ingress |
 | `grafana.sso.provider` | `none` | `keycloak` or `github` adds the matching preset; settings in `grafana.sso.<provider>` |
@@ -119,7 +120,7 @@ default. Lists are replaced, not appended.
 | `components.<c>.chart` | pinned | Upstream chart repoURL, name and version |
 | `components.<c>.values` | `{}` | Any value of the upstream chart, merged last |
 | `components.<c>.ignoreDifferences` | `[]` | Appended to the built-in list |
-| `addons.<a>.enabled` | `true` | `clusterInfo`, `pvcFillRules`, `grafanaDatasources`, `instrumentation`, `dashboards` |
+| `addons.<a>.enabled` | `true` | `clusterInfo`, `pvcFillRules`, `stackRules`, `grafanaDatasources`, `instrumentation`, `dashboards` |
 | `alerting.rules.services.*` | on, see [Service alerts](#service-alerts) | RED alerts per service; thresholds, `minRequestRate`, `overrides.<service>` |
 | `alerting.rules.workloads.*` | on, `memoryLimitRatio: 0.9` | See [Workload alerts](#workload-alerts) |
 | `project.enabled` | `false` | Sync the project folder (dashboards and rules) from the project's repo, see [Project folder](#project-folder) |
@@ -236,6 +237,8 @@ spec: {{- $.Files.Get $path | nindent 2 }}
 
 Names share `monitoring` with the stack's objects: avoid the `lgtm-` prefix. Label rules with `severity` (`info`,
 `warning`, `critical`) for routing, and keep `{{ $labels.x }}` as is in annotations: Helm does not template the files.
+An annotation `dashboard_url` (a Grafana path such as `/d/<uid>/<slug>?var-x={{ $labels.x }}`) adds a Dashboard link to
+the Slack message.
 
 ## Alerting
 
@@ -244,8 +247,16 @@ project folder's rules; every PrometheusRule in the cluster is selected) and Ale
 routes them; Grafana shows them read-only. Grafana contact points do not receive these alerts: they belong to
 Grafana's own Alertmanager.
 
-With `alerting.slack.enabled`, AlertmanagerConfig `slack` sends `severity` warning and critical, grouped by alertname
-and namespace, repeated every 4h, with resolved notices. Info alerts stay in Grafana.
+With `alerting.slack.enabled`, AlertmanagerConfig `slack` sends `severity` warning and critical, grouped by alertname,
+namespace and service, repeated every 4h, with resolved notices. Info alerts stay in Grafana. With `grafana.domain` set,
+the message links to Grafana:
+
+| Link | Opens |
+| --- | --- |
+| The title | Grafana's alert rule list filtered to the alert (Alertmanager's own URL is in-cluster only) |
+| `Runbook` | The rule's `runbook_url` |
+| `Dashboard` | The rule's `dashboard_url`: RED for service alerts, the Pod dashboard for workload alerts, self-monitoring for the stack's own |
+| `Silence` | A new silence in Grafana, pre-filled with the group's `alertname`, `namespace` and `service` |
 
 To silence a noisy kube-prometheus-stack default, set
 `components.kubePrometheusStack.values.defaultRules.disabled.<AlertName>: true`.
@@ -282,6 +293,17 @@ route, and the logs linked from the trace.
 
 All are `warning`. Crash loops, failed Jobs and not-ready pods come from the defaults (`KubePodCrashLooping`,
 `KubeJobFailed`, `KubePodNotReady`).
+
+### Stack alerts
+
+`lgtm-stack` alerts when the stack loses data it was sent. All are `warning`, after 10m:
+
+| Alert | Fires when | Look at |
+| --- | --- | --- |
+| `LgtmLokiDiscardingLogs` | Loki refuses lines (`reason`: rate or stream limits, line too long, too old) | Loki limits in `components.loki.values`, the client sending the burst |
+| `LgtmTempoDiscardingSpans` | Tempo refuses spans (`reason`: trace too large, rate limits) | Tempo overrides in `components.tempo.values` |
+| `LgtmAlloyLokiWriteFailing` | Alloy drops log batches it could not push | Loki up and Ready, the Alloy pod's logs |
+| `LgtmAlloyOtlpExportFailing` | Alloy fails to deliver app traces, metrics or logs | Tempo, Prometheus (remote-write receiver) and Loki, the Alloy pod's logs |
 
 ### PVC-fill alerts
 

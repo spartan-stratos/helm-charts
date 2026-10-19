@@ -1,6 +1,7 @@
 # Sends warning and critical alerts from the real Alertmanager to Slack. Info stays in Grafana; Watchdog has no severity.
 # The webhook URL comes from the Secret named in alerting.slack, created outside git. Until it exists the operator skips
 # this config and Alertmanager keeps running with the null receiver; once it exists, the operator picks it up.
+# Lines with __GRAFANA_URL__ (title link, Silence, Dashboard) are dropped when grafana.domain is not set.
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
@@ -9,7 +10,8 @@ metadata:
 spec:
   route:
     receiver: slack
-    groupBy: [alertname, namespace]
+    # service: the RED alerts have no namespace, so without it every service's alert lands in one message
+    groupBy: [alertname, namespace, service]
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 4h
@@ -25,9 +27,12 @@ spec:
             key: __SLACK_SECRET_KEY__
           sendResolved: true
           title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          titleLink: '__GRAFANA_URL__/alerting/list?search={{ .CommonLabels.alertname | urlquery }}' # the default is Alertmanager's in-cluster URL
           text: |-
             {{ range .Alerts }}*{{ .Annotations.summary }}*{{ if .Annotations.message }}*{{ .Annotations.message }}*{{ end }}
             {{ .Annotations.description }}
-            `cluster=__CLUSTER_NAME__ namespace={{ .Labels.namespace }}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.persistentvolumeclaim }} pvc={{ .Labels.persistentvolumeclaim }}{{ end }}{{ if .Labels.job_name }} job={{ .Labels.job_name }}{{ end }}`
+            `cluster=__CLUSTER_NAME__{{ if .Labels.namespace }} namespace={{ .Labels.namespace }}{{ else if .Labels.service }} service={{ .Labels.service }}{{ end }}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.persistentvolumeclaim }} pvc={{ .Labels.persistentvolumeclaim }}{{ end }}{{ if .Labels.job_name }} job={{ .Labels.job_name }}{{ end }}`
             {{ if .Annotations.runbook_url }}<{{ .Annotations.runbook_url }}|Runbook>{{ end }}
+            {{- if .Annotations.dashboard_url }} · <__GRAFANA_URL__{{ .Annotations.dashboard_url }}|Dashboard>{{ end }}
             {{ end }}
+            <__GRAFANA_URL__/alerting/silence/new?alertmanager=alertmanager&matcher={{ printf "alertname=%s" .CommonLabels.alertname | urlquery }}{{ if .CommonLabels.namespace }}&matcher={{ printf "namespace=%s" .CommonLabels.namespace | urlquery }}{{ end }}{{ if .CommonLabels.service }}&matcher={{ printf "service=%s" .CommonLabels.service | urlquery }}{{ end }}|Silence>

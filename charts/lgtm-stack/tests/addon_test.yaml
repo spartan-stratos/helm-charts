@@ -30,7 +30,7 @@ tests:
           value: my-slack
       - matchRegex:
           path: spec.receivers[0].slackConfigs[0].text
-          pattern: 'cluster=example-cluster namespace=\{\{ \.Labels\.namespace \}\}'
+          pattern: 'cluster=example-cluster\{\{ if \.Labels\.namespace \}\} namespace=\{\{ \.Labels\.namespace \}\}'
 
   - it: "renders both datasources"
     set:
@@ -96,6 +96,44 @@ tests:
     set:
       addon: workloadRules
     asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 4
+
+  - it: "links the Slack message to Grafana when grafana.domain is set"
+    set:
+      addon: alertmanagerConfig
+      grafana.domain: grafana.example.com
+    asserts:
+      - equal:
+          path: spec.receivers[0].slackConfigs[0].titleLink
+          value: https://grafana.example.com/alerting/list?search={{ .CommonLabels.alertname | urlquery }}
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: '<https://grafana\.example\.com/alerting/silence/new\?alertmanager=alertmanager&matcher='
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: '<https://grafana\.example\.com\{\{ \.Annotations\.dashboard_url \}\}\|Dashboard>'
+
+  - it: "drops the Grafana links without grafana.domain"
+    set:
+      addon: alertmanagerConfig
+    asserts:
+      - notExists:
+          path: spec.receivers[0].slackConfigs[0].titleLink
+      - notMatchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: 'GRAFANA|Silence|Dashboard'
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: '\|Runbook>'
+
+  - it: "renders the stack rules"
+    set:
+      addon: stackRules
+    asserts:
+      - isKind:
+          of: PrometheusRule
       - lengthEqual:
           path: spec.groups[0].rules
           count: 4

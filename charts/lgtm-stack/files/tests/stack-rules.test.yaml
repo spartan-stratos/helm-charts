@@ -1,0 +1,71 @@
+# promtool unit tests for files/manifests/stack-rules.yaml; run files/tests/test-rules.sh.
+rule_files:
+  - stack-rules.yaml
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      # Loki rate-limits one tenant's lines from minute 5
+      - series: 'loki_discarded_samples_total{reason="rate_limited",tenant="fake"}'
+        values: '0x5 0+10x30'
+      # Tempo refuses spans throughout
+      - series: 'tempo_discarded_spans_total{reason="trace_too_large",tenant="single-tenant"}'
+        values: '0+5x30'
+      # one Alloy drops log entries, another is healthy
+      - series: 'loki_write_dropped_entries_total{pod="alloy-a",component_id="loki.write.default"}'
+        values: '0+3x30'
+      - series: 'loki_write_dropped_entries_total{pod="alloy-b",component_id="loki.write.default"}'
+        values: '0x30'
+      # alloy-a fails to export spans, alloy-b metric points
+      - series: 'otelcol_exporter_send_failed_spans_total{pod="alloy-a",exporter="otlp_grpc/otelcol.exporter.otlp.tempo"}'
+        values: '0+2x30'
+      - series: 'otelcol_exporter_send_failed_metric_points_total{pod="alloy-b",exporter="otlphttp/otelcol.exporter.otlphttp.prometheus"}'
+        values: '0+2x30'
+    alert_rule_test:
+      # 12m: Loki has dropped for 7 minutes only
+      - eval_time: 12m
+        alertname: LgtmLokiDiscardingLogs
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: LgtmLokiDiscardingLogs
+        exp_alerts:
+          - exp_labels: { severity: warning, reason: rate_limited }
+            exp_annotations:
+              summary: Loki is discarding log lines (rate_limited)
+              description: Loki refused log lines for 10 minutes, so they are lost. The reason names the limit hit, e.g. rate_limited, stream_limit, line_too_long or greater_than_max_sample_age.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+              dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring
+      - eval_time: 20m
+        alertname: LgtmTempoDiscardingSpans
+        exp_alerts:
+          - exp_labels: { severity: warning, reason: trace_too_large }
+            exp_annotations:
+              summary: Tempo is discarding spans (trace_too_large)
+              description: Tempo refused spans for 10 minutes, so those traces are incomplete. The reason names the limit hit.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+              dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring
+      - eval_time: 20m
+        alertname: LgtmAlloyLokiWriteFailing
+        exp_alerts:
+          - exp_labels: { severity: warning, pod: alloy-a }
+            exp_annotations:
+              summary: alloy-a is dropping log lines on the way to Loki
+              description: Alloy gave up on log batches for 10 minutes. Check that Loki is up and the Alloy pod's logs.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+              dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring
+      - eval_time: 20m
+        alertname: LgtmAlloyOtlpExportFailing
+        exp_alerts:
+          - exp_labels: { severity: warning, pod: alloy-a }
+            exp_annotations:
+              summary: alloy-a fails to export OTLP data
+              description: Alloy could not deliver traces, metrics or logs from apps to Tempo, Prometheus or Loki for 10 minutes. Check those components and the Alloy pod's logs.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+              dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring
+          - exp_labels: { severity: warning, pod: alloy-b }
+            exp_annotations:
+              summary: alloy-b fails to export OTLP data
+              description: Alloy could not deliver traces, metrics or logs from apps to Tempo, Prometheus or Loki for 10 minutes. Check those components and the Alloy pod's logs.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#stack-alerts
+              dashboard_url: /d/lgtm-self-monitoring/lgtm-lite-self-monitoring

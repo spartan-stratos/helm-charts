@@ -141,6 +141,9 @@ addons:
     enabled: true
   pvcFillRules:
     enabled: true
+  # Alerts when Loki, Tempo or Alloy drop data
+  stackRules:
+    enabled: true
   grafanaDatasources:
     enabled: true
   instrumentation:

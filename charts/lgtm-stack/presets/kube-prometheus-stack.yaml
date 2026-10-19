@@ -43,6 +43,14 @@ kube-state-metrics:
   metricAnnotationsAllowList:
     - pods=[instrumentation.opentelemetry.io/inject-java,instrumentation.opentelemetry.io/inject-python,instrumentation.opentelemetry.io/inject-go,instrumentation.opentelemetry.io/inject-nodejs,instrumentation.opentelemetry.io/inject-dotnet]
 
+# EKS nodes are Linux; drop the AIX and macOS node dashboards
+nodeExporter:
+  operatingSystems:
+    aix:
+      enabled: false
+    darwin:
+      enabled: false
+
 prometheus:
   # The operator copies these to the StatefulSet. Rule and config changes are hot-reloaded by config-reloader, so a
   # Reloader running with --auto-reload-all must not restart the pod on every PrometheusRule change
