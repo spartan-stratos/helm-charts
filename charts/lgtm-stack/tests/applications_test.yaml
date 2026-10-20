@@ -72,7 +72,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.2.1
+          value: 0.2.2
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
@@ -201,9 +201,12 @@ tests:
       path: metadata.name
       value: lgtm-opentelemetry-operator
     asserts:
-      - equal:
-          path: spec.source.helm.valuesObject.admissionWebhooks.secretAnnotations
-          value: { helm.sh/hook: null, helm.sh/hook-delete-policy: null }
+      # As a string, so the nulls reach Helm (valuesObject drops them)
+      - notExists:
+          path: spec.source.helm.valuesObject
+      - matchRegex:
+          path: spec.source.helm.values
+          pattern: "secretAnnotations:\\n\\s+helm.sh/hook: null\\n\\s+helm.sh/hook-delete-policy: null"
       - lengthEqual:
           path: spec.ignoreDifferences
           count: 3

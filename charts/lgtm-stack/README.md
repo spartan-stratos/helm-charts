@@ -334,6 +334,9 @@ When one fires:
 | `lgtm-grafana` | Secret `grafana` data, Deployment `checksum/secret` | Random admin password on every render when the chart generates it |
 | `lgtm-opentelemetry-operator` | webhook cert Secret data, webhook `caBundle` | Cert generated on every render; the first pair is kept |
 
+The OTel Operator's values go to ArgoCD as `helm.values` (a string), not `valuesObject`: the preset nulls the chart's
+Helm hook annotations on the cert Secret, and nulls do not survive in `valuesObject`.
+
 ## Development
 
 ```sh
