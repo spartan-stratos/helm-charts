@@ -90,7 +90,9 @@ opentelemetryOperator:
   presets: [opentelemetry-operator.yaml]
   placement: [""]
   # The chart generates the webhook cert on every render; as a plain resource (hook annotations nulled below) ArgoCD
-  # creates it once and keeps it with the matching caBundle
+  # creates it once and keeps it with the matching caBundle. The nulls survive only in helm.values: in valuesObject
+  # they are dropped, the hooks stay, and every sync makes a new cert that no longer matches the caBundle.
+  valuesAsString: true
   ignoreDifferences:
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration

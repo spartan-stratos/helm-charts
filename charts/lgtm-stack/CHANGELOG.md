@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.2) (2026-10-20)
+
+### Bug Fixes
+
+* OTel Operator: its values go to ArgoCD as `helm.values` (a string) instead of `valuesObject`. In `valuesObject` the
+  nulls that remove the chart's Helm hook annotations were dropped, so the webhook cert Secret stayed a pre-upgrade
+  hook and was regenerated on syncs, while the ignored `caBundle` kept the first CA. The API server then failed the
+  webhook TLS (`bad certificate`) and, with `failurePolicy: Ignore`, pods started without an agent
+
+### Upgrading
+
+Clusters on 0.2.1 or older may already have a cert that does not match the `caBundle` (operator log
+`tls: bad certificate`, `PodMissingInstrumentation` firing). After syncing 0.2.2, delete the Secret
+`opentelemetry-operator-controller-manager-service-cert` and the `opentelemetry-operator-mutation` and
+`opentelemetry-operator-validation` webhook configurations so ArgoCD recreates them from one render, restart the
+operator, then restart the instrumented workloads.
+
 ## [0.2.1](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.1) (2026-10-19)
 
 ### Bug Fixes

@@ -19,7 +19,10 @@ spec:
     helm:
       releaseName: {{ $c.app }}
       {{- $values := include "lgtm-stack.values" (list $ $key $c) }}
-      {{- if ne $values "{}" }}
+      {{- if eq $values "{}" }}
+      {{- else if $c.valuesAsString }}
+      values: | {{- $values | nindent 8 }}
+      {{- else }}
       valuesObject: {{- $values | nindent 8 }}
       {{- end }}
   {{- with $ignores }}
