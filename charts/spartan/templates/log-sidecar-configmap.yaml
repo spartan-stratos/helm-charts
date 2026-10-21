@@ -1,0 +1,43 @@
+{{- if .Values.observability.logs.fileSidecar.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "spartan.logSidecar.name" . }}
+  labels:
+    {{- include "spartan.labels" . | nindent 4 }}
+data:
+  config.alloy: |
+    // collector="file-sidecar" tells these lines apart from the node Alloy (stdout) and the OTel agent's OTLP logs
+    local.file_match "app" {
+      path_targets = [{"__path__" = {{ printf "%s/%s" (trimSuffix "/" .Values.observability.logs.fileSidecar.path) .Values.observability.logs.fileSidecar.glob | quote }}}]
+    }
+
+    loki.source.file "app" {
+      targets    = local.file_match.app.targets
+      forward_to = [loki.process.app.receiver]
+    }
+
+    // JSON lines keep their level and trace context, so Grafana links the line to its trace; other lines pass as-is
+    loki.process "app" {
+      stage.json {
+        expressions = { level = "level", trace_id = "trace_id", span_id = "span_id" }
+      }
+      stage.structured_metadata {
+        values = { trace_id = "", span_id = "" }
+      }
+      forward_to = [loki.write.default.receiver]
+    }
+
+    loki.write "default" {
+      endpoint {
+        url = sys.env("LOKI_URL")
+      }
+      external_labels = {
+        cluster      = sys.env("CLUSTER_NAME"),
+        namespace    = sys.env("POD_NAMESPACE"),
+        service_name = sys.env("SERVICE_NAME"),
+        container    = sys.env("CONTAINER_NAME"),
+        collector    = "file-sidecar",
+      }
+    }
+{{- end }}

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.0) (2026-10-21)
+
+### Features
+
+* `observability.logs.fileSidecar`: an Alloy native sidecar on the Deployment and every worker that tails the app's log files and pushes them to Loki, for pods no node log agent reaches (Fargate). Off by default; a release that leaves it off renders exactly as on 0.10.0
+  * Reads the directory of the `sidecars[]` entry whose `sharedVolume.mountPath` equals `path`, so a service that already writes `/var/log/application/app.log` for the Datadog agent needs no app change; with no such entry it brings its own `emptyDir` and mounts it on the app
+  * Native sidecar (`initContainers` with `restartPolicy: Always`): starts before the app, stops after it, never blocks it; needs Kubernetes 1.29+
+  * Lines carry `cluster`, `namespace`, `service_name` (the Deployment or `<fullname>-worker-<name>`), `container` and `collector="file-sidecar"`; JSON lines keep `level`, `trace_id` and `span_id`
+  * `cluster` is required
+
 ## [0.10.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.10.0) (2026-10-16)
 
 ### Bug Fixes

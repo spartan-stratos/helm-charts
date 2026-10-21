@@ -26,6 +26,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- end }}
+        {{- if .Values.observability.logs.fileSidecar.enabled }}
+        checksum/log-sidecar: {{ include (print $.Template.BasePath "/log-sidecar-configmap.yaml") $ | sha256sum }}
+        {{- end }}
       labels:
         {{- include "spartan.workerLabels" $ | nindent 8 }}
         tier: "worker"
@@ -41,6 +44,10 @@ spec:
       terminationGracePeriodSeconds: {{ .worker.terminationGracePeriodSeconds | default 180 }}
       {{- if .Values.datadog.enabled }}
       shareProcessNamespace: true
+      {{- end }}
+      {{- if .Values.observability.logs.fileSidecar.enabled }}
+      initContainers:
+        {{- include "spartan.logSidecar.container" (list $ (printf "%s-worker-%s" (include "spartan.fullname" $) .worker.name) true) | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ include "spartan.containerName" . }}
@@ -133,6 +140,9 @@ spec:
               subPath: {{ .name }}
           {{- end }}
           {{- end }}
+          {{- if .Values.observability.logs.fileSidecar.enabled }}
+            {{- include "spartan.logSidecar.appMount" (list $ "" true) | nindent 12 }}
+          {{- end }}
 
         {{- range $sidecar := .Values.sidecars }}
         {{ include "sidecar.template" (dict "sidecar" $sidecar "Values" $.Values "Chart" $.Chart "Release" $.Release) | indent 8 }}
@@ -180,5 +190,8 @@ spec:
       {{- if .Values.sidecars }}
         - name: sidecar-volume
           emptyDir: {}
+      {{- end }}
+      {{- if .Values.observability.logs.fileSidecar.enabled }}
+        {{- include "spartan.logSidecar.volumes" (list $ "" true) | nindent 8 }}
       {{- end }}
 {{ end }}

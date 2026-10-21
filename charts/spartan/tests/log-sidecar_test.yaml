@@ -1,0 +1,114 @@
+suite: "File log sidecar"
+
+templates:
+  - "templates/deployment.yaml"
+  - "templates/worker.yaml"
+  - "templates/log-sidecar-configmap.yaml"
+  - "templates/configmap.yaml"
+  - "templates/secret.yaml"
+
+set:
+  observability.logs.fileSidecar:
+    enabled: true
+    cluster: example-cluster
+
+tests:
+  - it: "renders nothing when off"
+    set:
+      observability.logs.fileSidecar.enabled: false
+    template: "templates/log-sidecar-configmap.yaml"
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "fails without a cluster name"
+    set:
+      observability.logs.fileSidecar.cluster: ""
+    template: "templates/deployment.yaml"
+    asserts:
+      - failedTemplate:
+          errorMessage: "observability.logs.fileSidecar.cluster is required"
+
+  - it: "adds a native sidecar and its own log volume when no sidecar shares the directory"
+    template: "templates/deployment.yaml"
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: log-sidecar
+      - equal:
+          path: spec.template.spec.initContainers[0].restartPolicy
+          value: Always
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: { name: SERVICE_NAME, value: RELEASE-NAME-spartan }
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content: { name: log-sidecar-logs, mountPath: /var/log/application, readOnly: true }
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: { name: log-sidecar-logs, mountPath: /var/log/application }
+      - contains:
+          path: spec.template.spec.volumes
+          content: { name: log-sidecar-logs, emptyDir: { sizeLimit: 100Mi } }
+      - exists:
+          path: spec.template.metadata.annotations["checksum/log-sidecar"]
+
+  - it: "reads the directory a sidecar already shares, e.g. the datadog-agent's"
+    template: "templates/deployment.yaml"
+    set:
+      sidecars:
+        - name: datadog-agent
+          image: datadog/agent
+          sharedVolume: { mountPath: /var/log/application/ }
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content: { name: sidecar-volume, mountPath: /var/log/application, subPath: datadog-agent, readOnly: true }
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: { name: log-sidecar-logs, mountPath: /var/log/application }
+      - notContains:
+          path: spec.template.spec.volumes
+          content: { name: log-sidecar-logs, emptyDir: { sizeLimit: 100Mi } }
+
+  - it: "does not read a hook-only sidecar's directory on the Deployment"
+    template: "templates/deployment.yaml"
+    set:
+      sidecars:
+        - name: log-collector
+          image: fluent/fluent-bit
+          skipDeployment: true
+          sharedVolume: { mountPath: /var/log/application/ }
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content: { name: log-sidecar-logs, mountPath: /var/log/application, readOnly: true }
+
+  - it: "names each worker's lines after the worker"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: general
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: log-sidecar
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: { name: SERVICE_NAME, value: RELEASE-NAME-spartan-worker-general }
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: { name: log-sidecar-logs, mountPath: /var/log/application }
+
+  - it: "tails path/glob and labels the lines"
+    template: "templates/log-sidecar-configmap.yaml"
+    set:
+      observability.logs.fileSidecar.path: /app/logs/
+      observability.logs.fileSidecar.glob: "*.json"
+    asserts:
+      - matchRegex:
+          path: data["config.alloy"]
+          pattern: '"__path__" = "/app/logs/\*\.json"'
+      - matchRegex:
+          path: data["config.alloy"]
+          pattern: 'collector    = "file-sidecar"'

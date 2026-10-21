@@ -454,6 +454,30 @@ cronjobs: []
 #      # must match the name of one of the persistentVolumeClaims
 #      claimName: shared-data 
 
+## observability.logs.fileSidecar adds an Alloy native sidecar to the Deployment and every worker: it tails the app's
+## log files and pushes them to Loki, for pods no node log agent reaches (Fargate). It reads the directory of the
+## sidecars[] entry whose sharedVolume.mountPath equals path (e.g. the datadog-agent's), or brings its own emptyDir
+## mounted on the app at path. Lines carry collector="file-sidecar"; JSON lines keep level, trace_id and span_id.
+observability:
+  logs:
+    fileSidecar:
+      enabled: false
+      image: docker.io/grafana/alloy:v1.20.0
+      # Directory the app writes to, and the files in it to tail
+      path: /var/log/application
+      glob: "*.log"
+      # Required: the cluster label on every line, as the node Alloy sets it
+      cluster: ""
+      lokiUrl: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+      # Only for the emptyDir it brings; a shared sidecar-volume keeps its own limit
+      sizeLimit: 100Mi
+      resources:
+        requests:
+          cpu: 10m
+          memory: 48Mi
+        limits:
+          memory: 128Mi
+
 ## sidecars enables sidecars containers to run specific tasks and mounting shared volumes
 sidecars: []
 #  - name: datadog-agent
