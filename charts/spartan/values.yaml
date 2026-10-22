@@ -469,8 +469,9 @@ observability:
       # Required: the cluster label on every line, as the node Alloy sets it
       cluster: ""
       lokiUrl: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
-      # Only for the emptyDir it brings; a shared sidecar-volume keeps its own limit
-      sizeLimit: 100Mi
+      # Only for the emptyDir it brings (a shared sidecar-volume has none). Empty: no limit, like the shared volume. An app
+      # that never rotates its file (a plain logback FileAppender) gets the pod evicted once the file passes the limit
+      sizeLimit: ""
       resources:
         requests:
           cpu: 10m

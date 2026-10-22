@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Features
 
 * `observability.logs.fileSidecar`: an Alloy native sidecar on the Deployment and every worker that tails the app's log files and pushes them to Loki, for pods no node log agent reaches (Fargate). Off by default; a release that leaves it off renders exactly as on 0.10.0
-  * Reads the directory of the `sidecars[]` entry whose `sharedVolume.mountPath` equals `path`, so a service that already writes `/var/log/application/app.log` for the Datadog agent needs no app change; with no such entry it brings its own `emptyDir` and mounts it on the app
+  * Reads the directory of the `sidecars[]` entry whose `sharedVolume.mountPath` equals `path`, so a service that already writes `/var/log/application/app.log` for the Datadog agent needs no app change; with no such entry it brings its own `emptyDir` and mounts it on the app. That volume has no size limit by default, like the shared one: an app that never rotates its file (a plain logback `FileAppender`) would get the pod evicted once the file passed a limit; set `sizeLimit` where the app rotates
   * Native sidecar (`initContainers` with `restartPolicy: Always`): starts before the app, stops after it, never blocks it; needs Kubernetes 1.29+
   * Lines carry `cluster`, `namespace`, `service_name` (the Deployment or `<fullname>-worker-<name>`), `container` and `collector="file-sidecar"`; JSON lines keep `level`, `trace_id` and `span_id`
   * `cluster` is required

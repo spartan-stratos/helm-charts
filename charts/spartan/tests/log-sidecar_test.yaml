@@ -49,7 +49,7 @@ tests:
           content: { name: log-sidecar-logs, mountPath: /var/log/application }
       - contains:
           path: spec.template.spec.volumes
-          content: { name: log-sidecar-logs, emptyDir: { sizeLimit: 100Mi } }
+          content: { name: log-sidecar-logs, emptyDir: {} }
       - exists:
           path: spec.template.metadata.annotations["checksum/log-sidecar"]
 
@@ -69,7 +69,7 @@ tests:
           content: { name: log-sidecar-logs, mountPath: /var/log/application }
       - notContains:
           path: spec.template.spec.volumes
-          content: { name: log-sidecar-logs, emptyDir: { sizeLimit: 100Mi } }
+          content: { name: log-sidecar-logs, emptyDir: {} }
 
   - it: "does not read a hook-only sidecar's directory on the Deployment"
     template: "templates/deployment.yaml"
@@ -83,6 +83,15 @@ tests:
       - contains:
           path: spec.template.spec.initContainers[0].volumeMounts
           content: { name: log-sidecar-logs, mountPath: /var/log/application, readOnly: true }
+
+  - it: "caps its own volume when sizeLimit is set"
+    template: "templates/deployment.yaml"
+    set:
+      observability.logs.fileSidecar.sizeLimit: 1Gi
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content: { name: log-sidecar-logs, emptyDir: { sizeLimit: 1Gi } }
 
   - it: "names each worker's lines after the worker"
     template: "templates/worker.yaml"

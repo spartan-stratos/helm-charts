@@ -86,7 +86,11 @@ no node log agent reaches (Fargate). Callers pass (list $ serviceName isWorker).
   emptyDir: {}
 {{- if not (include "spartan.logSidecar.sharedFrom" .) }}
 - name: log-sidecar-logs
+  {{- with $.Values.observability.logs.fileSidecar.sizeLimit }}
   emptyDir:
-    sizeLimit: {{ $.Values.observability.logs.fileSidecar.sizeLimit }}
+    sizeLimit: {{ . }}
+  {{- else }}
+  emptyDir: {}
+  {{- end }}
 {{- end }}
 {{- end -}}
