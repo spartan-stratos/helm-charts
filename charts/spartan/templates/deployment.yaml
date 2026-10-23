@@ -1,3 +1,4 @@
+{{- $logSidecar := list . false (include "spartan.logSidecar.sharedFrom" (list . false)) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -50,7 +51,7 @@ spec:
       {{- end }}
       {{- if .Values.observability.logs.fileSidecar.enabled }}
       initContainers:
-        {{- include "spartan.logSidecar.container" (list . (include "spartan.fullname" .) false) | nindent 8 }}
+        {{- include "spartan.logSidecar.container" $logSidecar | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ include "spartan.containerName" . }}
@@ -170,7 +171,7 @@ spec:
               mountPath: {{ .mountPath }}
           {{- end }}
           {{- if .Values.observability.logs.fileSidecar.enabled }}
-            {{- include "spartan.logSidecar.appMount" (list . "" false) | nindent 12 }}
+            {{- include "spartan.logSidecar.appMount" $logSidecar | nindent 12 }}
           {{- end }}
         {{- range $sidecar := .Values.sidecars }}
         {{- if not $sidecar.skipDeployment }}
@@ -219,7 +220,7 @@ spec:
           emptyDir: {}
       {{- end }}
       {{- if .Values.observability.logs.fileSidecar.enabled }}
-        {{- include "spartan.logSidecar.volumes" (list . "" false) | nindent 8 }}
+        {{- include "spartan.logSidecar.volumes" $logSidecar | nindent 8 }}
       {{- end }}
       {{- range .Values.persistence }}
         - name: {{ .claimName }}-volume

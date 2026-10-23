@@ -1,4 +1,5 @@
 {{ define "spartan.worker" }}
+{{- $logSidecar := list $ true (include "spartan.logSidecar.sharedFrom" (list $ true)) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -47,7 +48,7 @@ spec:
       {{- end }}
       {{- if .Values.observability.logs.fileSidecar.enabled }}
       initContainers:
-        {{- include "spartan.logSidecar.container" (list $ (printf "%s-worker-%s" (include "spartan.fullname" $) .worker.name) true) | nindent 8 }}
+        {{- include "spartan.logSidecar.container" $logSidecar | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ include "spartan.containerName" . }}
@@ -141,7 +142,7 @@ spec:
           {{- end }}
           {{- end }}
           {{- if .Values.observability.logs.fileSidecar.enabled }}
-            {{- include "spartan.logSidecar.appMount" (list $ "" true) | nindent 12 }}
+            {{- include "spartan.logSidecar.appMount" $logSidecar | nindent 12 }}
           {{- end }}
 
         {{- range $sidecar := .Values.sidecars }}
@@ -192,6 +193,6 @@ spec:
           emptyDir: {}
       {{- end }}
       {{- if .Values.observability.logs.fileSidecar.enabled }}
-        {{- include "spartan.logSidecar.volumes" (list $ "" true) | nindent 8 }}
+        {{- include "spartan.logSidecar.volumes" $logSidecar | nindent 8 }}
       {{- end }}
 {{ end }}
