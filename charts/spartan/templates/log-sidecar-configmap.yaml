@@ -17,13 +17,14 @@ data:
       forward_to = [loki.process.app.receiver]
     }
 
-    // JSON lines keep their level and trace context, so Grafana links the line to its trace; other lines pass as-is
+    // JSON lines keep level and trace context as structured metadata (Loki 3, schema v13), so Grafana links the line to
+    // its trace; other lines pass as-is
     loki.process "app" {
       stage.json {
         expressions = { level = "level", trace_id = "trace_id", span_id = "span_id" }
       }
       stage.structured_metadata {
-        values = { trace_id = "", span_id = "" }
+        values = { level = "", trace_id = "", span_id = "" }
       }
       forward_to = [loki.write.default.receiver]
     }
@@ -31,6 +32,9 @@ data:
     loki.write "default" {
       endpoint {
         url = sys.env("LOKI_URL")
+        {{- with .Values.observability.logs.fileSidecar.tenantId }}
+        tenant_id = {{ . | quote }}
+        {{- end }}
       }
       external_labels = {
         cluster      = sys.env("CLUSTER_NAME"),

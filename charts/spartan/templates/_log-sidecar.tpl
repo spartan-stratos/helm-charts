@@ -50,6 +50,16 @@ no node log agent reaches (Fargate). Callers pass (list $ serviceName isWorker).
   {{- with $fs.resources }}
   resources: {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $fs.securityContext }}
+  securityContext: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if $fs.drainSeconds }}
+  # Alloy does not drain on SIGTERM: the delay lets it read and push the app's last lines (a crash) after the app exits
+  lifecycle:
+    preStop:
+      sleep:
+        seconds: {{ $fs.drainSeconds }}
+  {{- end }}
   volumeMounts:
     {{- if $from }}
     - name: sidecar-volume
@@ -72,6 +82,14 @@ no node log agent reaches (Fargate). Callers pass (list $ serviceName isWorker).
 {{- define "spartan.logSidecar.appMount" -}}
 {{- $ := index . 0 -}}
 {{- if not (include "spartan.logSidecar.sharedFrom" .) }}
+{{- $path := trimSuffix "/" $.Values.observability.logs.fileSidecar.path }}
+{{- if not (index . 2) }}
+{{- range concat ($.Values.volumeMounts | default list) ($.Values.persistence | default list) }}
+{{- if eq (trimSuffix "/" .mountPath) $path }}
+{{- fail (printf "observability.logs.fileSidecar.path %s is already a mount of the app; share it through a sidecars[] sharedVolume or pick another path" $path) }}
+{{- end }}
+{{- end }}
+{{- end }}
 - name: log-sidecar-logs
   mountPath: {{ $.Values.observability.logs.fileSidecar.path | quote }}
 {{- end }}

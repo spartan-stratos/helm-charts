@@ -2,15 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.11.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.0) (2026-10-21)
+## [0.11.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.0) (2026-10-23)
 
 ### Features
 
-* `observability.logs.fileSidecar`: an Alloy native sidecar on the Deployment and every worker that tails the app's log files and pushes them to Loki, for pods no node log agent reaches (Fargate). Off by default; a release that leaves it off renders exactly as on 0.10.0
-  * Reads the directory of the `sidecars[]` entry whose `sharedVolume.mountPath` equals `path`, so a service that already writes `/var/log/application/app.log` for the Datadog agent needs no app change; with no such entry it brings its own `emptyDir` and mounts it on the app. That volume has no size limit by default, like the shared one: an app that never rotates its file (a plain logback `FileAppender`) would get the pod evicted once the file passed a limit; set `sizeLimit` where the app rotates
-  * Native sidecar (`initContainers` with `restartPolicy: Always`): starts before the app, stops after it, never blocks it; needs Kubernetes 1.29+
-  * Lines carry `cluster`, `namespace`, `service_name` (the Deployment or `<fullname>-worker-<name>`), `container` and `collector="file-sidecar"`; JSON lines keep `level`, `trace_id` and `span_id`
-  * `cluster` is required
+* `observability.logs.fileSidecar`: an Alloy native sidecar on the Deployment and every worker that tails the app's log file into Loki, for pods no node log agent reaches (Fargate). Off by default; with it off the chart renders as on 0.10.0 (Kubernetes 1.30+ when on)
+  * Reuses the directory of a `sidecars[]` entry sharing `path` (e.g. the datadog-agent's), else brings its own `emptyDir`, unlimited by default since a non-rotating `FileAppender` would get the pod evicted at a limit
+  * `glob` defaults to `app.log`: a rotated name that still matches is read again from the start
+  * `drainSeconds` (5): a preStop delay, since Alloy does not drain on SIGTERM; without it the last lines before a crash were lost in 5 of 6 local runs
+  * Locked-down `securityContext`, optional `tenantId`; `level`, `trace_id` and `span_id` as structured metadata (Loki 3, schema v13)
 
 ## [0.10.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.10.0) (2026-10-16)
 

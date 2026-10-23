@@ -121,3 +121,52 @@ tests:
       - matchRegex:
           path: data["config.alloy"]
           pattern: 'collector    = "file-sidecar"'
+
+  - it: "waits drainSeconds before stopping and runs locked down"
+    template: "templates/deployment.yaml"
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].lifecycle.preStop.sleep.seconds
+          value: 5
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext
+          value: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+
+  - it: "drops the preStop delay when drainSeconds is 0"
+    template: "templates/deployment.yaml"
+    set:
+      observability.logs.fileSidecar.drainSeconds: 0
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers[0].lifecycle
+
+  - it: "fails when the app already mounts something at path"
+    template: "templates/deployment.yaml"
+    set:
+      volumeMounts:
+        - { name: logs, mountPath: /var/log/application/ }
+    asserts:
+      - failedTemplate:
+          errorMessage: "observability.logs.fileSidecar.path /var/log/application is already a mount of the app; share it through a sidecars[] sharedVolume or pick another path"
+
+  - it: "keeps level as structured metadata, tails app.log, sends no tenant by default"
+    template: "templates/log-sidecar-configmap.yaml"
+    asserts:
+      - matchRegex:
+          path: data["config.alloy"]
+          pattern: 'values = \{ level = "", trace_id = "", span_id = "" \}'
+      - matchRegex:
+          path: data["config.alloy"]
+          pattern: '"__path__" = "/var/log/application/app\.log"'
+      - notMatchRegex:
+          path: data["config.alloy"]
+          pattern: tenant_id
+
+  - it: "sets the tenant when tenantId is set"
+    template: "templates/log-sidecar-configmap.yaml"
+    set:
+      observability.logs.fileSidecar.tenantId: dev
+    asserts:
+      - matchRegex:
+          path: data["config.alloy"]
+          pattern: 'tenant_id = "dev"'
