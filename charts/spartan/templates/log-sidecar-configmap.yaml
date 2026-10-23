@@ -23,8 +23,13 @@ data:
       stage.json {
         expressions = { level = "level", trace_id = "trace_id", span_id = "span_id" }
       }
+      // The pod, so one replica's lines can be told apart without a stream per pod
+      stage.template {
+        source   = "pod"
+        template = sys.env("POD_NAME")
+      }
       stage.structured_metadata {
-        values = { level = "", trace_id = "", span_id = "" }
+        values = { level = "", trace_id = "", span_id = "", pod = "" }
       }
       forward_to = [loki.write.default.receiver]
     }
