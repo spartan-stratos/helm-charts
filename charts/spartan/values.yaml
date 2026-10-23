@@ -454,6 +454,43 @@ cronjobs: []
 #      # must match the name of one of the persistentVolumeClaims
 #      claimName: shared-data 
 
+## observability.logs.fileSidecar adds an Alloy native sidecar to the Deployment and every worker: it tails the app's
+## log files and pushes them to Loki, for pods no node log agent reaches (Fargate). It reads the directory of the
+## sidecars[] entry whose sharedVolume.mountPath equals path (e.g. the datadog-agent's), or brings its own emptyDir
+## mounted on the app at path. Lines carry collector="file-sidecar"; JSON lines keep level, trace_id and span_id as
+## structured metadata (Loki 3, schema v13). Use it where logs come from the file only: not on EC2 pods whose stdout the
+## node Alloy already ships, and not alongside OTLP logs from the OpenTelemetry agent.
+observability:
+  logs:
+    fileSidecar:
+      enabled: false
+      image: docker.io/grafana/alloy:v1.20.0
+      # Directory the app writes to, and the files in it to tail. Keep the glob off rotated names (app.2026-10-23.log would
+      # be read again from the start); the default matches the one file the Datadog agent reads
+      path: /var/log/application
+      glob: app.log
+      # Required: the cluster label on every line, as the node Alloy sets it
+      cluster: ""
+      lokiUrl: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+      # X-Scope-OrgID, for a Loki with auth_enabled; empty sends none
+      tenantId: ""
+      # preStop delay so Alloy pushes the app's last lines before it stops; counts against terminationGracePeriodSeconds
+      drainSeconds: 5
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      # Only for the emptyDir it brings (a shared sidecar-volume has none). Empty: no limit, like the shared volume. An app
+      # that never rotates its file (a plain logback FileAppender) gets the pod evicted once the file passes the limit
+      sizeLimit: ""
+      resources:
+        requests:
+          cpu: 10m
+          memory: 48Mi
+        limits:
+          memory: 128Mi
+
 ## sidecars enables sidecars containers to run specific tasks and mounting shared volumes
 sidecars: []
 #  - name: datadog-agent

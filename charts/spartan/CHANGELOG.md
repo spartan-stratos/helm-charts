@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.0) (2026-10-23)
+
+### Features
+
+* `observability.logs.fileSidecar`: an Alloy native sidecar on the Deployment and every worker that tails the app's log file into Loki, for pods no node log agent reaches (Fargate). Off by default; with it off the chart renders as on 0.10.0 (Kubernetes 1.30+ when on)
+  * Reuses the directory of a `sidecars[]` entry sharing `path` (e.g. the datadog-agent's), else brings its own `emptyDir`, unlimited by default since a non-rotating `FileAppender` would get the pod evicted at a limit
+  * `glob` defaults to `app.log`: a rotated name that still matches is read again from the start
+  * `drainSeconds` (5): a preStop delay, since Alloy does not drain on SIGTERM; without it the last lines before a crash were lost in 5 of 6 local runs
+  * Locked-down `securityContext`, optional `tenantId`; `level`, `trace_id` and `span_id` as structured metadata (Loki 3, schema v13)
+
 ## [0.10.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.10.0) (2026-10-16)
 
 ### Bug Fixes
