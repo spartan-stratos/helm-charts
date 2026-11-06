@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.1) (2026-10-23)
+
+### Bug Fixes
+
+* `observability.logs.fileSidecar`:
+  * `service_name` comes from the pod's `app.kubernetes.io/name`, as the node Alloy sets it. It was the release fullname, so a worker's lines (`<fullname>-worker-<name>` instead of `<appNameLabel>-<name>`) missed the dashboards and alert rules
+  * `pod` joins `level`, `trace_id` and `span_id` as structured metadata, so one replica's lines can be told apart
+  * Runs as the image's `alloy` user (473) with `runAsNonRoot`, so pods with a non-root `podSecurityContext` start; the log file must be readable by others or by `fsGroup`
+  * Fails at render below Kubernetes 1.30, and when a `secret`/`configMap` file mount already sits at `path`
+
 ## [0.11.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.0) (2026-10-23)
 
 ### Features

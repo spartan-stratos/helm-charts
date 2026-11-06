@@ -460,6 +460,8 @@ cronjobs: []
 ## mounted on the app at path. Lines carry collector="file-sidecar"; JSON lines keep level, trace_id and span_id as
 ## structured metadata (Loki 3, schema v13). Use it where logs come from the file only: not on EC2 pods whose stdout the
 ## node Alloy already ships, and not alongside OTLP logs from the OpenTelemetry agent.
+## The app waits for the sidecar to start, so a failed image pull keeps the pod in Init: mirror the image where docker.io
+## is not reachable. Needs Loki 3 with allow_structured_metadata; an older Loki rejects every push.
 observability:
   logs:
     fileSidecar:
@@ -476,7 +478,12 @@ observability:
       tenantId: ""
       # preStop delay so Alloy pushes the app's last lines before it stops; counts against terminationGracePeriodSeconds
       drainSeconds: 5
+      # The image's alloy user; the app's log file must be readable by others (0644, the default umask) or by its group
+      # through podSecurityContext.fsGroup
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 473
+        runAsGroup: 473
         allowPrivilegeEscalation: false
         readOnlyRootFilesystem: true
         capabilities:

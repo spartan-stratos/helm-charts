@@ -1,5 +1,5 @@
 {{- range $index, $worker := (.Values.workers) }}
-  {{- include "spartan.worker" (dict "worker" $worker "Values" $.Values "Chart" $.Chart "Release" $.Release "Template" $.Template) }}
+  {{- include "spartan.worker" (dict "worker" $worker "Values" $.Values "Chart" $.Chart "Release" $.Release "Template" $.Template "Capabilities" $.Capabilities) }}
   {{- if lt $index (sub (len $.Values.workers) 1) }}
 ---
   {{- end }}

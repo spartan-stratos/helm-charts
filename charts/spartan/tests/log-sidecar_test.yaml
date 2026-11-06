@@ -40,7 +40,10 @@ tests:
           value: Always
       - contains:
           path: spec.template.spec.initContainers[0].env
-          content: { name: SERVICE_NAME, value: RELEASE-NAME-spartan }
+          content: { name: SERVICE_NAME, valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } } }
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: { name: POD_NAME, valueFrom: { fieldRef: { fieldPath: metadata.name } } }
       - contains:
           path: spec.template.spec.initContainers[0].volumeMounts
           content: { name: log-sidecar-logs, mountPath: /var/log/application, readOnly: true }
@@ -93,7 +96,7 @@ tests:
           path: spec.template.spec.volumes
           content: { name: log-sidecar-logs, emptyDir: { sizeLimit: 1Gi } }
 
-  - it: "names each worker's lines after the worker"
+  - it: "names each worker's lines from its app.kubernetes.io/name label, as the node Alloy does"
     template: "templates/worker.yaml"
     set:
       workers:
@@ -102,9 +105,12 @@ tests:
       - equal:
           path: spec.template.spec.initContainers[0].name
           value: log-sidecar
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: spartan-general
       - contains:
           path: spec.template.spec.initContainers[0].env
-          content: { name: SERVICE_NAME, value: RELEASE-NAME-spartan-worker-general }
+          content: { name: SERVICE_NAME, valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } } }
       - contains:
           path: spec.template.spec.containers[0].volumeMounts
           content: { name: log-sidecar-logs, mountPath: /var/log/application }
@@ -130,7 +136,7 @@ tests:
           value: 5
       - equal:
           path: spec.template.spec.initContainers[0].securityContext
-          value: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          value: { runAsNonRoot: true, runAsUser: 473, runAsGroup: 473, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
 
   - it: "drops the preStop delay when drainSeconds is 0"
     template: "templates/deployment.yaml"
@@ -154,7 +160,7 @@ tests:
     asserts:
       - matchRegex:
           path: data["config.alloy"]
-          pattern: 'values = \{ level = "", trace_id = "", span_id = "" \}'
+          pattern: 'values = \{ level = "", trace_id = "", span_id = "", pod = "" \}'
       - matchRegex:
           path: data["config.alloy"]
           pattern: '"__path__" = "/var/log/application/app\.log"'
@@ -170,3 +176,21 @@ tests:
       - matchRegex:
           path: data["config.alloy"]
           pattern: 'tenant_id = "dev"'
+
+  - it: "fails on a cluster older than 1.30"
+    template: "templates/deployment.yaml"
+    capabilities:
+      majorVersion: 1
+      minorVersion: 29
+    asserts:
+      - failedTemplate:
+          errorMessage: "observability.logs.fileSidecar needs Kubernetes 1.30+ (native sidecar, preStop sleep), got v1.29.0; pass --kube-version to helm template"
+
+  - it: "fails when a ConfigMap file mount already sits at path, on workers too"
+    template: "templates/worker.yaml"
+    set:
+      workers: [{ name: general }]
+      configMap.asFile: { enabled: true, mountPath: /var/log/application, data: { a: b } }
+    asserts:
+      - failedTemplate:
+          errorMessage: "observability.logs.fileSidecar.path /var/log/application is already a mount of the app; share it through a sidecars[] sharedVolume or pick another path"
