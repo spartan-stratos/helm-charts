@@ -76,6 +76,8 @@ tests:
     asserts:
       - notExists:
           path: "spec.advanced"
+      - notExists:
+          path: "metadata.annotations[\"scaledobject.keda.sh/transfer-hpa-ownership\"]"
 
   - it: "should inherit autoscaling.behavior with both flags and no keda.behavior"
     set:

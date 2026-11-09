@@ -13,6 +13,16 @@ tests:
       - isKind:
           of: HorizontalPodAutoscaler
 
+  - it: "should render an HPA for a worker with keda.enabled false"
+    set:
+      workers:
+        - name: jobs
+          autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3, targetCPUUtilizationPercentage: 80 }
+          keda: { enabled: false }
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+
   - it: "should render only the ScaledObject for a worker with both flags"
     set:
       workers:
