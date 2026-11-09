@@ -231,6 +231,55 @@ tests:
           path: "spec.fallback"
           value: { failureThreshold: 12, replicas: 3 }
 
+  - it: "should fail at render on a worker fallback with no failureThreshold"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            fallback: { replicas: 3 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - failedTemplate:
+          errorPattern: "workers.*keda.fallback.failureThreshold is required"
+
+  - it: "should fail at render on a worker fallback with no replicas"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            fallback: { failureThreshold: 12 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - failedTemplate:
+          errorPattern: "workers.*keda.fallback.replicas is required"
+
+  - it: "should render a worker fallback of zero replicas"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            fallback: { failureThreshold: 12, replicas: 0 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 0
+
   - it: "should leave out fallback on a worker by default"
     set:
       workers:

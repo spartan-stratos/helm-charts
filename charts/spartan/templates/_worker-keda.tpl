@@ -37,6 +37,8 @@ spec:
   scaleTargetRef:
     name: {{ include "spartan.fullname" $ }}-worker-{{ .worker.name }}
   {{- with .worker.keda.fallback }}
+  {{- $_ := required "workers[].keda.fallback.failureThreshold is required" .failureThreshold }}
+  {{- $_ = required "workers[].keda.fallback.replicas is required" .replicas }}
   fallback:
     {{- toYaml . | nindent 4 }}
   {{- end }}

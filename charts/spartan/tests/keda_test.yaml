@@ -161,6 +161,31 @@ tests:
           path: "spec.fallback"
           value: { failureThreshold: 12, replicas: 8 }
 
+  - it: "should fail at render on a fallback with no failureThreshold"
+    set:
+      keda.enabled: true
+      keda.fallback: { replicas: 8 }
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.fallback.failureThreshold is required"
+
+  - it: "should fail at render on a fallback with no replicas"
+    set:
+      keda.enabled: true
+      keda.fallback: { failureThreshold: 12 }
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.fallback.replicas is required"
+
+  - it: "should render a fallback of zero replicas"
+    set:
+      keda.enabled: true
+      keda.fallback: { failureThreshold: 12, replicas: 0 }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 0
+
   - it: "should leave out fallback by default"
     set:
       keda.enabled: true

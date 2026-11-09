@@ -35,6 +35,8 @@ spec:
   scaleTargetRef:
     name: {{ $fullName }}
   {{- with .Values.keda.fallback }}
+  {{- $_ := required "keda.fallback.failureThreshold is required" .failureThreshold }}
+  {{- $_ = required "keda.fallback.replicas is required" .replicas }}
   fallback:
     {{- toYaml . | nindent 4 }}
   {{- end }}

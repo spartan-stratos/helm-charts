@@ -205,6 +205,7 @@ autoscaling:
 
 ## this key indicates that the configuration is specific to keda https://keda.sh
 ## With autoscaling.enabled too, KEDA takes over the HPA of that name, the chart renders no HPA, and the Deployment has no spec.replicas
+## autoscaling.metrics, minReplicas and maxReplicas then stop applying to that HPA, so a service that scales on CPU needs a cpu trigger in keda.triggers
 ## Warning: turning autoscaling.enabled on for a release that renders spec.replicas removes the field, and the Deployment can drop to 1 pod once. See the 0.12.0 upgrade notes in CHANGELOG.md
 keda:
   ## enabled specifies whether keda
@@ -237,7 +238,8 @@ keda:
   behavior: {}
 
   ## fallback sets the replicas KEDA holds once a scaler keeps failing, instead of leaving the replica count as it is
-  ## KEDA counts one failure per HPA read, about every 15 seconds. Every trigger needs metricType: AverageValue, so KEDA rejects it with cpu or memory triggers
+  ## KEDA counts one failure per HPA read, about every 15 seconds. It applies only to triggers with an AverageValue metric, which is the default, so cpu and memory triggers never fall back
+  ## KEDA 2.15 only logs an invalid fallback, and 2.17 and later check it in the webhook
   fallback: {}
   #  failureThreshold: 12
   #  replicas: 10
@@ -390,6 +392,7 @@ workers: []
 #      pollingInterval: 30
 #      authentication: []
 #      behavior: {}
+#      fallback: {}
 #      triggers: []
 #    extraEnvs:
 #      - name: SERVICE
