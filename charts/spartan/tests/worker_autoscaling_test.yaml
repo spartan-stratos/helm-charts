@@ -245,7 +245,7 @@ tests:
               - { type: datadog, metadata: { queryValue: "3" } }
     asserts:
       - failedTemplate:
-          errorPattern: "workers.*keda.fallback.failureThreshold is required"
+          errorPattern: "workers .jobs. keda.fallback.failureThreshold is required"
 
   - it: "should fail at render on a worker fallback with no replicas"
     set:
@@ -261,7 +261,7 @@ tests:
               - { type: datadog, metadata: { queryValue: "3" } }
     asserts:
       - failedTemplate:
-          errorPattern: "workers.*keda.fallback.replicas is required"
+          errorPattern: "workers .jobs. keda.fallback.replicas is required"
 
   - it: "should render a worker fallback of zero replicas"
     set:
@@ -279,6 +279,38 @@ tests:
       - equal:
           path: "spec.fallback.replicas"
           value: 0
+
+  - it: "should fail at render on a worker fallback above maxReplicas"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            fallback: { failureThreshold: 12, replicas: 8 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - failedTemplate:
+          errorPattern: "workers .jobs. keda.fallback.replicas 8 must be 0 or between"
+
+  - it: "should fail at render on a worker fallback below minReplicas"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 2
+            maxReplicas: 3
+            pollingInterval: 30
+            fallback: { failureThreshold: 12, replicas: 1 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - failedTemplate:
+          errorPattern: "workers .jobs. keda.fallback.replicas 1 must be 0 or between"
 
   - it: "should leave out fallback on a worker by default"
     set:

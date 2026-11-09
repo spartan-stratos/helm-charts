@@ -37,6 +37,9 @@ spec:
   {{- with .Values.keda.fallback }}
   {{- $_ := required "keda.fallback.failureThreshold is required" .failureThreshold }}
   {{- $_ = required "keda.fallback.replicas is required" .replicas }}
+  {{- if and (ne (int .replicas) 0) (or (lt (int .replicas) (int $.Values.keda.minReplicas)) (gt (int .replicas) (int $.Values.keda.maxReplicas))) }}
+  {{- fail (printf "keda.fallback.replicas %d must be 0 or between keda.minReplicas and keda.maxReplicas" (int .replicas)) }}
+  {{- end }}
   fallback:
     {{- toYaml . | nindent 4 }}
   {{- end }}
