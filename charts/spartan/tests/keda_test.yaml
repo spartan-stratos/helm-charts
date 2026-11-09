@@ -214,6 +214,16 @@ tests:
           path: "spec.fallback.replicas"
           value: 4
 
+  - it: "should render a fallback equal to minReplicas"
+    set:
+      keda.enabled: true
+      keda.minReplicas: 2
+      keda.fallback: { failureThreshold: 12, replicas: 2 }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 2
+
   - it: "should leave out fallback by default"
     set:
       keda.enabled: true

@@ -242,7 +242,7 @@ keda:
   ## KEDA below 2.17: the first poll where a scaler errors and no trigger is active sets the Deployment straight to replicas, ignoring failureThreshold, maxReplicas and behavior
   ## replicas: 0 skips that write and is the one case where failureThreshold applies. The failure count can stall when the scaler can't be rebuilt, such as with a bad key or during an outage
   ## KEDA 2.17 and later wait for failureThreshold, according to their source (not run)
-  ## It applies only to triggers with an AverageValue metric, which is the default, so cpu and memory triggers never fall back. KEDA 2.15 only logs an invalid fallback, and 2.17 and later check it in the webhook
+  ## On the HPA path it applies only to triggers with an AverageValue metric, which is the default, so cpu and memory triggers never fall back there. The direct write below 2.17 doesn't check the metric type. KEDA 2.15 only logs an invalid fallback, and 2.17 and later check it in the webhook
   fallback: {}
   #  failureThreshold: 12
   #  replicas: 10

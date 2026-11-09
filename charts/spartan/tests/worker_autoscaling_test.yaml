@@ -312,6 +312,23 @@ tests:
       - failedTemplate:
           errorPattern: "workers .jobs. keda.fallback.replicas 1 must be 0 or between"
 
+  - it: "should render a worker fallback equal to minReplicas"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 2
+            maxReplicas: 3
+            pollingInterval: 30
+            fallback: { failureThreshold: 12, replicas: 2 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 2
+
   - it: "should leave out fallback on a worker by default"
     set:
       workers:
