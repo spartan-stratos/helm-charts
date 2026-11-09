@@ -232,6 +232,7 @@ keda:
   #        key: DD_APP_KEY
 
   ## behavior specifies separate scaling policies upon scale-up and scale-down, as autoscaling.behavior
+  ## With autoscaling.enabled too and no keda.behavior, it takes autoscaling.behavior
   behavior: {}
 
   ## list of event sources that trigger the autoscaling https://keda.sh/docs/latest/scalers/
@@ -381,6 +382,7 @@ workers: []
 #      maxReplicas: 10
 #      pollingInterval: 30
 #      authentication: []
+#      behavior: {}
 #      triggers: []
 #    extraEnvs:
 #      - name: SERVICE
