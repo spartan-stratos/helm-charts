@@ -126,6 +126,28 @@ tests:
       - failedTemplate:
           errorPattern: "keda.authentication .datadog. needs podIdentity or secretTargetRef"
 
+  - it: "should point a trigger at its TriggerAuthentication"
+    set:
+      fullnameOverride: app
+      keda.enabled: true
+      keda.authentication:
+        - name: datadog
+          secretTargetRef:
+            - { parameter: apiKey, name: my-secret, key: DD_API_KEY }
+      keda.triggers:
+        - type: datadog
+          authentication: { name: datadog }
+          metadata: { queryValue: "3" }
+    asserts:
+      - equal:
+          path: "metadata.name"
+          value: "app-datadog"
+        documentIndex: 0
+      - equal:
+          path: "spec.triggers[0].authenticationRef.name"
+          value: "app-datadog"
+        documentIndex: 1
+
   - it: "should render useCachedMetrics only when asked"
     set:
       keda.enabled: true

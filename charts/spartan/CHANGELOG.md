@@ -15,7 +15,12 @@ All notable changes to this project will be documented in this file.
 
 * `hpa.yaml` and `worker-hpa.yaml` render no HPA when KEDA is enabled for the same workload. With `autoscaling.enabled` too, every sync put the chart's HPA back over the one KEDA manages
 * `pdb.yaml` and `worker-pdb.yaml` read the floor from `keda.minReplicas` when both `autoscaling.enabled` and `keda.enabled` are true
-* An `authentication` entry with neither `podIdentity` nor `secretTargetRef` fails at render, instead of producing an empty spec that only the CRD rejects at sync
+* An `authentication` entry with neither `podIdentity` nor `secretTargetRef` fails with a clear error naming the entry, instead of a nil pointer at render
+
+### Upgrade notes
+
+* Upgrading to this version removes `spec.replicas` from no release: a release with `autoscaling.enabled` already renders none
+* Turning `autoscaling.enabled` on for a release that renders `spec.replicas` removes the field. Argo CD's default client-side apply then deletes it and the API server defaults it to 1, so the Deployment can drop to 1 pod once. See "Migrating Deployments and StatefulSets to horizontal autoscaling" in the Kubernetes HPA docs
 
 ## [0.11.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.1) (2026-10-23)
 

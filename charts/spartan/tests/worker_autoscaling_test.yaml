@@ -166,6 +166,32 @@ tests:
           path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
           value: 900
 
+  - it: "should point a worker trigger at its TriggerAuthentication"
+    set:
+      fullnameOverride: app
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            authentication:
+              - name: datadog
+                secretTargetRef:
+                  - { parameter: apiKey, name: my-secret, key: DD_API_KEY }
+            triggers:
+              - { type: datadog, authentication: { name: datadog }, metadata: { queryValue: "3" } }
+    asserts:
+      - equal:
+          path: "metadata.name"
+          value: "app-worker-jobs-datadog"
+        documentIndex: 0
+      - equal:
+          path: "spec.triggers[0].authenticationRef.name"
+          value: "app-worker-jobs-datadog"
+        documentIndex: 1
+
   - it: "should render useCachedMetrics only when asked on a worker"
     set:
       workers:
