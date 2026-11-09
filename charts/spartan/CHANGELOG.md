@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 
 * Upgrading to this version removes `spec.replicas` from nothing: the main Deployment already renders none with `autoscaling.enabled`, and worker Deployments are unchanged
 * Turning `autoscaling.enabled` on for a release whose main Deployment renders `spec.replicas` removes the field. Argo CD's default client-side apply then deletes it and the API server defaults it to 1, so the Deployment can drop to 1 pod once. See "Migrating Deployments and StatefulSets to horizontal autoscaling" in the Kubernetes HPA docs
+* Turning `keda.enabled` off on a release with both flags removes the HPA too, because the ScaledObject owns it. Helm 3 reports success and leaves no HPA until the next `helm upgrade` creates it. Helm 4 fails with a field conflict and changes nothing. A client-side apply with no prune leaves the ScaledObject in control until it is deleted, and there is then no HPA until the next apply. 0.11.1 behaves the same under Helm
 
 ## [0.11.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.1) (2026-10-23)
 
