@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.3) (2026-11-09)
+
+### Features
+
+* Grafana loads dashboards from every namespace (`sidecar.dashboards.searchNamespace: ALL`), so a project sharing the
+  cluster ships its dashboards from its own GitOps repo into its own namespace, next to its rules. Datasources still
+  load only from `monitoring`; the sidecar's ClusterRole is unchanged
+
+### Bug Fixes
+
+* Span metrics leave out health checks (`/health`, `/healthz`, `/livez`, `/readyz`, `/ping`, `/metrics`,
+  `/prometheus`, also under `/actuator`) and `OPTIONS` requests, through Tempo's `filter_policies`. Probes and CORS
+  preflights inflated the request rate and pulled p95 down on the RED dashboard and in `ServiceErrorRateHigh` /
+  `ServiceLatencyHigh`. The spans stay in Tempo
+
 ## [0.2.2](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.2) (2026-10-20)
 
 ### Bug Fixes

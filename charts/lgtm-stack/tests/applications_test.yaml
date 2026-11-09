@@ -72,7 +72,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.2.2
+          value: 0.2.3
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
@@ -161,6 +161,29 @@ tests:
       - equal:
           path: spec.destination.namespace
           value: monitoring
+
+  - it: "loads dashboards from every namespace, datasources only from monitoring"
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.sidecar.dashboards.searchNamespace
+          value: ALL
+      - notExists:
+          path: spec.source.helm.valuesObject.sidecar.datasources.searchNamespace
+
+  - it: "keeps health checks and OPTIONS out of span metrics"
+    documentSelector:
+      path: metadata.name
+      value: lgtm-tempo
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.overrides.defaults.metrics_generator.processor.span_metrics.filter_policies[0].exclude.attributes[0].key
+          value: span.url.path
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.overrides.defaults.metrics_generator.processor.span_metrics.filter_policies[1].exclude.attributes[0]
+          value: { key: span.http.request.method, value: OPTIONS }
 
   - it: "requires a path for the project folder"
     set:
