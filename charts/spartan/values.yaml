@@ -227,11 +227,15 @@ keda:
   #      - parameter: apiKey
   #        name: my-secret
   #        key: DD_API_KEY
+  #      - parameter: appKey
+  #        name: my-secret
+  #        key: DD_APP_KEY
 
   ## behavior specifies separate scaling policies upon scale-up and scale-down, as autoscaling.behavior
   behavior: {}
 
   ## list of event sources that trigger the autoscaling https://keda.sh/docs/latest/scalers/
+  ## useCachedMetrics: true on a trigger serves the HPA from KEDA's last poll. KEDA rejects it on cpu, memory and cron triggers
   triggers: []
   #  - type: cpu
   #    metricType: Utilization # Allowed types are 'Utilization' or 'AverageValue'

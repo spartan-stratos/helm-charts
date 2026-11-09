@@ -1,0 +1,145 @@
+suite: "Worker HPA and KEDA template tests"
+
+templates:
+  - "templates/worker-hpa.yaml"
+
+tests:
+  - it: "should render an HPA for a worker with only autoscaling"
+    set:
+      workers:
+        - name: jobs
+          autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3, targetCPUUtilizationPercentage: 80 }
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+
+  - it: "should render only the ScaledObject for a worker with both flags"
+    set:
+      workers:
+        - name: jobs
+          autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3, targetCPUUtilizationPercentage: 80 }
+          keda: { enabled: true, minReplicas: 1, maxReplicas: 3, pollingInterval: 30, triggers: [] }
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: "metadata.annotations[\"scaledobject.keda.sh/transfer-hpa-ownership\"]"
+          value: "true"
+      - exists:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.name"
+
+  - it: "should render no advanced section for a KEDA-only worker with no behavior"
+    set:
+      workers:
+        - name: jobs
+          keda: { enabled: true, minReplicas: 1, maxReplicas: 3, pollingInterval: 30, triggers: [] }
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - notExists:
+          path: "spec.advanced"
+
+  - it: "should render a worker TriggerAuthentication from secretTargetRef"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            triggers: []
+            authentication:
+              - name: datadog
+                secretTargetRef:
+                  - { parameter: apiKey, name: my-secret, key: DD_API_KEY }
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: TriggerAuthentication
+      - equal:
+          path: "spec.secretTargetRef[0].key"
+          value: "DD_API_KEY"
+      - notExists:
+          path: "spec.podIdentity"
+
+  - it: "should keep rendering a worker podIdentity"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            triggers: []
+            authentication:
+              - name: aws-irsa
+                podIdentity: { provider: aws }
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: "spec.podIdentity.identityOwner"
+          value: "workload"
+
+  - it: "should fail at render on a worker authentication entry with no credentials"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            triggers: []
+            authentication:
+              - name: datadog
+    asserts:
+      - failedTemplate:
+          errorPattern: "workers .jobs. keda.authentication .datadog. needs podIdentity or secretTargetRef"
+
+  - it: "should pass keda.behavior through for a worker"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            triggers: []
+            behavior: { scaleDown: { stabilizationWindowSeconds: 1800 } }
+    asserts:
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 1800
+
+  - it: "should inherit a worker autoscaling.behavior with both flags"
+    set:
+      workers:
+        - name: jobs
+          autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3, behavior: { scaleDown: { stabilizationWindowSeconds: 900 } } }
+          keda: { enabled: true, minReplicas: 1, maxReplicas: 3, pollingInterval: 30, triggers: [] }
+    asserts:
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 900
+
+  - it: "should render useCachedMetrics only when asked on a worker"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            triggers:
+              - { type: datadog, useCachedMetrics: true, metadata: { queryValue: "3" } }
+              - { type: cron, metadata: { timezone: UTC } }
+    asserts:
+      - equal:
+          path: "spec.triggers[0].useCachedMetrics"
+          value: true
+      - notExists:
+          path: "spec.triggers[1].useCachedMetrics"

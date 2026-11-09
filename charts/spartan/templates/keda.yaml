@@ -1,6 +1,9 @@
 {{- if .Values.keda.enabled }}
 {{- $fullName := include "spartan.fullname" . -}}
 {{- range .Values.keda.authentication }}
+{{- if not (or .podIdentity .secretTargetRef) }}
+{{- fail (printf "keda.authentication %q needs podIdentity or secretTargetRef" .name) }}
+{{- end }}
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
@@ -31,13 +34,14 @@ spec:
   pollingInterval: {{ .Values.keda.pollingInterval }}
   scaleTargetRef:
     name: {{ $fullName }}
-  {{- if or .Values.autoscaling.enabled .Values.keda.behavior }}
+  {{- $behavior := .Values.keda.behavior | default (and .Values.autoscaling.enabled .Values.autoscaling.behavior) }}
+  {{- if or .Values.autoscaling.enabled $behavior }}
   advanced:
     horizontalPodAutoscalerConfig:
       {{- if .Values.autoscaling.enabled }}
       name: {{ include "spartan.fullname" . }}
       {{- end }}
-      {{- with .Values.keda.behavior }}
+      {{- with $behavior }}
       behavior:
         {{- toYaml . | nindent 8 }}
       {{- end }}

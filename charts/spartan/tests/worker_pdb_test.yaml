@@ -1,0 +1,48 @@
+suite: "Worker PodDisruptionBudget template tests"
+
+templates:
+  - "templates/worker-pdb.yaml"
+
+tests:
+  - it: "should read the floor from keda.minReplicas with both flags"
+    set:
+      workers:
+        - name: jobs
+          pdb: { enabled: true, minAvailable: 1 }
+          autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3 }
+          keda: { enabled: true, minReplicas: 3, maxReplicas: 5 }
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should not be created at a KEDA floor of one with both flags"
+    set:
+      workers:
+        - name: jobs
+          pdb: { enabled: true, minAvailable: 1 }
+          autoscaling: { enabled: true, minReplicas: 3, maxReplicas: 5 }
+          keda: { enabled: true, minReplicas: 1, maxReplicas: 5 }
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "should keep using autoscaling.minReplicas without KEDA"
+    set:
+      workers:
+        - name: jobs
+          pdb: { enabled: true, minAvailable: 1 }
+          autoscaling: { enabled: true, minReplicas: 3, maxReplicas: 5 }
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should keep using replicaCount on a KEDA-only worker"
+    set:
+      workers:
+        - name: jobs
+          replicaCount: 2
+          pdb: { enabled: true, minAvailable: 1 }
+          keda: { enabled: true, minReplicas: 1, maxReplicas: 5 }
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget

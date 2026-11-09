@@ -2,6 +2,9 @@
   {{- $replicaCount := int (default 1 $worker.replicaCount) }}
   {{- $autoscalingEnabled := (and $worker.autoscaling $worker.autoscaling.enabled) }}
   {{- $autoscalingMinReplica := int (default 1 (dig "autoscaling" "minReplicas" 1 $worker)) }}
+  {{- if and $autoscalingEnabled (dig "keda" "enabled" false $worker) }}
+    {{- $autoscalingMinReplica = int (dig "keda" "minReplicas" 1 $worker) }}
+  {{- end }}
   {{- if and $worker.pdb $worker.pdb.enabled (or (and (gt $replicaCount 1) (not $autoscalingEnabled)) (and $autoscalingEnabled (gt $autoscalingMinReplica 1))) }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget

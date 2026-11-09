@@ -77,6 +77,53 @@ tests:
       - notExists:
           path: "spec.advanced"
 
+  - it: "should inherit autoscaling.behavior with both flags and no keda.behavior"
+    set:
+      keda.enabled: true
+      autoscaling.enabled: true
+      autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+    asserts:
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 900
+
+  - it: "should prefer keda.behavior over autoscaling.behavior"
+    set:
+      keda.enabled: true
+      autoscaling.enabled: true
+      autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+      keda.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 1800
+    asserts:
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 1800
+
+  - it: "should ignore a leftover autoscaling.behavior on a KEDA-only release"
+    set:
+      keda.enabled: true
+      autoscaling.enabled: false
+      autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+    asserts:
+      - notExists:
+          path: "spec.advanced"
+
+  - it: "should fail at render on an authentication entry with no credentials"
+    set:
+      keda.enabled: true
+      keda.authentication:
+        - name: datadog
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.authentication .datadog. needs podIdentity or secretTargetRef"
+
   - it: "should render useCachedMetrics only when asked"
     set:
       keda.enabled: true

@@ -6,14 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-* `keda`:
+* `keda` and `workers[].keda`:
   * `authentication[].secretTargetRef` reads a scaler's credentials from a Secret, for scalers such as Datadog that have no pod identity
-  * `behavior` sets the HPA scaling policies KEDA creates
-  * `triggers[].useCachedMetrics` serves the HPA from KEDA's last poll, so a rate-limited metrics API is called less often
+  * `behavior` sets the HPA scaling policies KEDA creates. With `autoscaling.enabled` too and no `keda.behavior`, it takes `autoscaling.behavior`
+  * `triggers[].useCachedMetrics` serves the HPA from KEDA's last poll, so a rate-limited metrics API is called less often. KEDA rejects it on cpu, memory and cron triggers
 
 ### Bug Fixes
 
-* `hpa.yaml` renders nothing when `keda.enabled` is true. With `autoscaling.enabled` too, every sync put the chart's HPA back over the one KEDA manages
+* `hpa.yaml` and `worker-hpa.yaml` render no HPA when KEDA is enabled for the same workload. With `autoscaling.enabled` too, every sync put the chart's HPA back over the one KEDA manages
+* `pdb.yaml` and `worker-pdb.yaml` read the floor from `keda.minReplicas` when both `autoscaling.enabled` and `keda.enabled` are true
+* An `authentication` entry with neither `podIdentity` nor `secretTargetRef` fails at render, instead of producing an empty spec that only the CRD rejects at sync
 
 ## [0.11.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.1) (2026-10-23)
 

@@ -1,6 +1,6 @@
 {{- range $index, $worker := (.Values.workers) }}
   {{- if (dig "autoscaling" false $worker) }}
-    {{- if .autoscaling.enabled }}
+    {{- if and .autoscaling.enabled (not (dig "keda" "enabled" false $worker)) }}
       {{- include "spartan.workerHpa" (dict "worker" $worker "Values" $.Values "Chart" $.Chart "Release" $.Release) }}
       {{- if lt $index (sub (len $.Values.workers) 1) }}
       {{- end }}
