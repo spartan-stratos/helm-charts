@@ -61,14 +61,16 @@ tests:
 
   - it: "should take over the named HPA when autoscaling is enabled too"
     set:
+      fullnameOverride: app
       keda.enabled: true
       autoscaling.enabled: true
     asserts:
       - equal:
           path: "metadata.annotations[\"scaledobject.keda.sh/transfer-hpa-ownership\"]"
           value: "true"
-      - exists:
+      - equal:
           path: "spec.advanced.horizontalPodAutoscalerConfig.name"
+          value: "app"
 
   - it: "should render no advanced section without autoscaling or behavior"
     set:

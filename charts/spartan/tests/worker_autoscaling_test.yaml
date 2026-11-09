@@ -23,8 +23,29 @@ tests:
       - isKind:
           of: HorizontalPodAutoscaler
 
+  - it: "should render an HPA for a worker with keda: null"
+    set:
+      workers:
+        - name: jobs
+          autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3, targetCPUUtilizationPercentage: 80 }
+          keda: null
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+
+  - it: "should render an HPA for a worker with keda: false"
+    set:
+      workers:
+        - name: jobs
+          autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3, targetCPUUtilizationPercentage: 80 }
+          keda: false
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+
   - it: "should render only the ScaledObject for a worker with both flags"
     set:
+      fullnameOverride: app
       workers:
         - name: jobs
           autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 3, targetCPUUtilizationPercentage: 80 }
@@ -35,8 +56,9 @@ tests:
       - equal:
           path: "metadata.annotations[\"scaledobject.keda.sh/transfer-hpa-ownership\"]"
           value: "true"
-      - exists:
+      - equal:
           path: "spec.advanced.horizontalPodAutoscalerConfig.name"
+          value: "app-worker-jobs"
 
   - it: "should render no advanced section for a KEDA-only worker with no behavior"
     set:

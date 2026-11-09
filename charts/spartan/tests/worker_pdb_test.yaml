@@ -46,3 +46,25 @@ tests:
     asserts:
       - isKind:
           of: PodDisruptionBudget
+
+  - it: "should keep using autoscaling.minReplicas with keda: null"
+    set:
+      workers:
+        - name: jobs
+          pdb: { enabled: true, minAvailable: 1 }
+          autoscaling: { enabled: true, minReplicas: 3, maxReplicas: 5 }
+          keda: null
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should keep using autoscaling.minReplicas with keda: false"
+    set:
+      workers:
+        - name: jobs
+          pdb: { enabled: true, minAvailable: 1 }
+          autoscaling: { enabled: true, minReplicas: 3, maxReplicas: 5 }
+          keda: false
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
