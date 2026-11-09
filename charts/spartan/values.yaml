@@ -236,6 +236,12 @@ keda:
   ## With autoscaling.enabled too and no keda.behavior, it takes autoscaling.behavior
   behavior: {}
 
+  ## fallback sets the replicas KEDA holds once a scaler keeps failing, instead of leaving the replica count as it is
+  ## KEDA counts one failure per HPA read, about every 15 seconds. Every trigger needs metricType: AverageValue, so KEDA rejects it with cpu or memory triggers
+  fallback: {}
+  #  failureThreshold: 12
+  #  replicas: 10
+
   ## list of event sources that trigger the autoscaling https://keda.sh/docs/latest/scalers/
   ## useCachedMetrics: true on a trigger serves the HPA from KEDA's last poll. KEDA rejects it on cpu, memory and cron triggers
   triggers: []

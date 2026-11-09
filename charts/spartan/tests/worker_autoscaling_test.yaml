@@ -214,6 +214,38 @@ tests:
           value: "app-worker-jobs-datadog"
         documentIndex: 1
 
+  - it: "should render fallback on a worker when set"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            fallback: { failureThreshold: 12, replicas: 3 }
+            triggers:
+              - { type: datadog, metricType: AverageValue, metadata: { queryValue: "3" } }
+    asserts:
+      - equal:
+          path: "spec.fallback"
+          value: { failureThreshold: 12, replicas: 3 }
+
+  - it: "should leave out fallback on a worker by default"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 3
+            pollingInterval: 30
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - notExists:
+          path: "spec.fallback"
+
   - it: "should render useCachedMetrics only when asked on a worker"
     set:
       workers:

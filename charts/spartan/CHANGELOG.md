@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
   * `authentication[].secretTargetRef` reads a scaler's credentials from a Secret, for scalers such as Datadog that have no pod identity
   * `behavior` sets the HPA scaling policies KEDA creates. With `autoscaling.enabled` too and no `keda.behavior`, it takes `autoscaling.behavior`
   * `triggers[].useCachedMetrics` serves the HPA from KEDA's last poll, so a rate-limited metrics API is called less often. KEDA rejects it on cpu, memory and cron triggers
+  * `fallback` sets the replicas KEDA holds once a scaler keeps failing. Every trigger needs `metricType: AverageValue`, so KEDA rejects it with cpu or memory triggers
 
 ### Bug Fixes
 

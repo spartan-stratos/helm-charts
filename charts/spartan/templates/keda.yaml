@@ -34,6 +34,10 @@ spec:
   pollingInterval: {{ .Values.keda.pollingInterval }}
   scaleTargetRef:
     name: {{ $fullName }}
+  {{- with .Values.keda.fallback }}
+  fallback:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- $behavior := .Values.keda.behavior | default (and .Values.autoscaling.enabled .Values.autoscaling.behavior) }}
   {{- if or .Values.autoscaling.enabled $behavior }}
   advanced:
