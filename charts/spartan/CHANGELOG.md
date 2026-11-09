@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.12.0) (2026-11-09)
+
+### Features
+
+* `keda`:
+  * `authentication[].secretTargetRef` reads a scaler's credentials from a Secret, for scalers such as Datadog that have no pod identity
+  * `behavior` sets the HPA scaling policies KEDA creates
+  * `triggers[].useCachedMetrics` serves the HPA from KEDA's last poll, so a rate-limited metrics API is called less often
+
+### Bug Fixes
+
+* `hpa.yaml` renders nothing when `keda.enabled` is true. With `autoscaling.enabled` too, every sync put the chart's HPA back over the one KEDA manages
+
 ## [0.11.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.1) (2026-10-23)
 
 ### Bug Fixes

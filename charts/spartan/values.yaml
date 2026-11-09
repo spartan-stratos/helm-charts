@@ -204,6 +204,7 @@ autoscaling:
   behavior: {}
 
 ## this key indicates that the configuration is specific to keda https://keda.sh
+## With autoscaling.enabled too, KEDA takes over the HPA of that name, the chart renders no HPA, and the Deployment has no spec.replicas
 keda:
   ## enabled specifies whether keda
   enabled: false
@@ -220,6 +221,15 @@ keda:
   #    podIdentity:
   #      provider: aws
   #      identityOwner: workload
+  #  - name: datadog
+  #    ## Reads the scaler's credentials from a Secret in the release namespace
+  #    secretTargetRef:
+  #      - parameter: apiKey
+  #        name: my-secret
+  #        key: DD_API_KEY
+
+  ## behavior specifies separate scaling policies upon scale-up and scale-down, as autoscaling.behavior
+  behavior: {}
 
   ## list of event sources that trigger the autoscaling https://keda.sh/docs/latest/scalers/
   triggers: []

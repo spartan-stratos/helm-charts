@@ -1,0 +1,96 @@
+suite: "KEDA template tests"
+
+templates:
+  - "templates/keda.yaml"
+
+tests:
+  - it: "should render a TriggerAuthentication from secretTargetRef"
+    set:
+      keda.enabled: true
+      keda.authentication:
+        - name: datadog
+          secretTargetRef:
+            - parameter: apiKey
+              name: my-secret
+              key: DD_API_KEY
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: TriggerAuthentication
+      - equal:
+          path: "spec.secretTargetRef[0].parameter"
+          value: "apiKey"
+      - equal:
+          path: "spec.secretTargetRef[0].key"
+          value: "DD_API_KEY"
+      - notExists:
+          path: "spec.podIdentity"
+
+  - it: "should keep rendering podIdentity"
+    set:
+      keda.enabled: true
+      keda.authentication:
+        - name: aws-irsa
+          podIdentity:
+            provider: aws
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: "spec.podIdentity.provider"
+          value: "aws"
+      - equal:
+          path: "spec.podIdentity.identityOwner"
+          value: "workload"
+      - notExists:
+          path: "spec.secretTargetRef"
+
+  - it: "should pass behavior to the HPA KEDA creates"
+    set:
+      keda.enabled: true
+      keda.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 1800
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 1800
+      - notExists:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.name"
+
+  - it: "should take over the named HPA when autoscaling is enabled too"
+    set:
+      keda.enabled: true
+      autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: "metadata.annotations[\"scaledobject.keda.sh/transfer-hpa-ownership\"]"
+          value: "true"
+      - exists:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.name"
+
+  - it: "should render no advanced section without autoscaling or behavior"
+    set:
+      keda.enabled: true
+    asserts:
+      - notExists:
+          path: "spec.advanced"
+
+  - it: "should render useCachedMetrics only when asked"
+    set:
+      keda.enabled: true
+      keda.triggers:
+        - type: datadog
+          useCachedMetrics: true
+          metadata:
+            queryValue: "3"
+        - type: cron
+          metadata:
+            timezone: UTC
+    asserts:
+      - equal:
+          path: "spec.triggers[0].useCachedMetrics"
+          value: true
+      - notExists:
+          path: "spec.triggers[1].useCachedMetrics"
