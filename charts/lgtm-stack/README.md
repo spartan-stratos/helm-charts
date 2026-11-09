@@ -154,8 +154,8 @@ keep it as break-glass.
 
 ## Dashboards
 
-Grafana's sidecar loads every ConfigMap in `monitoring` labelled `grafana_dashboard: "1"` and files it in the folder
-named by annotation `grafana_folder`. Three sources use it:
+Grafana's sidecar loads every ConfigMap labelled `grafana_dashboard: "1"`, in any namespace, and files it in the
+folder named by annotation `grafana_folder`. Three sources use it:
 
 | Folder | Dashboards | From |
 |---|---|---|
@@ -240,6 +240,14 @@ Names share `monitoring` with the stack's objects: avoid the `lgtm-` prefix. Lab
 An annotation `dashboard_url` (a Grafana path such as `/d/<uid>/<slug>?var-x={{ $labels.x }}`) adds a Dashboard link to
 the Slack message.
 
+### Projects sharing the cluster
+
+`project` syncs one folder, from the repo that installs the stack. Another project on the same cluster keeps the same
+folder in its own GitOps repo and deploys it with its own Application into its own namespace; nothing changes here.
+Prometheus selects every PrometheusRule (and ServiceMonitor) in the cluster, and Grafana loads dashboards from every
+namespace. Name the Grafana folder after the project and keep dashboard `uid`s unique across projects: two dashboards
+with one `uid` replace each other.
+
 ## Alerting
 
 Prometheus evaluates the PrometheusRules (kube-prometheus-stack's defaults, this chart's bundles below and the
@@ -276,6 +284,12 @@ Services below `minRequestRate` (0.1 req/s) are not alerted on. `overrides.<serv
 that service, e.g. `payments: { errorRate: { critical: 0.01 } }`, or `batch: { enabled: false }` to skip it; drop a
 severity's threshold to skip that severity. The alerts carry `service` (inhibition matches on it, so one service's
 critical does not hide another's warning) but no `namespace`, which span metrics do not have.
+
+Span metrics leave out health checks (`url.path` `/health`, `/healthz`, `/livez`, `/readyz`, `/ping`, `/metrics`,
+`/prometheus`, each also under `/actuator`, and their subpaths) and `OPTIONS` requests, so probes and CORS preflights
+do not inflate the request rate or pull p95 down. The spans stay in Tempo. To change the list, set
+`components.tempo.values.tempo.overrides.defaults.metrics_generator.processor.span_metrics.filter_policies` (it
+replaces the whole list).
 
 When one fires: open the Service overview (RED) dashboard for the service, then its recent error traces or the slowest
 route, and the logs linked from the trace.

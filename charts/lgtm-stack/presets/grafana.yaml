@@ -50,13 +50,16 @@ grafana.ini:
   unified_alerting:
     enabled: true
 
-# Dashboards and datasources come from ConfigMaps in this namespace, so each component adds its own:
-# kube-prometheus-stack ships the Kubernetes dashboards, the grafanaDatasources addon adds Loki and Tempo
+# Dashboards and datasources come from labelled ConfigMaps, so each component adds its own: kube-prometheus-stack
+# ships the Kubernetes dashboards, the grafanaDatasources addon adds Loki and Tempo
 sidecar:
   dashboards:
     enabled: true
     label: grafana_dashboard
     labelValue: "1"
+    # Every namespace, so a project sharing the cluster ships dashboards from its own GitOps repo into its own
+    # namespace. Datasources stay limited to this one
+    searchNamespace: ALL
     folderAnnotation: grafana_folder
     provider:
       foldersFromFilesStructure: true

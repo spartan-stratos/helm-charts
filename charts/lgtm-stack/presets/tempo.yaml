@@ -23,6 +23,19 @@ tempo:
           # Gives traces_spanmetrics_calls_total an http_response_status_code label for 5xx alerts
           span_metrics:
             dimensions: [http.response.status_code, http.request.method, http.route]
+            # Health checks, metrics scrapes and CORS preflights stay in traces but out of RED: they inflate the
+            # request rate and pull p95 down. A span is counted only if it passes every policy
+            filter_policies:
+              - exclude:
+                  match_type: regex
+                  attributes:
+                    - key: span.url.path
+                      value: ^(/actuator)?/(health|healthz|livez|readyz|ping|metrics|prometheus)(/.*)?$
+              - exclude:
+                  match_type: strict
+                  attributes:
+                    - key: span.http.request.method
+                      value: OPTIONS
           service_graphs:
             dimensions: [http.request.method]
   resources:

@@ -152,6 +152,7 @@ addons:
 # The project's own dashboards and alert rules: an Application syncing a folder of the project's GitOps repo into
 # `namespace`. ArgoCD detects the folder type (Helm chart, kustomize or plain YAML). Dashboards are ConfigMaps labelled
 # grafana_dashboard: "1" (folder in annotation grafana_folder); rules are PrometheusRules. See the README.
+# Other projects on the cluster deploy the same folder from their own repo, into their own namespace.
 project:
   enabled: false
   repoURL: ""
