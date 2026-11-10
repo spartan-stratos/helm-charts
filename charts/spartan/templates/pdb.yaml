@@ -1,9 +1,10 @@
 {{- $replicaCount := int .Values.replicaCount }}
+{{- $scaled := or .Values.autoscaling.enabled .Values.keda.enabled }}
 {{- $autoscalingMinReplica := int .Values.autoscaling.minReplicas }}
-{{- if and .Values.autoscaling.enabled .Values.keda.enabled }}
+{{- if .Values.keda.enabled }}
 {{- $autoscalingMinReplica = int .Values.keda.minReplicas }}
 {{- end }}
-{{- if and .Values.pdb.enabled (or (and (gt $replicaCount 1) (not .Values.autoscaling.enabled)) (and .Values.autoscaling.enabled (gt $autoscalingMinReplica 1))) }}
+{{- if and .Values.pdb.enabled (or (and (gt $replicaCount 1) (not $scaled)) (and $scaled (gt $autoscalingMinReplica 1))) }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

@@ -36,13 +36,35 @@ tests:
       - isKind:
           of: PodDisruptionBudget
 
-  - it: "should keep using replicaCount on a KEDA-only worker"
+  - it: "should read the floor from keda.minReplicas on a KEDA-only worker"
+    set:
+      workers:
+        - name: jobs
+          replicaCount: 1
+          pdb: { enabled: true, minAvailable: 1 }
+          keda: { enabled: true, minReplicas: 3, maxReplicas: 5 }
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should not be created at a KEDA floor of one on a KEDA-only worker, whatever replicaCount says"
+    set:
+      workers:
+        - name: jobs
+          replicaCount: 3
+          pdb: { enabled: true, minAvailable: 1 }
+          keda: { enabled: true, minReplicas: 1, maxReplicas: 5 }
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "should keep using replicaCount on a worker with KEDA off"
     set:
       workers:
         - name: jobs
           replicaCount: 2
           pdb: { enabled: true, minAvailable: 1 }
-          keda: { enabled: true, minReplicas: 1, maxReplicas: 5 }
+          keda: { enabled: false, minReplicas: 1, maxReplicas: 5 }
     asserts:
       - isKind:
           of: PodDisruptionBudget
