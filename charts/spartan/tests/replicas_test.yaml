@@ -1,0 +1,103 @@
+suite: "spec.replicas template tests"
+
+templates:
+  - "templates/deployment.yaml"
+  - "templates/worker.yaml"
+  - "templates/configmap.yaml"
+  - "templates/secret.yaml"
+
+tests:
+  - it: "should render replicas on the main Deployment with no scaler"
+    template: "templates/deployment.yaml"
+    set:
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: "spec.replicas"
+          value: 3
+
+  - it: "should leave out replicas on the main Deployment with autoscaling"
+    template: "templates/deployment.yaml"
+    set:
+      autoscaling.enabled: true
+    asserts:
+      - notExists:
+          path: "spec.replicas"
+
+  - it: "should leave out replicas on the main Deployment with keda"
+    template: "templates/deployment.yaml"
+    set:
+      keda.enabled: true
+    asserts:
+      - notExists:
+          path: "spec.replicas"
+
+  - it: "should leave out replicas on the main Deployment with both"
+    template: "templates/deployment.yaml"
+    set:
+      autoscaling.enabled: true
+      keda.enabled: true
+    asserts:
+      - notExists:
+          path: "spec.replicas"
+
+  - it: "should render replicas on a worker with no scaler"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+          replicaCount: 3
+    asserts:
+      - equal:
+          path: "spec.replicas"
+          value: 3
+
+  - it: "should render replicas on a worker with both scalers off"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+          replicaCount: 3
+          autoscaling: { enabled: false }
+          keda: { enabled: false }
+    asserts:
+      - equal:
+          path: "spec.replicas"
+          value: 3
+
+  - it: "should render replicas on a worker with null scalers"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+          autoscaling: null
+          keda: null
+    asserts:
+      - equal:
+          path: "spec.replicas"
+          value: 1
+
+  - it: "should leave out replicas on a worker with autoscaling"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+          autoscaling: { enabled: true }
+    asserts:
+      - notExists:
+          path: "spec.replicas"
+
+  - it: "should leave out replicas on a worker with keda"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+          keda: { enabled: true }
+    asserts:
+      - notExists:
+          path: "spec.replicas"

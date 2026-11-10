@@ -3,7 +3,7 @@
 ## Declare variables to be passed into your templates.
 ## For more details: https://github.com/spartan-stratos/helm-charts/blob/master/charts/spartan/README.md
 
-## replicaCount specifies the number of replicas
+## replicaCount specifies the number of replicas. The Deployment leaves spec.replicas out when autoscaling.enabled or keda.enabled is on
 replicaCount: 1
 
 image:
@@ -204,9 +204,10 @@ autoscaling:
   behavior: {}
 
 ## this key indicates that the configuration is specific to keda https://keda.sh
-## With autoscaling.enabled too, KEDA takes over the HPA of that name, the chart renders no HPA, and the Deployment has no spec.replicas
+## The Deployment has no spec.replicas with keda.enabled, because KEDA owns the count
+## With autoscaling.enabled too, KEDA takes over the HPA of that name and the chart renders no HPA
 ## autoscaling.metrics, minReplicas and maxReplicas then stop applying to that HPA, so a service that scales on CPU needs a cpu trigger in keda.triggers
-## Warning: turning autoscaling.enabled on for a release that renders spec.replicas removes the field, and the Deployment can drop to 1 pod once. See the 0.12.0 upgrade notes in CHANGELOG.md
+## Warning: turning autoscaling.enabled or keda.enabled on for a release that renders spec.replicas removes the field, and the Deployment can drop to 1 pod once. See the 0.12.0 upgrade notes in CHANGELOG.md
 keda:
   ## enabled specifies whether keda
   enabled: false
@@ -237,12 +238,9 @@ keda:
   ## With autoscaling.enabled too and no keda.behavior, it takes autoscaling.behavior
   behavior: {}
 
-  ## fallback sets the replicas KEDA falls back to when a scaler errors, instead of leaving the replica count as it is. Both fields are required
-  ## replicas must be 0 or between keda.minReplicas and keda.maxReplicas, because outside that range the replica count flaps. keda.maxReplicas is the safe value: it can only scale up
-  ## KEDA below 2.17: the first poll where a scaler errors and no trigger is active sets the Deployment straight to replicas, ignoring failureThreshold, maxReplicas and behavior
-  ## replicas: 0 skips that write and is the one case where failureThreshold applies. The failure count can stall when the scaler can't be rebuilt, such as with a bad key or during an outage
-  ## KEDA 2.17 and later wait for failureThreshold, according to their source (not run)
-  ## On the HPA path it applies only to triggers with an AverageValue metric, which is the default, so cpu and memory triggers never fall back there. The direct write below 2.17 doesn't check the metric type. KEDA 2.15 only logs an invalid fallback, and 2.17 and later check it in the webhook
+  ## fallback sets the replicas KEDA falls back to when a scaler errors. Both fields are required
+  ## replicas must be 0 or between keda.minReplicas and keda.maxReplicas. keda.maxReplicas is the safe value
+  ## Below KEDA 2.17 a scaler error can apply replicas at once, before failureThreshold. On the HPA path only AverageValue triggers fall back, so not cpu or memory. See the 0.12.0 CHANGELOG
   fallback: {}
   #  failureThreshold: 12
   #  replicas: 10
@@ -369,7 +367,7 @@ workers: []
 #  - name: worker-1
 #    shell: /bin/bash
 #    command: "echo worker-1"
-#    replicaCount: 1
+#    replicaCount: 1 # Left out of the Deployment when this worker's autoscaling or keda is enabled
 #    terminationGracePeriodSeconds: 180
 #    resources: {}
 #    customImage:

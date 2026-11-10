@@ -10,18 +10,19 @@ All notable changes to this project will be documented in this file.
   * `authentication[].secretTargetRef` reads a scaler's credentials from a Secret, for scalers such as Datadog that have no pod identity
   * `behavior` sets the HPA scaling policies KEDA creates. With `autoscaling.enabled` too and no `keda.behavior`, it takes `autoscaling.behavior`
   * `triggers[].useCachedMetrics` serves the HPA from KEDA's last poll, so a rate-limited metrics API is called less often. KEDA rejects it on cpu, memory and cron triggers
-  * `fallback` sets the replicas KEDA falls back to when a scaler errors. Below KEDA 2.17, the first poll where a scaler errors and no trigger is active sets the Deployment straight to `fallback.replicas`, ignoring `failureThreshold`, `maxReplicas` and `behavior`, so `keda.maxReplicas` is the safe value: it can only scale up. `replicas: 0` skips that write and is the one case where `failureThreshold` applies, and the failure count can stall when the scaler can't be rebuilt, such as with a bad key or during an outage. KEDA 2.17 and later wait for `failureThreshold`, according to their source (not run). On the HPA path it applies only to triggers with an AverageValue metric, which is the default, so cpu and memory triggers never fall back there. The direct write below 2.17 doesn't check the metric type. KEDA 2.15 only logs an invalid fallback, and 2.17 and later check it in the webhook. A fallback without `failureThreshold` or `replicas`, or with `replicas` other than 0 outside `minReplicas` to `maxReplicas`, fails at render
+  * `fallback` sets the replicas KEDA falls back to when a scaler errors. `failureThreshold` and `replicas` are required, and `replicas` must be 0 or within `minReplicas` to `maxReplicas`, or the render fails. Below KEDA 2.17, a scaler error with no active trigger sets `fallback.replicas` at once, ignoring `failureThreshold`, `maxReplicas` and `behavior`, so `keda.maxReplicas` is the safe value; `replicas: 0` skips that write. On the HPA path only AverageValue triggers fall back, so cpu and memory triggers don't
 
 ### Bug Fixes
 
 * `hpa.yaml` and `worker-hpa.yaml` render no HPA when KEDA is enabled for the same workload. With `autoscaling.enabled` too, every sync put the chart's HPA back over the one KEDA manages
+* `deployment.yaml` and `worker.yaml` leave out `spec.replicas` when a scaler owns the count: the main Deployment with `keda.enabled`, and a worker with `keda.enabled` or `autoscaling.enabled`. Every sync put the count back to `replicaCount`
 * `pdb.yaml` and `worker-pdb.yaml` read the floor from `keda.minReplicas` when both `autoscaling.enabled` and `keda.enabled` are true
 * An `authentication` entry with neither `podIdentity` nor `secretTargetRef` fails with a clear error naming the entry, instead of a nil pointer at render
 
 ### Upgrade notes
 
-* Upgrading to this version removes `spec.replicas` from nothing: the main Deployment already renders none with `autoscaling.enabled`, and worker Deployments are unchanged
-* Turning `autoscaling.enabled` on for a release whose main Deployment renders `spec.replicas` removes the field. Argo CD's default client-side apply then deletes it and the API server defaults it to 1, so the Deployment can drop to 1 pod once. See "Migrating Deployments and StatefulSets to horizontal autoscaling" in the Kubernetes HPA docs
+* Upgrading removes `spec.replicas` from the main Deployment with `keda.enabled`, and from a worker with `keda.enabled` or `autoscaling.enabled`. Nothing else changes: a main Deployment with `autoscaling.enabled` already omits it
+* Whenever `spec.replicas` goes away, on that upgrade or by turning `autoscaling.enabled` or `keda.enabled` on later, Argo CD's default client-side apply deletes the field and the API server defaults it to 1, so the Deployment can drop to 1 pod once. See "Migrating Deployments and StatefulSets to horizontal autoscaling" in the Kubernetes HPA docs
 * Turning `keda.enabled` off on a release with both flags removes the HPA too, because the ScaledObject owns it. Helm 3 reports success and leaves no HPA until the next `helm upgrade` creates it. A release installed with Helm 4 fails with a field conflict and changes nothing. A client-side apply with no prune leaves the ScaledObject in control until it is deleted, and there is then no HPA until the next apply. 0.11.1 behaves the same under Helm
 
 ## [0.11.1](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.11.1) (2026-10-23)

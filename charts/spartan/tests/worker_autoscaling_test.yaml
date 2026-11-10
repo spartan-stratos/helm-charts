@@ -329,6 +329,37 @@ tests:
           path: "spec.fallback.replicas"
           value: 2
 
+  - it: "should take KEDA's ceiling of 100 for a worker fallback with no maxReplicas"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            pollingInterval: 30
+            fallback: { failureThreshold: 12, replicas: 8 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 8
+
+  - it: "should fail at render on a worker fallback above KEDA's ceiling with no maxReplicas"
+    set:
+      workers:
+        - name: jobs
+          keda:
+            enabled: true
+            minReplicas: 1
+            pollingInterval: 30
+            fallback: { failureThreshold: 12, replicas: 101 }
+            triggers:
+              - { type: datadog, metadata: { queryValue: "3" } }
+    asserts:
+      - failedTemplate:
+          errorPattern: "workers .jobs. keda.fallback.replicas 101 must be 0 or between"
+
   - it: "should leave out fallback on a worker by default"
     set:
       workers:
