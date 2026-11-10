@@ -83,3 +83,50 @@ tests:
     asserts:
       - notExists:
           path: PodDisruptionBudget
+
+  - it: "should read the floor from keda.minReplicas with both flags"
+    set:
+      pdb.enabled: true
+      pdb.minAvailable: 1
+      autoscaling.enabled: true
+      keda.enabled: true
+      keda.minReplicas: 3
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should not be created at a KEDA floor of one with both flags, whatever autoscaling.minReplicas says"
+    set:
+      pdb.enabled: true
+      pdb.minAvailable: 1
+      autoscaling.enabled: true
+      autoscaling.minReplicas: 3
+      keda.enabled: true
+      keda.minReplicas: 1
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "should read the floor from keda.minReplicas on a KEDA-only release"
+    set:
+      replicaCount: 1
+      pdb.enabled: true
+      pdb.minAvailable: 1
+      autoscaling.enabled: false
+      keda.enabled: true
+      keda.minReplicas: 3
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+
+  - it: "should not be created at a KEDA floor of one on a KEDA-only release, whatever replicaCount says"
+    set:
+      replicaCount: 3
+      pdb.enabled: true
+      pdb.minAvailable: 1
+      autoscaling.enabled: false
+      keda.enabled: true
+      keda.minReplicas: 1
+    asserts:
+      - hasDocuments:
+          count: 0

@@ -1,0 +1,250 @@
+suite: "KEDA template tests"
+
+templates:
+  - "templates/keda.yaml"
+
+tests:
+  - it: "should render a TriggerAuthentication from secretTargetRef"
+    set:
+      keda.enabled: true
+      keda.authentication:
+        - name: datadog
+          secretTargetRef:
+            - parameter: apiKey
+              name: my-secret
+              key: DD_API_KEY
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: TriggerAuthentication
+      - equal:
+          path: "spec.secretTargetRef[0].parameter"
+          value: "apiKey"
+      - equal:
+          path: "spec.secretTargetRef[0].key"
+          value: "DD_API_KEY"
+      - notExists:
+          path: "spec.podIdentity"
+
+  - it: "should keep rendering podIdentity"
+    set:
+      keda.enabled: true
+      keda.authentication:
+        - name: aws-irsa
+          podIdentity:
+            provider: aws
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: "spec.podIdentity.provider"
+          value: "aws"
+      - equal:
+          path: "spec.podIdentity.identityOwner"
+          value: "workload"
+      - notExists:
+          path: "spec.secretTargetRef"
+
+  - it: "should pass behavior to the HPA KEDA creates"
+    set:
+      keda.enabled: true
+      keda.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 1800
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 1800
+      - notExists:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.name"
+
+  - it: "should take over the named HPA when autoscaling is enabled too"
+    set:
+      fullnameOverride: app
+      keda.enabled: true
+      autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: "metadata.annotations[\"scaledobject.keda.sh/transfer-hpa-ownership\"]"
+          value: "true"
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.name"
+          value: "app"
+
+  - it: "should render no advanced section without autoscaling or behavior"
+    set:
+      keda.enabled: true
+    asserts:
+      - notExists:
+          path: "spec.advanced"
+      - notExists:
+          path: "metadata.annotations[\"scaledobject.keda.sh/transfer-hpa-ownership\"]"
+
+  - it: "should inherit autoscaling.behavior with both flags and no keda.behavior"
+    set:
+      keda.enabled: true
+      autoscaling.enabled: true
+      autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+    asserts:
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 900
+
+  - it: "should prefer keda.behavior over autoscaling.behavior"
+    set:
+      keda.enabled: true
+      autoscaling.enabled: true
+      autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+      keda.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 1800
+    asserts:
+      - equal:
+          path: "spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds"
+          value: 1800
+
+  - it: "should ignore a leftover autoscaling.behavior on a KEDA-only release"
+    set:
+      keda.enabled: true
+      autoscaling.enabled: false
+      autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+    asserts:
+      - notExists:
+          path: "spec.advanced"
+
+  - it: "should fail at render on an authentication entry with no credentials"
+    set:
+      keda.enabled: true
+      keda.authentication:
+        - name: datadog
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.authentication .datadog. needs podIdentity or secretTargetRef"
+
+  - it: "should point a trigger at its TriggerAuthentication"
+    set:
+      fullnameOverride: app
+      keda.enabled: true
+      keda.authentication:
+        - name: datadog
+          secretTargetRef:
+            - { parameter: apiKey, name: my-secret, key: DD_API_KEY }
+      keda.triggers:
+        - type: datadog
+          authentication: { name: datadog }
+          metadata: { queryValue: "3" }
+    asserts:
+      - equal:
+          path: "metadata.name"
+          value: "app-datadog"
+        documentIndex: 0
+      - equal:
+          path: "spec.triggers[0].authenticationRef.name"
+          value: "app-datadog"
+        documentIndex: 1
+
+  - it: "should render fallback when set"
+    set:
+      keda.enabled: true
+      keda.fallback: { failureThreshold: 12, replicas: 8 }
+      keda.triggers:
+        - { type: datadog, metricType: AverageValue, metadata: { queryValue: "3" } }
+    asserts:
+      - equal:
+          path: "spec.fallback"
+          value: { failureThreshold: 12, replicas: 8 }
+
+  - it: "should fail at render on a fallback with no failureThreshold"
+    set:
+      keda.enabled: true
+      keda.fallback: { replicas: 8 }
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.fallback.failureThreshold is required"
+
+  - it: "should fail at render on a fallback with no replicas"
+    set:
+      keda.enabled: true
+      keda.fallback: { failureThreshold: 12 }
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.fallback.replicas is required"
+
+  - it: "should render a fallback of zero replicas"
+    set:
+      keda.enabled: true
+      keda.fallback: { failureThreshold: 12, replicas: 0 }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 0
+
+  - it: "should fail at render on a fallback above maxReplicas"
+    set:
+      keda.enabled: true
+      keda.maxReplicas: 4
+      keda.fallback: { failureThreshold: 12, replicas: 8 }
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.fallback.replicas 8 must be 0 or between"
+
+  - it: "should fail at render on a fallback below minReplicas"
+    set:
+      keda.enabled: true
+      keda.minReplicas: 2
+      keda.fallback: { failureThreshold: 12, replicas: 1 }
+    asserts:
+      - failedTemplate:
+          errorPattern: "keda.fallback.replicas 1 must be 0 or between"
+
+  - it: "should render a fallback equal to maxReplicas"
+    set:
+      keda.enabled: true
+      keda.maxReplicas: 4
+      keda.fallback: { failureThreshold: 12, replicas: 4 }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 4
+
+  - it: "should render a fallback equal to minReplicas"
+    set:
+      keda.enabled: true
+      keda.minReplicas: 2
+      keda.fallback: { failureThreshold: 12, replicas: 2 }
+    asserts:
+      - equal:
+          path: "spec.fallback.replicas"
+          value: 2
+
+  - it: "should leave out fallback by default"
+    set:
+      keda.enabled: true
+    asserts:
+      - notExists:
+          path: "spec.fallback"
+
+  - it: "should render useCachedMetrics only when asked"
+    set:
+      keda.enabled: true
+      keda.triggers:
+        - type: datadog
+          useCachedMetrics: true
+          metadata:
+            queryValue: "3"
+        - type: cron
+          metadata:
+            timezone: UTC
+    asserts:
+      - equal:
+          path: "spec.triggers[0].useCachedMetrics"
+          value: true
+      - notExists:
+          path: "spec.triggers[1].useCachedMetrics"

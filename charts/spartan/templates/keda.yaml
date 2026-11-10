@@ -1,14 +1,23 @@
 {{- if .Values.keda.enabled }}
 {{- $fullName := include "spartan.fullname" . -}}
 {{- range .Values.keda.authentication }}
+{{- if not (or .podIdentity .secretTargetRef) }}
+{{- fail (printf "keda.authentication %q needs podIdentity or secretTargetRef" .name) }}
+{{- end }}
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
   name: {{ $fullName }}-{{ .name }}
 spec:
+  {{- if .podIdentity }}
   podIdentity:
     provider: {{ .podIdentity.provider }}
     identityOwner: {{ .podIdentity.identityOwner | default "workload" }}
+  {{- end }}
+  {{- with .secretTargetRef }}
+  secretTargetRef:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 ---
 {{- end }}
 apiVersion: keda.sh/v1alpha1
@@ -25,16 +34,35 @@ spec:
   pollingInterval: {{ .Values.keda.pollingInterval }}
   scaleTargetRef:
     name: {{ $fullName }}
-  {{- if .Values.autoscaling.enabled }}
+  {{- with .Values.keda.fallback }}
+  {{- $_ := required "keda.fallback.failureThreshold is required" .failureThreshold }}
+  {{- $_ = required "keda.fallback.replicas is required" .replicas }}
+  {{- if and (ne (int .replicas) 0) (or (lt (int .replicas) (int $.Values.keda.minReplicas)) (gt (int .replicas) (int $.Values.keda.maxReplicas))) }}
+  {{- fail (printf "keda.fallback.replicas %d must be 0 or between keda.minReplicas and keda.maxReplicas" (int .replicas)) }}
+  {{- end }}
+  fallback:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- $behavior := .Values.keda.behavior | default (and .Values.autoscaling.enabled .Values.autoscaling.behavior) }}
+  {{- if or .Values.autoscaling.enabled $behavior }}
   advanced:
     horizontalPodAutoscalerConfig:
+      {{- if .Values.autoscaling.enabled }}
       name: {{ include "spartan.fullname" . }}
+      {{- end }}
+      {{- with $behavior }}
+      behavior:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   {{- end }}
   triggers:
     {{- range .Values.keda.triggers }}
     - type: {{ .type }}
       {{- if .metricType }}
       metricType: {{ .metricType }}
+      {{- end }}
+      {{- if .useCachedMetrics }}
+      useCachedMetrics: true
       {{- end }}
       {{- if .authentication }}
       authenticationRef:

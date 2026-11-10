@@ -3,7 +3,7 @@
 ## Declare variables to be passed into your templates.
 ## For more details: https://github.com/spartan-stratos/helm-charts/blob/master/charts/spartan/README.md
 
-## replicaCount specifies the number of replicas
+## replicaCount specifies the number of replicas. The Deployment leaves spec.replicas out when autoscaling.enabled or keda.enabled is on
 replicaCount: 1
 
 image:
@@ -204,6 +204,11 @@ autoscaling:
   behavior: {}
 
 ## this key indicates that the configuration is specific to keda https://keda.sh
+## The Deployment has no spec.replicas with keda.enabled, because KEDA owns the count
+## The PDB follows keda.minReplicas too, not replicaCount or autoscaling.minReplicas
+## With autoscaling.enabled too, KEDA takes over the HPA of that name and the chart renders no HPA
+## autoscaling.metrics, minReplicas and maxReplicas then stop applying to that HPA, so a service that scales on CPU needs a cpu trigger in keda.triggers
+## Warning: turning autoscaling.enabled or keda.enabled on for a release that renders spec.replicas removes the field, and the Deployment can drop to 1 pod once. See the 0.12.0 upgrade notes in CHANGELOG.md
 keda:
   ## enabled specifies whether keda
   enabled: false
@@ -220,8 +225,30 @@ keda:
   #    podIdentity:
   #      provider: aws
   #      identityOwner: workload
+  #  - name: datadog
+  #    ## Reads the scaler's credentials from a Secret in the release namespace
+  #    secretTargetRef:
+  #      - parameter: apiKey
+  #        name: my-secret
+  #        key: DD_API_KEY
+  #      - parameter: appKey
+  #        name: my-secret
+  #        key: DD_APP_KEY
+
+  ## behavior specifies separate scaling policies upon scale-up and scale-down, as autoscaling.behavior
+  ## With autoscaling.enabled too and no keda.behavior, it takes autoscaling.behavior
+  behavior: {}
+
+  ## fallback sets the replicas KEDA falls back to when a scaler errors. Both fields are required
+  ## replicas must be 0 or between keda.minReplicas and keda.maxReplicas. keda.maxReplicas is the safe value
+  ## Below KEDA 2.17 a scaler error can apply replicas at once, before failureThreshold. On the HPA path only AverageValue triggers fall back, so not cpu or memory. See the 0.12.0 CHANGELOG
+  ## KEDA 2.17.0 only: the webhook rejects a fallback unless a trigger other than cpu or memory sets metricType: AverageValue explicitly
+  fallback: {}
+  #  failureThreshold: 12
+  #  replicas: 10
 
   ## list of event sources that trigger the autoscaling https://keda.sh/docs/latest/scalers/
+  ## useCachedMetrics: true on a trigger serves the HPA from KEDA's last poll. KEDA rejects it on cpu, memory and cron triggers
   triggers: []
   #  - type: cpu
   #    metricType: Utilization # Allowed types are 'Utilization' or 'AverageValue'
@@ -342,7 +369,7 @@ workers: []
 #  - name: worker-1
 #    shell: /bin/bash
 #    command: "echo worker-1"
-#    replicaCount: 1
+#    replicaCount: 1 # Left out of the Deployment when this worker's autoscaling or keda is enabled
 #    terminationGracePeriodSeconds: 180
 #    resources: {}
 #    customImage:
@@ -367,6 +394,8 @@ workers: []
 #      maxReplicas: 10
 #      pollingInterval: 30
 #      authentication: []
+#      behavior: {}
+#      fallback: {} # Same rules as keda.fallback
 #      triggers: []
 #    extraEnvs:
 #      - name: SERVICE

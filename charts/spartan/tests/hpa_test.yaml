@@ -4,6 +4,14 @@ templates:
   - "templates/hpa.yaml"
 
 tests:
+  - it: "should render nothing when KEDA owns the autoscaling"
+    set:
+      autoscaling.enabled: true
+      keda.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
   - it: "should have correct minReplicas and maxReplicas values"
     set:
       autoscaling.enabled: true
