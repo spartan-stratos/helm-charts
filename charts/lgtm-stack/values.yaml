@@ -68,12 +68,37 @@ grafana:
     github: {}
 
 alerting:
-  # AlertmanagerConfig sending warning and critical alerts to Slack. The webhook URL lives in a Secret created outside
-  # git; until it exists the operator skips the receiver and Alertmanager keeps running.
+  # A priority label on every alert, P1 (users failing now) to P5 (noise), next to severity, added by Prometheus alert
+  # relabelling. The rule's own priority label wins, then overrides, then the default for its severity. Alerts with no
+  # severity (Watchdog, InfoInhibitor) get none, so they are never sent
+  priority:
+    default: { critical: P2, warning: P3, info: P4 }
+    # Per alert name: one priority for every severity, or one per severity. null drops a built-in entry
+    overrides:
+      # EKS manages the control plane: nothing to fix but an AWS case
+      KubeAPIErrorBudgetBurn: { critical: P3, warning: P4 }
+      # Precursors and observability gaps; the alert that bites (ContainerOOMKilled, KubeNodeNotReady) stays P3
+      ContainerMemoryNearLimit: P4
+      PodMissingInstrumentation: P4
+      KubeNodeReadinessFlapping: P4
+      KubeQuotaExceeded: P4
+      # Pressure means the kubelet starts evicting pods
+      KubeNodePressure: P3
+      # Capacity follows requests on Fargate and Karpenter; throttling alone is normal for bursty services
+      KubeCPUOvercommit: P5
+      KubeMemoryOvercommit: P5
+      CPUThrottlingHigh: P5
+  # AlertmanagerConfig sending alerts to Slack. The webhook URL lives in a Secret created outside git; until it exists
+  # the operator skips the receiver and Alertmanager keeps running.
   slack:
     enabled: false
     secretName: alert-slack
     secretKey: webhook-url
+    # Priorities sent to Slack; the rest stay in Grafana
+    priorities: [P1, P2, P3]
+    # Message text for firing alerts of mentionPriorities: <!here>, <!channel> or a user group <!subteam^ID>; "" for none
+    mention: "<!here>"
+    mentionPriorities: [P1, P2]
   # Shared PrometheusRule bundles. A project's own rules go in its project folder (see `project`)
   rules:
     # RED per service from Tempo span metrics (server spans). Thresholds per severity; drop one to skip that severity
@@ -81,9 +106,10 @@ alerting:
       enabled: true
       # Requests per second below which a service is not alerted on, so a quiet service does not page on one error
       minRequestRate: 0.1
-      errorRate: { warning: 0.02, critical: 0.05, for: 10m }
+      # priority: per severity, over alerting.priority (a critical error rate is the one alert that means users fail)
+      errorRate: { warning: 0.02, critical: 0.05, for: 10m, priority: { critical: P1 } }
       # Seconds
-      latencyP95: { warning: 1, critical: 3, for: 10m }
+      latencyP95: { warning: 1, critical: 3, for: 10m, priority: {} }
       # Per service, merged over the above, e.g. payments: { errorRate: { critical: 0.01 } } or batch: { enabled: false }
       overrides: {}
     # Image pull failures, OOM kills, memory near the limit, pods annotated for injection but without an agent

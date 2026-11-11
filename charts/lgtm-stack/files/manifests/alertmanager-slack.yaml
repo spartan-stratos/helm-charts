@@ -1,4 +1,6 @@
-# Sends warning and critical alerts from the real Alertmanager to Slack. Info stays in Grafana; Watchdog has no severity.
+# Sends alerts of alerting.slack.priorities from the real Alertmanager to Slack; the rest stay in Grafana, and Watchdog
+# has no priority. Firing alerts of alerting.slack.mentionPriorities carry the mention as the message text (a mention in
+# the attachment notifies nobody); the line is dropped when the mention is empty.
 # The webhook URL comes from the Secret named in alerting.slack, created outside git. Until it exists the operator skips
 # this config and Alertmanager keeps running with the null receiver; once it exists, the operator picks it up.
 # Lines with __GRAFANA_URL__ (title link, Silence, Dashboard) are dropped when grafana.domain is not set.
@@ -10,15 +12,16 @@ metadata:
 spec:
   route:
     receiver: slack
-    # service: the RED alerts have no namespace, so without it every service's alert lands in one message
-    groupBy: [alertname, namespace, service]
+    # service: the RED alerts have no namespace, so without it every service's alert lands in one message.
+    # priority: one alert at two priorities (a PVC at warning and another at critical) gets one message each
+    groupBy: [alertname, namespace, service, priority]
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 4h
     matchers:
-      - name: severity
+      - name: priority
         matchType: "=~"
-        value: warning|critical
+        value: __SLACK_PRIORITIES__
   receivers:
     - name: slack
       slackConfigs:
@@ -26,7 +29,8 @@ spec:
             name: __SLACK_SECRET_NAME__
             key: __SLACK_SECRET_KEY__
           sendResolved: true
-          title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          messageText: '{{ if and (eq .Status "firing") (match "^(__SLACK_MENTION_PRIORITIES__)$" .CommonLabels.priority) }}__SLACK_MENTION__{{ end }}'
+          title: '[{{ .CommonLabels.priority }}] [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
           titleLink: '__GRAFANA_URL__/alerting/list?search={{ .CommonLabels.alertname | urlquery }}' # the default is Alertmanager's in-cluster URL
           text: |-
             {{ range .Alerts }}*{{ .Annotations.summary }}*{{ if .Annotations.message }}*{{ .Annotations.message }}*{{ end }}

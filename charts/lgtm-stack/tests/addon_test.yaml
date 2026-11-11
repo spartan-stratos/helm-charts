@@ -32,6 +32,35 @@ tests:
           path: spec.receivers[0].slackConfigs[0].text
           pattern: 'cluster=example-cluster\{\{ if \.Labels\.namespace \}\} namespace=\{\{ \.Labels\.namespace \}\}'
 
+  - it: "routes Slack by priority and mentions only firing P1 and P2"
+    set:
+      addon: alertmanagerConfig
+    asserts:
+      - equal:
+          path: spec.route.matchers[0]
+          value: { name: priority, matchType: "=~", value: P1|P2|P3 }
+      - contains:
+          path: spec.route.groupBy
+          content: priority
+      - equal:
+          path: spec.receivers[0].slackConfigs[0].messageText
+          value: '{{ if and (eq .Status "firing") (match "^(P1|P2)$" .CommonLabels.priority) }}<!here>{{ end }}'
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].title
+          pattern: '^\[\{\{ \.CommonLabels\.priority \}\}\] '
+
+  - it: "sends no mention when alerting.slack.mention is empty"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.mention: ""
+      alerting.slack.priorities: [P1, P2]
+    asserts:
+      - notExists:
+          path: spec.receivers[0].slackConfigs[0].messageText
+      - equal:
+          path: spec.route.matchers[0].value
+          value: P1|P2
+
   - it: "renders both datasources"
     set:
       addon: grafanaDatasources
@@ -91,6 +120,24 @@ tests:
       - equal:
           path: spec.groups[1].rules[0].annotations.summary
           value: Service {{ $labels.service }} is failing {{ $value | humanizePercentage }} of requests
+
+  - it: "labels a critical error rate P1 and takes per-service priorities"
+    set:
+      addon: serviceRules
+      alerting.rules.services.overrides:
+        payments: { latencyP95: { priority: { critical: P1 } } }
+    asserts:
+      # defaults: warning error, warning latency, critical error, critical latency; then the same for payments
+      - notExists:
+          path: spec.groups[1].rules[0].labels.priority
+      - equal:
+          path: spec.groups[1].rules[2].labels
+          value: { severity: critical, priority: P1 }
+      - notExists:
+          path: spec.groups[1].rules[3].labels.priority
+      - equal:
+          path: spec.groups[1].rules[7].labels
+          value: { severity: critical, priority: P1 }
 
   - it: "renders the workloads rule bundle"
     set:

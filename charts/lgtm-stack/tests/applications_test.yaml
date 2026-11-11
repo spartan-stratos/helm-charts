@@ -72,7 +72,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.2.3
+          value: 0.2.4
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
@@ -218,6 +218,51 @@ tests:
       - contains:
           path: spec.syncPolicy.syncOptions
           content: RespectIgnoreDifferences=true
+
+  - it: "sets priority by alertname and severity, then by severity, only while it is empty"
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    asserts:
+      - contains:
+          path: spec.source.helm.valuesObject.prometheus.prometheusSpec.additionalAlertRelabelConfigs
+          content:
+            source_labels: [priority, alertname, severity]
+            regex: ;KubeAPIErrorBudgetBurn;critical
+            target_label: priority
+            replacement: P3
+      - contains:
+          path: spec.source.helm.valuesObject.prometheus.prometheusSpec.additionalAlertRelabelConfigs
+          content:
+            source_labels: [priority, alertname, severity]
+            regex: ;CPUThrottlingHigh;.*
+            target_label: priority
+            replacement: P5
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus.prometheusSpec.additionalAlertRelabelConfigs[10]
+          value:
+            source_labels: [priority, severity]
+            regex: ;critical
+            target_label: priority
+            replacement: P2
+
+  - it: "drops a built-in priority override set to null"
+    set:
+      alerting.priority.overrides.KubeNodePressure: null
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    asserts:
+      - lengthEqual:
+          path: spec.source.helm.valuesObject.prometheus.prometheusSpec.additionalAlertRelabelConfigs
+          count: 12
+
+  - it: "fails on a priority outside P1-P5"
+    set:
+      alerting.priority.overrides.Foo: high
+    asserts:
+      - failedTemplate:
+          errorMessage: "alerting.priority.overrides.Foo: high is not P1-P5"
 
   - it: "keeps the OTel webhook cert out of Helm hooks"
     documentSelector:
