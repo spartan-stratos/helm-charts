@@ -17,6 +17,9 @@ spec:
   {{- if .Values.updateStrategy}}
   strategy: {{- toYaml .Values.updateStrategy | nindent 4 }}
   {{- end }}
+  {{- with .Values.progressDeadlineSeconds }}
+  progressDeadlineSeconds: {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "spartan.selectorLabels" . | nindent 6 }}

@@ -1,0 +1,56 @@
+suite: "spec.progressDeadlineSeconds template tests"
+
+templates:
+  - "templates/deployment.yaml"
+  - "templates/worker.yaml"
+  - "templates/configmap.yaml"
+  - "templates/secret.yaml"
+
+tests:
+  - it: "should leave out progressDeadlineSeconds on the main Deployment by default"
+    template: "templates/deployment.yaml"
+    asserts:
+      - notExists:
+          path: "spec.progressDeadlineSeconds"
+
+  - it: "should render progressDeadlineSeconds on the main Deployment when set"
+    template: "templates/deployment.yaml"
+    set:
+      progressDeadlineSeconds: 420
+    asserts:
+      - equal:
+          path: "spec.progressDeadlineSeconds"
+          value: 420
+
+  - it: "should leave out progressDeadlineSeconds on a worker by default"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+    asserts:
+      - notExists:
+          path: "spec.progressDeadlineSeconds"
+
+  - it: "should render a worker's own progressDeadlineSeconds"
+    template: "templates/worker.yaml"
+    set:
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+          progressDeadlineSeconds: 240
+    asserts:
+      - equal:
+          path: "spec.progressDeadlineSeconds"
+          value: 240
+
+  - it: "should not apply the top-level progressDeadlineSeconds to a worker"
+    template: "templates/worker.yaml"
+    set:
+      progressDeadlineSeconds: 420
+      workers:
+        - name: jobs
+          image: { repository: busybox, tag: "1" }
+    asserts:
+      - notExists:
+          path: "spec.progressDeadlineSeconds"

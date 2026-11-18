@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.13.0) (2026-11-19)
+
+### Features
+
+* `progressDeadlineSeconds` and `workers[].progressDeadlineSeconds` set how long a rollout may go without progress before the Deployment reports `ProgressDeadlineExceeded`, which Argo CD shows as Degraded. Unset, the field is left out and Kubernetes keeps its 600-second default, so existing releases render byte-identically. A worker does not inherit the top-level value, as with `updateStrategy`
+
 ## [0.12.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.12.0) (2026-11-09)
 
 ### Features

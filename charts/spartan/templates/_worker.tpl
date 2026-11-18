@@ -11,6 +11,9 @@ spec:
   {{- if not (or (.worker.autoscaling | default dict).enabled (.worker.keda | default dict).enabled) }}
   replicas: {{ .worker.replicaCount | default 1 }}
   {{- end }}
+  {{- with .worker.progressDeadlineSeconds }}
+  progressDeadlineSeconds: {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "spartan.workerLabels" $ | nindent 6 }}

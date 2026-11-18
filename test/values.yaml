@@ -252,6 +252,7 @@ workers:
       image: busybox
     replicaCount: 1
     terminationGracePeriodSeconds: 180
+    progressDeadlineSeconds: 240
     resources: {}
     podAnnotations: {}
     extraEnvs:
@@ -465,6 +466,8 @@ updateStrategy:
   rollingUpdate:
     maxSurge: 25%
     maxUnavailable: 25%
+
+progressDeadlineSeconds: 420
 
 pdb:
   enabled: true
