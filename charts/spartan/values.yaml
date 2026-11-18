@@ -503,6 +503,10 @@ observability:
       glob: app.log
       # Required: the cluster label on every line, as the node Alloy sets it
       cluster: ""
+      # The service_name label on every line. Empty takes the app.kubernetes.io/name pod label, which the node Alloy
+      # also uses - set it only where that label does not identify the service, e.g. a shared nameOverride, or to match
+      # OTEL_SERVICE_NAME so logs, traces and metrics agree
+      serviceName: ""
       lokiUrl: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
       # X-Scope-OrgID, for a Loki with auth_enabled; empty sends none
       tenantId: ""

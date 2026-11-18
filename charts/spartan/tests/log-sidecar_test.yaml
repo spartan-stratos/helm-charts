@@ -115,6 +115,18 @@ tests:
           path: spec.template.spec.containers[0].volumeMounts
           content: { name: log-sidecar-logs, mountPath: /var/log/application }
 
+  - it: "takes service_name from serviceName when set, over the pod label"
+    template: "templates/deployment.yaml"
+    set:
+      observability.logs.fileSidecar.serviceName: service-foo
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: { name: SERVICE_NAME, value: service-foo }
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content: { name: SERVICE_NAME, valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } } }
+
   - it: "tails path/glob and labels the lines"
     template: "templates/log-sidecar-configmap.yaml"
     set:
