@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-* `observability.logs.fileSidecar.serviceName` sets the `service_name` label on the sidecar's lines. Empty keeps the current behaviour, the `app.kubernetes.io/name` pod label the node Alloy also uses. Set it where that label does not identify the service: it is shared by every release that sets the same `nameOverride`, so those releases are indistinguishable by `service_name` in Loki, and on Fargate there is no node Alloy to agree with. Setting it to `OTEL_SERVICE_NAME` makes logs, traces and metrics name the service alike
+* `observability.logs.fileSidecar.serviceName` sets the `service_name` label on the sidecar's lines. Empty keeps the current behaviour, the `app.kubernetes.io/name` pod label the node Alloy also uses. Set it where that label does not identify the service: it is shared by every release that sets the same `nameOverride`, so those releases are indistinguishable by `service_name` in Loki, and on Fargate there is no node Alloy to agree with. Setting it to the same value as `OTEL_SERVICE_NAME` makes logs, traces and metrics name the service alike. Workers inherit it, so a worker's lines then share the main Deployment's `service_name` and only the `pod` label tells them apart
 
 ## [0.13.0](https://github.com/spartan-stratos/helm-charts/releases/tag/spartan-0.13.0) (2026-11-19)
 

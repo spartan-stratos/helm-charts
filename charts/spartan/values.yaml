@@ -505,7 +505,8 @@ observability:
       cluster: ""
       # The service_name label on every line. Empty takes the app.kubernetes.io/name pod label, which the node Alloy
       # also uses - set it only where that label does not identify the service, e.g. a shared nameOverride, or to match
-      # OTEL_SERVICE_NAME so logs, traces and metrics agree
+      # the value of OTEL_SERVICE_NAME so logs, traces and metrics agree. Workers inherit it, so once set a worker's lines
+      # carry the same service_name as the main Deployment and only the pod label tells them apart
       serviceName: ""
       lokiUrl: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
       # X-Scope-OrgID, for a Loki with auth_enabled; empty sends none

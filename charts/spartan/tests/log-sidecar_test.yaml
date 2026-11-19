@@ -127,6 +127,17 @@ tests:
           path: spec.template.spec.initContainers[0].env
           content: { name: SERVICE_NAME, valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } } }
 
+  - it: "gives workers the top-level serviceName too"
+    template: "templates/worker.yaml"
+    set:
+      observability.logs.fileSidecar.serviceName: service-foo
+      workers:
+        - name: general
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: { name: SERVICE_NAME, value: service-foo }
+
   - it: "tails path/glob and labels the lines"
     template: "templates/log-sidecar-configmap.yaml"
     set:
