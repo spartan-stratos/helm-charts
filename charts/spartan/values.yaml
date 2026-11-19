@@ -371,6 +371,7 @@ workers: []
 #    command: "echo worker-1"
 #    replicaCount: 1 # Left out of the Deployment when this worker's autoscaling or keda is enabled
 #    terminationGracePeriodSeconds: 180
+#    progressDeadlineSeconds: 600 # Unset keeps the Kubernetes default; the top-level value does not apply here
 #    resources: {}
 #    customImage:
 #      enabled: false
@@ -608,6 +609,13 @@ datadog:
 ##   maxUnavailable: 25%
 ## updateStrategy specifies the configuration for deployment strategy
 updateStrategy: {}
+
+## progressDeadlineSeconds is how long a rollout may go without progress before the Deployment
+## reports ProgressDeadlineExceeded, which Argo CD shows as Degraded. Unset keeps the Kubernetes
+## default of 600. Set it above the time one pod takes to become ready, or a healthy slow rollout
+## is reported as failed. Workers take their own workers[].progressDeadlineSeconds.
+## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#progress-deadline-seconds
+progressDeadlineSeconds: null
 
 ## Pod Disruption Budget configuration
 ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb
