@@ -1,0 +1,33 @@
+        # Queued work never drains. durable_queue_depth excludes in-flight messages, so one long job does not hold this open.
+        # "> 0 for 30m" is the whole condition: a busy queue touches empty and resets it. No magnitude threshold, since
+        # there is no throughput baseline yet. A plain `for` rather than min_over_time, which fires before its window fills.
+        - alert: DurableQueueNotDraining
+          expr: durable_queue_depth{service_name="${SERVICE_NAME}"} > 0
+          for: 30m
+          labels:
+            namespace: ${NAMESPACE}
+            severity: warning
+          annotations:
+            summary: "${SERVICE_SHORT} durable queue {{ $labels.queue_name }} has not drained in 30 minutes"
+            description: >-
+              The queue never reached empty across the window, so jobs are accumulating rather than flowing. Check
+              the activity errors in Loki with
+              namespace="${NAMESPACE}" filtered on level ERROR.
+
+        # Registration happens once at startup; zero while up means every durable job fails to dispatch.
+        # A down pod emits no series, so absence is left to lgtm-workloads.
+        - alert: DurableActivitiesNotRegistered
+          expr: durable_runtime_registered_activities{service_name="${SERVICE_NAME}"} == 0
+          for: 10m
+          labels:
+            namespace: ${NAMESPACE}
+            severity: critical
+          annotations:
+            summary: "${SERVICE_SHORT} registered zero durable activities"
+            description: >-
+              The durable runtime is up but registered no activities, so every durable job will fail to dispatch.
+              Check the startup logs in Loki with namespace="${NAMESPACE}" for registration errors.
+
+        # NOT WRITTEN: nothing may key on durable_runtime_workers_capacity/_active/_available. Capacity is the runtime's
+        # batchSize (hardcoded 1), and the 10 runtimes share one tag set, so Micrometer keeps only the first registration.
+        # The activity counters export no series until a first increment; wait until observed before a failure-rate rule.

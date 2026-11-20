@@ -1,0 +1,91 @@
+suite: "optional rule tests"
+templates:
+  - "templates/rules.yaml"
+release:
+  namespace: alerts-test
+tests:
+  - it: "should render only migration rules when migration is enabled"
+    set:
+      rules.migration.enabled: true
+    asserts:
+      - isKind:
+          of: PrometheusRule
+      - equal:
+          path: metadata.namespace
+          value: alerts-test
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 1
+      - equal:
+          path: spec.groups[0].rules[0].alert
+          value: MigrationJobFailed
+      - equal:
+          path: spec.groups[0].rules[0].labels.namespace
+          value: alerts-test
+  - it: "should render only worker rules when worker is enabled"
+    set:
+      rules.worker.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 2
+      - equal:
+          path: spec.groups[0].rules[0].alert
+          value: DurableQueueNotDraining
+      - equal:
+          path: spec.groups[0].rules[1].alert
+          value: DurableActivitiesNotRegistered
+      - equal:
+          path: metadata.namespace
+          value: alerts-test
+      - equal:
+          path: spec.groups[0].rules[0].labels.namespace
+          value: alerts-test
+      - equal:
+          path: spec.groups[0].rules[1].labels.namespace
+          value: alerts-test
+  - it: "should append extra rules after both built-in groups"
+    set:
+      rules.migration.enabled: true
+      rules.worker.enabled: true
+      extraRules:
+        - alert: ExtraRule
+          expr: up == 0
+          labels:
+            namespace: alerts-test
+            severity: warning
+    asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 4
+      - equal:
+          path: spec.groups[0].rules[0].alert
+          value: MigrationJobFailed
+      - equal:
+          path: spec.groups[0].rules[1].alert
+          value: DurableQueueNotDraining
+      - equal:
+          path: spec.groups[0].rules[2].alert
+          value: DurableActivitiesNotRegistered
+      - equal:
+          path: spec.groups[0].rules[3]
+          value:
+            alert: ExtraRule
+            expr: up == 0
+            labels:
+              namespace: alerts-test
+              severity: warning
+  - it: "should render extra rules without built-in rules"
+    set:
+      extraRules:
+        - alert: ExtraRule
+          expr: up == 0
+          labels:
+            namespace: alerts-test
+    asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 1
+      - equal:
+          path: spec.groups[0].rules[0].alert
+          value: ExtraRule

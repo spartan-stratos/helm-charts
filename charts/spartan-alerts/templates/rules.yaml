@@ -1,0 +1,23 @@
+{{- $rules := "" -}}
+{{- if .Values.rules.migration.enabled -}}
+{{- $rules = printf "%s%s" $rules (.Files.Get "files/rules-migration.yaml") -}}
+{{- end -}}
+{{- if .Values.rules.worker.enabled -}}
+{{- $rules = printf "%s%s" $rules (.Files.Get "files/rules-worker.yaml") -}}
+{{- end -}}
+{{- if .Values.extraRules -}}
+{{- $rules = printf "%s%s\n" $rules (toYaml .Values.extraRules | indent 8) -}}
+{{- end -}}
+{{- if $rules -}}
+{{- .Files.Get "files/rules.yaml"
+  | replace "${RULES}" (printf "\n%s" $rules)
+  | replace "${NAMESPACE}" .Release.Namespace
+  | replace "${SERVICE_NAME}" .Values.service.name
+  | replace "${SERVICE_SHORT}" .Values.service.short
+  | replace "${ENV}" .Values.env
+  | replace "${CLUSTER_NAME}" .Values.workloadCluster
+  | replace "${GRAFANA_URL}" .Values.grafanaUrl
+  | replace "${ALERT_SLACK_SECRET}" .Values.slack.secretName
+  | replace "${ALERT_SLACK_CHANNEL}" .Values.slack.channel
+}}
+{{- end }}

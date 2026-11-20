@@ -1,0 +1,21 @@
+service:
+  name: service
+  short: service
+env: ""
+workloadCluster: ""
+grafanaUrl: ""
+slack:
+  secretName: alert-slack
+  channel: ""
+externalSecrets:
+  enabled: false
+  secretArn: ""
+  region: ""
+  serviceAccount: alert-secrets
+  roleArn: ""
+rules:
+  migration:
+    enabled: false
+  worker:
+    enabled: false
+extraRules: []

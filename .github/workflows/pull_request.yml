@@ -6,7 +6,7 @@ jobs:
   helm-check:
     strategy:
       matrix:
-        chart: [ spartan, datadog, lgtm-stack ]
+        chart: [ spartan, datadog, lgtm-stack, spartan-alerts ]
 
     runs-on: ubuntu-latest
     steps:

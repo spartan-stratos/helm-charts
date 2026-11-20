@@ -1,0 +1,14 @@
+{{- $manifest := .Files.Get "files/alertmanager.yaml" -}}
+{{- if empty .Values.slack.channel -}}
+{{- $manifest = replace "          channel: '#${ALERT_SLACK_CHANNEL}'\n" "" $manifest -}}
+{{- end -}}
+{{- $manifest
+  | replace "${NAMESPACE}" .Release.Namespace
+  | replace "${SERVICE_NAME}" .Values.service.name
+  | replace "${SERVICE_SHORT}" .Values.service.short
+  | replace "${ENV}" .Values.env
+  | replace "${CLUSTER_NAME}" .Values.workloadCluster
+  | replace "${GRAFANA_URL}" .Values.grafanaUrl
+  | replace "${ALERT_SLACK_SECRET}" .Values.slack.secretName
+  | replace "${ALERT_SLACK_CHANNEL}" .Values.slack.channel
+}}

@@ -1,0 +1,27 @@
+suite: "default resource tests"
+templates:
+  - "templates/externalsecret.yaml"
+  - "templates/secretstore.yaml"
+  - "templates/serviceaccount.yaml"
+  - "templates/rules.yaml"
+tests:
+  - it: "should render no ExternalSecret by default"
+    template: "templates/externalsecret.yaml"
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: "should render no SecretStore by default"
+    template: "templates/secretstore.yaml"
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: "should render no ServiceAccount by default"
+    template: "templates/serviceaccount.yaml"
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: "should render no PrometheusRule by default"
+    template: "templates/rules.yaml"
+    asserts:
+      - hasDocuments:
+          count: 0

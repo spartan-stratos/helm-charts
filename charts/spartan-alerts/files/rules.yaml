@@ -1,0 +1,12 @@
+# Synced to ${NAMESPACE} by ArgoCD from master; hand edits on the cluster are reverted.
+# The webhook Secret is created by hand unless externalSecrets.enabled, when ESO creates it.
+# Every selector must stay pinned to this tenant in a shared Prometheus.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ${SERVICE_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  groups:
+    - name: ${SERVICE_NAME}
+      rules:${RULES}

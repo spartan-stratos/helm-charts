@@ -1,0 +1,11 @@
+# Exclude test fixtures and non-chart development files.
+tests/
+.git/
+.agent/
+.*
+*.md
+*.sh
+*.tgz
+*.log
+*.tmp
+*~
