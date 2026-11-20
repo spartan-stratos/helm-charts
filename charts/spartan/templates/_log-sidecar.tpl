@@ -41,11 +41,18 @@ no node log agent reaches (Fargate). Callers pass (list $ isWorker from), from =
   env:
     - name: CLUSTER_NAME
       value: {{ required "observability.logs.fileSidecar.cluster is required" $fs.cluster | quote }}
-    # The pod label the node Alloy takes service_name from, so both collectors name the service alike
+    # Defaults to the pod label the node Alloy takes service_name from, so both collectors name the service alike.
+    # serviceName overrides it where that label does not identify the service: it is shared by every release that sets
+    # the same nameOverride, and on Fargate there is no node Alloy to agree with
+    {{- if $fs.serviceName }}
+    - name: SERVICE_NAME
+      value: {{ $fs.serviceName | quote }}
+    {{- else }}
     - name: SERVICE_NAME
       valueFrom:
         fieldRef:
           fieldPath: metadata.labels['app.kubernetes.io/name']
+    {{- end }}
     - name: CONTAINER_NAME
       value: {{ include "spartan.containerName" $ | quote }}
     - name: LOKI_URL
