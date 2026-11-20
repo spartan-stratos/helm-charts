@@ -27,7 +27,14 @@ data:
 {{- $m := $.Files.Get (printf "files/manifests/%s" .)
   | replace "__CLUSTER_NAME__" (required "cluster.name is required" $.Values.cluster.name)
   | replace "__SLACK_SECRET_NAME__" $.Values.alerting.slack.secretName
-  | replace "__SLACK_SECRET_KEY__" $.Values.alerting.slack.secretKey }}
+  | replace "__SLACK_SECRET_KEY__" $.Values.alerting.slack.secretKey
+  | replace "__SLACK_PRIORITIES__" (join "|" $.Values.alerting.slack.priorities)
+  | replace "__SLACK_MENTION_PRIORITIES__" (join "|" $.Values.alerting.slack.mentionPriorities) }}
+{{- with $.Values.alerting.slack.mention }}
+{{- $m = replace "__SLACK_MENTION__" . $m }}
+{{- else }}
+{{- $m = regexReplaceAll "(?m)^.*__SLACK_MENTION__.*\n?" $m "" }}
+{{- end }}
 {{- with $.Values.grafana.domain }}
 {{- $m = replace "__GRAFANA_URL__" (printf "https://%s" .) $m }}
 {{- else }}

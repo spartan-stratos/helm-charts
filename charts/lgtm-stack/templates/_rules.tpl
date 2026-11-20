@@ -54,6 +54,9 @@ spec:
           for: {{ $t.errorRate.for }}
           labels:
             severity: {{ $sev }}
+            {{- with index ($t.errorRate.priority | default dict) $sev }}
+            priority: {{ . }}
+            {{- end }}
           annotations:
             summary: Service {{ $o }} $labels.service {{ $c }} is failing {{ $o }} $value | humanizePercentage {{ $c }} of requests
             description: >-
@@ -70,6 +73,9 @@ spec:
           for: {{ $t.latencyP95.for }}
           labels:
             severity: {{ $sev }}
+            {{- with index ($t.latencyP95.priority | default dict) $sev }}
+            priority: {{ . }}
+            {{- end }}
           annotations:
             summary: Service {{ $o }} $labels.service {{ $c }} p95 latency is {{ $o }} $value | humanizeDuration {{ $c }}
             description: >-

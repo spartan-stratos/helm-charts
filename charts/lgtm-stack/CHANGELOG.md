@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.4](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.4) (2026-11-11)
+
+### Features
+
+* Every alert carries a `priority` label, P1 (users failing now) to P5 (noise), next to `severity`. Prometheus alert
+  relabelling sets it when the rule has none: `alerting.priority.overrides` by alert name (and severity), then
+  `alerting.priority.default` by severity (critical P2, warning P3, info P4). Built-in overrides lower EKS-managed and
+  precursor alerts (`KubeAPIErrorBudgetBurn`, `ContainerMemoryNearLimit`, `PodMissingInstrumentation`,
+  `KubeCPUOvercommit`, `CPUThrottlingHigh`...) and raise `KubeNodePressure` to P3
+* `ServiceErrorRateHigh` at critical is P1; `alerting.rules.services.{errorRate,latencyP95}.priority` sets it per
+  severity, and per service through `overrides.<service>`
+* Slack routes by priority instead of severity: `alerting.slack.priorities` (P1-P3) are sent, firing
+  `alerting.slack.mentionPriorities` (P1, P2) carry `alerting.slack.mention` (`<!here>`) as the message text, titles
+  start with the priority, and alerts are grouped by priority too
+
+### Upgrading
+
+Slack now gets what P1-P3 cover. Compared with 0.2.3 (warning and critical), the alerts lowered to P4 / P5 stop posting
+and `KubeNodePressure` (info) starts. Set `alerting.slack.mention: ""` for a cluster where nobody should be pinged, e.g.
+dev. Grafana's alert rule list reads the rules from Prometheus and shows `priority` only for rules that set it; the
+Alertmanager view in Grafana shows it on every alert.
+
 ## [0.2.3](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.3) (2026-11-09)
 
 ### Features

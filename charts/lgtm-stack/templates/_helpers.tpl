@@ -151,6 +151,37 @@ instrumentation:
   files: [instrumentation.yaml]
 {{- end -}}
 
+{{/* Alert relabelling that sets priority when the rule set none: overrides by alertname (and severity), then the
+default by severity. Each step matches only while priority is still empty */}}
+{{- define "lgtm-stack.priorityRelabel" -}}
+{{- $p := .Values.alerting.priority -}}
+{{- $overrides := $p.overrides | default dict -}}
+{{- range $name := keys $overrides | sortAlpha }}
+{{- $v := index $overrides $name }}
+{{- if $v }}
+{{- $bySeverity := $v }}
+{{- if kindIs "string" $v }}{{ $bySeverity = dict "" $v }}{{ end }}
+{{- range $sev := keys $bySeverity | sortAlpha }}
+{{- $prio := index $bySeverity $sev }}
+{{- if not (regexMatch "^P[1-5]$" (toString $prio)) }}{{ fail (printf "alerting.priority.overrides.%s: %v is not P1-P5" $name $prio) }}{{ end }}
+- source_labels: [priority, alertname, severity]
+  regex: {{ printf ";%s;%s" (regexQuoteMeta $name) (ternary ".*" (regexQuoteMeta $sev) (eq $sev "")) | quote }}
+  target_label: priority
+  replacement: {{ $prio }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $default := $p.default | default dict -}}
+{{- range $sev := keys $default | sortAlpha }}
+{{- $prio := index $default $sev }}
+{{- if not (regexMatch "^P[1-5]$" (toString $prio)) }}{{ fail (printf "alerting.priority.default.%s: %v is not P1-P5" $sev $prio) }}{{ end }}
+- source_labels: [priority, severity]
+  regex: {{ printf ";%s" (regexQuoteMeta $sev) | quote }}
+  target_label: priority
+  replacement: {{ $prio }}
+{{- end }}
+{{- end -}}
+
 {{/* Settings this chart derives from the top-level values, per component: (list $ key) */}}
 {{- define "lgtm-stack.generated" -}}
 {{- $ := index . 0 -}}
@@ -161,6 +192,9 @@ prometheus:
   prometheusSpec:
     externalLabels:
       cluster: {{ $v.cluster.name | quote }}
+    {{- with include "lgtm-stack.priorityRelabel" $ }}
+    additionalAlertRelabelConfigs: {{- . | nindent 6 }}
+    {{- end }}
 {{- if $v.alerting.slack.enabled }}
 alertmanager:
   alertmanagerSpec:

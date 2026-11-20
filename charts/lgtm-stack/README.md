@@ -114,8 +114,11 @@ default. Lists are replaced, not appended.
 | `grafana.domain` | `""` | `root_url` and Ingress host |
 | `grafana.ingress.enabled` / `.className` / `.annotations` | `false` / `alb` / `{}` | Grafana Ingress |
 | `grafana.sso.provider` | `none` | `keycloak` or `github` adds the matching preset; settings in `grafana.sso.<provider>` |
-| `alerting.slack.enabled` | `false` | Slack receiver for warning and critical alerts |
+| `alerting.priority.default` / `.overrides` | critical P2, warning P3, info P4; see [Priority](#priority) | `priority` label set on alerts that have none |
+| `alerting.slack.enabled` | `false` | Slack receiver, see [Alerting](#alerting) |
 | `alerting.slack.secretName` / `.secretKey` | `alert-slack` / `webhook-url` | Secret holding the Slack webhook URL |
+| `alerting.slack.priorities` | `[P1, P2, P3]` | Priorities sent to Slack |
+| `alerting.slack.mention` / `.mentionPriorities` | `<!here>` / `[P1, P2]` | Message text on firing alerts of those priorities; `""` for none |
 | `components.<c>.enabled` | `true` | Drop a component |
 | `components.<c>.chart` | pinned | Upstream chart repoURL, name and version |
 | `components.<c>.values` | `{}` | Any value of the upstream chart, merged last |
@@ -236,7 +239,7 @@ spec: {{- $.Files.Get $path | nindent 2 }}
 ```
 
 Names share `monitoring` with the stack's objects: avoid the `lgtm-` prefix. Label rules with `severity` (`info`,
-`warning`, `critical`) for routing, and keep `{{ $labels.x }}` as is in annotations: Helm does not template the files.
+`warning`, `critical`), and with `priority` (`P1`-`P5`) when the default for that severity is wrong; keep `{{ $labels.x }}` as is in annotations: Helm does not template the files.
 An annotation `dashboard_url` (a Grafana path such as `/d/<uid>/<slug>?var-x={{ $labels.x }}`) adds a Dashboard link to
 the Slack message.
 
@@ -255,9 +258,11 @@ project folder's rules; every PrometheusRule in the cluster is selected) and Ale
 routes them; Grafana shows them read-only. Grafana contact points do not receive these alerts: they belong to
 Grafana's own Alertmanager.
 
-With `alerting.slack.enabled`, AlertmanagerConfig `slack` sends `severity` warning and critical, grouped by alertname,
-namespace and service, repeated every 4h, with resolved notices. Info alerts stay in Grafana. With `grafana.domain` set,
-the message links to Grafana:
+With `alerting.slack.enabled`, AlertmanagerConfig `slack` sends `priority` P1-P3 (`alerting.slack.priorities`),
+grouped by alertname, namespace, service and priority, repeated every 4h, with resolved notices. P4 and P5 stay in
+Grafana. Titles start with the priority (`[P1] [FIRING:1] ServiceErrorRateHigh (critical)`), and firing P1 and P2
+messages carry `alerting.slack.mention` (`<!here>` by default; a user group is `<!subteam^ID>`) as their text, where
+Slack notifies on it. With `grafana.domain` set, the message links to Grafana:
 
 | Link | Opens |
 | --- | --- |
@@ -267,7 +272,48 @@ the message links to Grafana:
 | `Silence` | A new silence in Grafana, pre-filled with the group's `alertname`, `namespace` and `service` |
 
 To silence a noisy kube-prometheus-stack default, set
-`components.kubePrometheusStack.values.defaultRules.disabled.<AlertName>: true`.
+`components.kubePrometheusStack.values.defaultRules.disabled.<AlertName>: true`, or give it P5 to keep it in Grafana.
+
+### Priority
+
+Alerts keep `severity` (kube-prometheus-stack's rules and the inhibit rules use it) and get `priority`, as in Datadog
+monitors:
+
+| Priority | Meaning | Default for | Slack |
+| --- | --- | --- | --- |
+| P1 | Users are failing now | set per rule | sent, mention |
+| P2 | Impact is imminent, or data or alerting is being lost | critical | sent, mention |
+| P3 | Degraded or broken, act within working hours | warning | sent |
+| P4 | Informational, capacity, observability gaps | info | Grafana only |
+| P5 | Noisy, kept for context | set per rule | Grafana only |
+
+Prometheus alert relabelling sets it on alerts sent to Alertmanager, first match wins: the rule's own `priority` label,
+then `alerting.priority.overrides.<alertname>` (one value, or one per severity), then `alerting.priority.default`.
+Alerts with no severity, such as `Watchdog`, get none and are never sent. The built-in overrides:
+
+| Alert | Priority | Why |
+| --- | --- | --- |
+| `ServiceErrorRateHigh` critical | P1 | The one alert that says users are failing (`alerting.rules.services.errorRate.priority`) |
+| `KubeNodePressure` | P3 | Info by default, but pressure means evictions |
+| `KubeAPIErrorBudgetBurn` | P3 / P4 | EKS manages the control plane |
+| `ContainerMemoryNearLimit`, `PodMissingInstrumentation`, `KubeNodeReadinessFlapping`, `KubeQuotaExceeded` | P4 | Precursors and observability gaps |
+| `KubeCPUOvercommit`, `KubeMemoryOvercommit`, `CPUThrottlingHigh` | P5 | Capacity follows requests on Fargate and Karpenter; throttling alone is normal |
+
+```yaml
+alerting:
+  priority:
+    overrides:
+      KubeJobFailed: P2                 # every severity
+      KubeHpaMaxedOut: { warning: P4 }  # one severity
+      CPUThrottlingHigh: null           # back to the default for its severity
+  rules:
+    services:
+      overrides:
+        payments: { latencyP95: { priority: { critical: P1 } } }
+```
+
+Grafana's alert rule list reads the rules from Prometheus, so it shows `priority` only where a rule sets it; the
+Alertmanager view (and Slack) shows it on every alert.
 
 ### Service alerts
 
@@ -275,10 +321,10 @@ To silence a noisy kube-prometheus-stack default, set
 (`service:traces_spanmetrics_{calls,errors,error_ratio,latency_p95}:rate5m`) and two alerts, each at warning and
 critical:
 
-| Alert | Fires when | Default warning / critical |
-|---|---|---|
-| `ServiceErrorRateHigh` | share of server spans with status ERROR is above the threshold for `errorRate.for` | 2% / 5%, 10m |
-| `ServiceLatencyHigh` | p95 of server spans is above the threshold (seconds) for `latencyP95.for` | 1s / 3s, 10m |
+| Alert | Fires when | Default warning / critical | Priority |
+|---|---|---|---|
+| `ServiceErrorRateHigh` | share of server spans with status ERROR is above the threshold for `errorRate.for` | 2% / 5%, 10m | P3 / P1 |
+| `ServiceLatencyHigh` | p95 of server spans is above the threshold (seconds) for `latencyP95.for` | 1s / 3s, 10m | P3 / P2 |
 
 Services below `minRequestRate` (0.1 req/s) are not alerted on. `overrides.<service>` is merged over the defaults for
 that service, e.g. `payments: { errorRate: { critical: 0.01 } }`, or `batch: { enabled: false }` to skip it; drop a
