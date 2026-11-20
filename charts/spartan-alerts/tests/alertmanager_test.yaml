@@ -38,3 +38,19 @@ tests:
       - matchRegex:
           path: spec.receivers[0].slackConfigs[0].text
           pattern: '\{\{ .Annotations.description \}\}'
+  - it: "should keep the service route off alerts the namespace route already sends"
+    set:
+      service.name: svc
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.route.matchers
+          content:
+            name: service
+            value: svc
+      - contains:
+          path: spec.route.matchers
+          content:
+            name: namespace
+            matchType: "!="
+            value: alerts-test

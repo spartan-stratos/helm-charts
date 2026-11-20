@@ -4,7 +4,7 @@ Provide namespace-scoped alert routing with optional webhook secret synchronizat
 
 ## Introduction
 
-This chart creates two AlertmanagerConfig objects: one matches the namespace label and one matches the service label.
+This chart creates two AlertmanagerConfig objects: one matches the namespace label, and one matches the service label on alerts from outside the release namespace, so an alert carrying both labels posts once.
 Both route warning and critical alerts to Slack. The chart ships no alert definitions; a PrometheusRule renders only from the `groups` value.
 
 ## Prerequisites

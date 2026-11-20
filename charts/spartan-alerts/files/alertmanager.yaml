@@ -1,6 +1,7 @@
 # ArgoCD renders this chart into ${NAMESPACE} and reverts cluster edits.
 # Two configs because RED alerts carry `service` and no `namespace`, and workload alerts the reverse; one route cannot
 # match either. Both live in the tenant namespace and match only this tenant, so the operator scopes them to it.
+# The service config excludes this namespace, so an alert carrying both labels posts once, via the namespace config.
 # No continue override: the operator forces continue on every config's top route, so the shared slack route still receives these.
 # The webhook Secret ${ALERT_SLACK_SECRET} (key webhook-url) is created by hand unless externalSecrets.enabled, when ESO creates it.
 apiVersion: monitoring.coreos.com/v1alpha1
@@ -54,6 +55,9 @@ spec:
     matchers:
       - name: service
         value: ${SERVICE_NAME}
+      - name: namespace
+        matchType: "!="
+        value: ${NAMESPACE}
       - name: severity
         matchType: "=~"
         value: warning|critical
