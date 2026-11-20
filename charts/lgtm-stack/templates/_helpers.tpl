@@ -84,6 +84,11 @@ tempo:
   wave: 60
   presets: [tempo.yaml]
   placement: [""]
+alloyGateway:
+  app: alloy-gateway
+  wave: 53
+  presets: [alloy-gateway.yaml]
+  placement: [controller]
 opentelemetryOperator:
   app: opentelemetry-operator
   wave: 61
@@ -111,6 +116,10 @@ clusterInfo:
   app: cluster-info
   wave: 10
   files: [cluster-info.yaml]
+gateway:
+  app: gateway
+  wave: 54
+  files: []
 # One ConfigMap per files/dashboards/<folder>/<name>.json; the Grafana sidecar loads them, so no ordering is needed
 dashboards:
   app: dashboards
@@ -165,12 +174,14 @@ prometheus:
   prometheusSpec:
     externalLabels:
       cluster: {{ $v.cluster.name | quote }}
-{{- if $v.alerting.slack.enabled }}
 alertmanager:
   alertmanagerSpec:
-    # AlertmanagerConfig routes match alerts from every namespace, not only the config's own
     alertmanagerConfigMatcherStrategy:
-      type: None
+      type: OnNamespace
+{{- if $v.alerting.slack.enabled }}
+    # The platform route must receive alerts from every namespace.
+    alertmanagerConfiguration:
+      name: slack
 {{- end }}
 {{- else if eq $key "grafana" }}
 {{- with $v.grafana.domain }}
@@ -231,6 +242,9 @@ service:
 {{- end -}}
 {{- range $presets -}}
 {{- $file := $.Files.Get (printf "presets/%s" .) -}}
+{{- if has . (list "alloy.yaml" "alloy-gateway.yaml") -}}
+{{- $file = tpl $file $ -}}
+{{- end -}}
 {{- if not $file -}}{{- fail (printf "unknown preset %s" .) -}}{{- end -}}
 {{- include "lgtm-stack.merge" (list $out (fromYaml $file)) -}}
 {{- end -}}

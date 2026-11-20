@@ -44,7 +44,13 @@ tests:
           value: lgtm-alertmanager-config
       - equal:
           path: spec.source.helm.valuesObject.alertmanager.alertmanagerSpec.alertmanagerConfigMatcherStrategy.type
-          value: None
+          value: OnNamespace
+        documentSelector:
+          path: metadata.name
+          value: lgtm-kube-prometheus-stack
+      - equal:
+          path: spec.source.helm.valuesObject.alertmanager.alertmanagerSpec.alertmanagerConfiguration.name
+          value: slack
         documentSelector:
           path: metadata.name
           value: lgtm-kube-prometheus-stack
@@ -72,7 +78,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.2.4
+          value: 0.3.0
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info

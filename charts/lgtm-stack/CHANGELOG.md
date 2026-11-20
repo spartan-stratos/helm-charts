@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.0 (2026-11-20)
+
+### Features
+
+* Optional authenticated OTLP/HTTP gateway with dedicated receivers and fixed tenant headers.
+* Platform Alloy and Grafana datasources send tenant headers. Backend tenant authentication remains disabled.
+* Slack uses the global Alertmanager configuration; other routes are restricted by namespace.
+
 ## [0.2.4](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.4) (2026-11-20)
 
 ### Bug Fixes

@@ -81,6 +81,7 @@ prometheus:
         - k8s.namespace.name
         - k8s.pod.name
         - team
+        - tenant
     externalLabels:
       # Set from cluster.name
       cluster: ""

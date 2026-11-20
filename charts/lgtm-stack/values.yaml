@@ -40,6 +40,18 @@ self:
 # Fixed: the presets wire components together through monitoring.svc.cluster.local URLs
 namespace: monitoring
 
+platformTenant: platform
+# Each credential binds to one receiver port and server-selected tenant.
+# - id: example
+#   port: 4320
+#   htpasswdSecret: { name: example-otlp, key: htpasswd }
+tenants: []
+gateway:
+  ingress:
+    enabled: false
+    className: alb
+    host: ""
+
 cluster:
   # Cluster label on every metric and log line (Prometheus externalLabels, Alloy, Slack messages). Required
   name: ""
@@ -124,6 +136,11 @@ components:
   tempo:
     enabled: true
     chart: { repoURL: https://grafana-community.github.io/helm-charts, name: tempo, version: 3.0.0 }
+    values: {}
+    ignoreDifferences: []
+  alloyGateway:
+    enabled: true
+    chart: { repoURL: https://grafana.github.io/helm-charts, name: alloy, version: 1.13.0 }
     values: {}
     ignoreDifferences: []
   opentelemetryOperator:

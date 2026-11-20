@@ -15,6 +15,7 @@ data:
         type: tempo
         url: http://tempo.monitoring.svc.cluster.local:3200
         jsonData:
+          httpHeaderName1: X-Scope-OrgID
           serviceMap:
             datasourceUid: prometheus
           nodeGraph:
@@ -30,3 +31,5 @@ data:
             datasourceUid: prometheus
             tags:
               - { key: service.name, value: service }
+        secureJsonData:
+          httpHeaderValue1: "__PLATFORM_TENANT__"

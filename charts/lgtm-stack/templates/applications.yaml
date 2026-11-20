@@ -5,7 +5,7 @@
 {{- if hasKey $components "Error" }}{{ fail $components.Error }}{{ end }}
 {{- range $key, $c := $components }}
 {{- $cv := index $.Values.components $key }}
-{{- if $cv.enabled }}
+{{- if and $cv.enabled (or (ne $key "alloyGateway") (not (empty $.Values.tenants))) }}
 {{- $ignores := concat ($c.ignoreDifferences | default list) ($cv.ignoreDifferences | default list) }}
 ---
 {{ include "lgtm-stack.applicationHeader" (list $ $c.app $c.wave) }}
@@ -36,6 +36,8 @@ spec:
 {{- $enabled := false }}
 {{- if eq $key "alertmanagerConfig" }}
 {{- $enabled = $.Values.alerting.slack.enabled }}
+{{- else if eq $key "gateway" }}
+{{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.alloyGateway.enabled $.Values.gateway.ingress.enabled }}
 {{- else if $a.rules }}
 {{- $enabled = (index $.Values.alerting.rules $a.rules).enabled }}
 {{- else }}
@@ -62,6 +64,13 @@ spec:
         mode: addon
         addon: {{ $key }}
         namespace: {{ $.Values.namespace }}
+        {{- if eq $key "gateway" }}
+        tenants: {{- toYaml $.Values.tenants | nindent 10 }}
+        gateway: {{- toYaml $.Values.gateway | nindent 10 }}
+        {{- end }}
+        {{- if eq $key "grafanaDatasources" }}
+        platformTenant: {{ $.Values.platformTenant | quote }}
+        {{- end }}
         cluster: {{- toYaml $.Values.cluster | nindent 10 }}
         alerting: {{- toYaml $.Values.alerting | nindent 10 }}
         grafana:

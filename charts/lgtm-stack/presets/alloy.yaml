@@ -116,6 +116,7 @@ alloy:
       loki.write "default" {
         endpoint {
           url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+          tenant_id = {{ .Values.platformTenant | quote }}
         }
         external_labels = { cluster = sys.env("CLUSTER_NAME") }
       }
@@ -187,12 +188,14 @@ alloy:
       otelcol.exporter.otlphttp "loki" {
         client {
           endpoint = "http://loki.monitoring.svc.cluster.local:3100/otlp"
+          headers = { "X-Scope-OrgID" = {{ .Values.platformTenant | quote }} }
         }
       }
 
       otelcol.exporter.otlp "tempo" {
         client {
           endpoint = "tempo.monitoring.svc.cluster.local:4317"
+          headers = { "X-Scope-OrgID" = {{ .Values.platformTenant | quote }} }
           tls {
             insecure = true
           }

@@ -15,9 +15,12 @@ data:
         type: loki
         url: http://loki.monitoring.svc.cluster.local:3100
         jsonData:
+          httpHeaderName1: X-Scope-OrgID
           derivedFields:
             - name: trace_id
               matcherType: label
               matcherRegex: trace_id
               datasourceUid: tempo
               url: "$${__value.raw}"
+        secureJsonData:
+          httpHeaderValue1: "__PLATFORM_TENANT__"
