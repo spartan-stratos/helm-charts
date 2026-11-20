@@ -72,7 +72,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.2.3
+          value: 0.2.4
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
@@ -89,9 +89,15 @@ tests:
         documentSelector:
           path: metadata.name
           value: lgtm-kube-prometheus-stack
+      # node-exporter reads its own node, so like Alloy: tolerations yes, nodeSelector no
       - equal:
           path: spec.source.helm.valuesObject.prometheus-node-exporter.tolerations[0].value
           value: lgtm
+        documentSelector:
+          path: metadata.name
+          value: lgtm-kube-prometheus-stack
+      - notExists:
+          path: spec.source.helm.valuesObject.prometheus-node-exporter.nodeSelector
         documentSelector:
           path: metadata.name
           value: lgtm-kube-prometheus-stack

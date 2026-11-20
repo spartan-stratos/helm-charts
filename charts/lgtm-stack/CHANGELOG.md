@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.4](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.4) (2026-11-20)
+
+### Bug Fixes
+
+* node-exporter no longer takes `placement.nodeSelector`, only its tolerations, the same as Alloy. With a nodeSelector
+  set it ran on the pinned node alone, so host metrics covered one node. Clusters whose node pools carry other taints
+  still need a wider toleration, e.g. `components.kubePrometheusStack.values.prometheus-node-exporter.tolerations`
+  and `components.alloy.values.controller.tolerations` set to `[{ operator: Exists }]`
+
 ## [0.2.3](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.3) (2026-11-09)
 
 ### Features
