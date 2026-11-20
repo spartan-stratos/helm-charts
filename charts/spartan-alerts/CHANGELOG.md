@@ -6,5 +6,4 @@ All notable changes to this chart will be documented in this file.
 
 ### Features
 
-* Add namespace and service alert routing to Slack with optional webhook secret synchronization.
-* Add optional migration and durable worker alerts, with support for additional rules.
+* Add namespace and service alert routing to Slack, optional webhook secret synchronization, and consumer-supplied PrometheusRule groups.

@@ -1,11 +1,11 @@
 # spartan-alerts chart
 
-Provide namespace-scoped alert routing with optional alert rules and webhook secret synchronization.
+Provide namespace-scoped alert routing with optional webhook secret synchronization and consumer-supplied rule groups.
 
 ## Introduction
 
 This chart creates two AlertmanagerConfig objects: one matches the namespace label and one matches the service label.
-Both route warning and critical alerts to Slack. Optional PrometheusRule definitions cover migration failures and durable workers.
+Both route warning and critical alerts to Slack. The chart ships no alert definitions; a PrometheusRule renders only from the `groups` value.
 
 ## Prerequisites
 
@@ -41,15 +41,11 @@ All objects use the release namespace. Without external secret synchronization, 
 | `externalSecrets.region` | `""` | Secrets Manager region; required when enabled. |
 | `externalSecrets.serviceAccount` | `alert-secrets` | ServiceAccount used by the SecretStore for JWT authentication. |
 | `externalSecrets.roleArn` | `""` | IAM role ARN annotated on the ServiceAccount; required when enabled. |
-| `rules` | `{migration: {enabled: false}, worker: {enabled: false}}` | Built-in rule switches. |
-| `rules.migration` | `{enabled: false}` | Migration alert settings. |
-| `rules.migration.enabled` | `false` | Add the MigrationJobFailed rule. |
-| `rules.worker` | `{enabled: false}` | Durable worker alert settings. |
-| `rules.worker.enabled` | `false` | Add DurableQueueNotDraining and DurableActivitiesNotRegistered rules. |
-| `extraRules` | `[]` | Rule definitions appended after enabled built-in rules; also work alone. |
+| `groups` | `[]` | PrometheusRule groups rendered verbatim into `spec.groups`, in order. Empty renders no PrometheusRule. |
 
-Each rule must carry a static `namespace` label matching the release namespace for routing.
-Built-in rules set it automatically. Add it explicitly to every `extraRules` entry, including rules whose expressions aggregate away namespace labels.
+The chart's namespace route matches on a static `namespace` label, so every alerting rule needs one.
+For each rule with an `alert` key and no `namespace` label, the chart sets it to the release namespace; an explicit value is kept.
+Recording rules are not changed. Rule content is never passed through Helm templating, so `{{ $labels.x }}` stays literal.
 Keep metric selectors scoped to the intended workload when sharing Prometheus.
 
 ### Minimal Example
@@ -67,6 +63,21 @@ slack:
 
 No PrometheusRule or secret synchronization objects render by default. An empty channel uses the webhook's default destination.
 Alertmanager message templates remain literal for Alertmanager to evaluate.
+
+### Rule Groups Example
+
+```yaml
+groups:
+  - name: api
+    rules:
+      - alert: ApiDown
+        expr: up{job="api"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.pod }} is down"
+```
 
 ### External Secrets Example
 
@@ -88,11 +99,6 @@ externalSecrets:
   region: us-west-2
   serviceAccount: alert-secrets
   roleArn: <role-arn>
-rules:
-  migration:
-    enabled: true
-  worker:
-    enabled: true
 ```
 
 The ExternalSecret refreshes hourly and writes the `webhook-url` key to `slack.secretName`.

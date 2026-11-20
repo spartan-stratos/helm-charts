@@ -13,9 +13,4 @@ externalSecrets:
   region: ""
   serviceAccount: alert-secrets
   roleArn: ""
-rules:
-  migration:
-    enabled: false
-  worker:
-    enabled: false
-extraRules: []
+groups: []
