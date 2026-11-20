@@ -1,0 +1,32 @@
+{{- if and (eq .Values.mode "addon") (eq .Values.addon "tenantRules") .Values.components.promLabelProxy.enabled }}
+{{- range $tenant := .Values.tenants }}
+{{- if $tenant.namespaces }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ThanosRuler
+metadata:
+  name: {{ $tenant.id }}-ruler
+  namespace: {{ $.Values.namespace }}
+spec:
+  replicas: 1
+  evaluationInterval: 1m
+  ruleSelector: {}
+  ruleNamespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values: {{- toYaml $tenant.namespaces | nindent 10 }}
+  queryEndpoints:
+    - http://prom-label-proxy-{{ $tenant.id }}.monitoring.svc.cluster.local:8080
+  alertmanagersUrl:
+    - http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+  enforcedNamespaceLabel: namespace
+  {{- with $.Values.placement.nodeSelector }}
+  nodeSelector: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $.Values.placement.tolerations }}
+  tolerations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

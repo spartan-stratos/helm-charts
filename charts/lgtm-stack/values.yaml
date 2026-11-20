@@ -41,10 +41,8 @@ self:
 namespace: monitoring
 
 platformTenant: platform
-# Each credential binds to one receiver port and server-selected tenant.
-# - id: example
-#   port: 4320
-#   htpasswdSecret: { name: example-otlp, key: htpasswd }
+# Each credential binds to one receiver port and a server-selected tenant; namespaces lists the tenant namespaces whose rules run in its own ruler.
+# Entry: { id: example, port: 4320, namespaces: [example], htpasswdSecret: { name: example-otlp, key: htpasswd } }
 tenants: []
 gateway:
   ingress:
@@ -107,6 +105,11 @@ alerting:
 # settings above), so anything the upstream chart accepts can be set here. ignoreDifferences is appended to the
 # built-in list.
 components:
+  promLabelProxy:
+    enabled: true
+    chart: { repoURL: https://prometheus-community.github.io/helm-charts, name: prom-label-proxy, version: 0.25.2 }
+    values: {}
+    ignoreDifferences: []
   prometheusOperatorCrds:
     enabled: true
     # Bump together with kube-prometheus-stack: 32.0.1 ships the CRDs for operator v0.94.1

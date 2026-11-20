@@ -65,6 +65,11 @@ prometheus:
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
+    # Tenant namespaces are labelled by the platform so their rules run only in their own ruler.
+    ruleNamespaceSelector:
+      matchExpressions:
+        - key: lgtm-stack/tenant
+          operator: DoesNotExist
     probeSelectorNilUsesHelmValues: false
     scrapeConfigSelectorNilUsesHelmValues: false
     # Tempo metrics-generator remote-writes span metrics here

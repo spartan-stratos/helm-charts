@@ -31,6 +31,35 @@ spec:
   {{- include "lgtm-stack.syncPolicy" (list $ (gt (len $ignores) 0)) | nindent 2 }}
 {{- end }}
 {{- end }}
+{{- $hasTenantNamespaces := false }}
+{{- range $tenant := .Values.tenants }}
+{{- if $tenant.namespaces }}
+{{- $hasTenantNamespaces = true }}
+{{- $cv := $.Values.components.promLabelProxy }}
+{{- if $cv.enabled }}
+{{- $name := printf "prom-label-proxy-%s" $tenant.id }}
+{{- $c := dict "presets" list "placement" (list "") }}
+{{- $values := dict "fullnameOverride" $name "config" (dict "upstream" "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090" "label" "tenant" "extraArgs" (list (printf "--label-value=%s" $tenant.id) "--enable-label-apis=true" "--error-on-replace=true")) }}
+{{- include "lgtm-stack.merge" (list $values (fromYaml (include "lgtm-stack.values" (list $ "promLabelProxy" $c)))) }}
+---
+{{ include "lgtm-stack.applicationHeader" (list $ $name 31) }}
+spec:
+  project: {{ $.Values.argocd.project }}
+  {{- include "lgtm-stack.destination" $ | nindent 2 }}
+  source:
+    repoURL: {{ $cv.chart.repoURL }}
+    chart: {{ $cv.chart.name }}
+    targetRevision: {{ $cv.chart.version | quote }}
+    helm:
+      releaseName: {{ $name }}
+      valuesObject: {{- toYaml $values | nindent 8 }}
+  {{- with $cv.ignoreDifferences }}
+  ignoreDifferences: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- include "lgtm-stack.syncPolicy" (list $ (not (empty $cv.ignoreDifferences))) | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- $addons := include "lgtm-stack.addons" . | fromYaml }}
 {{- range $key, $a := $addons }}
 {{- $enabled := false }}
@@ -38,6 +67,8 @@ spec:
 {{- $enabled = $.Values.alerting.slack.enabled }}
 {{- else if eq $key "gateway" }}
 {{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.alloyGateway.enabled $.Values.gateway.ingress.enabled }}
+{{- else if eq $key "tenantRules" }}
+{{- $enabled = and $hasTenantNamespaces $.Values.components.promLabelProxy.enabled }}
 {{- else if $a.rules }}
 {{- $enabled = (index $.Values.alerting.rules $a.rules).enabled }}
 {{- else }}
@@ -64,6 +95,13 @@ spec:
         mode: addon
         addon: {{ $key }}
         namespace: {{ $.Values.namespace }}
+        {{- if eq $key "tenantRules" }}
+        tenants: {{- toYaml $.Values.tenants | nindent 10 }}
+        placement: {{- toYaml $.Values.placement | nindent 10 }}
+        components:
+          promLabelProxy:
+            enabled: {{ $.Values.components.promLabelProxy.enabled }}
+        {{- end }}
         {{- if eq $key "gateway" }}
         tenants: {{- toYaml $.Values.tenants | nindent 10 }}
         gateway: {{- toYaml $.Values.gateway | nindent 10 }}
