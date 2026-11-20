@@ -69,6 +69,8 @@ spec:
 {{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.alloyGateway.enabled $.Values.gateway.ingress.enabled }}
 {{- else if eq $key "tenantRules" }}
 {{- $enabled = and $hasTenantNamespaces $.Values.components.promLabelProxy.enabled }}
+{{- else if eq $key "tenantOrgs" }}
+{{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.grafana.enabled }}
 {{- else if $a.rules }}
 {{- $enabled = (index $.Values.alerting.rules $a.rules).enabled }}
 {{- else }}
@@ -95,6 +97,13 @@ spec:
         mode: addon
         addon: {{ $key }}
         namespace: {{ $.Values.namespace }}
+        {{- if eq $key "tenantOrgs" }}
+        tenants: {{- toYaml $.Values.tenants | nindent 10 }}
+        placement: {{- toYaml $.Values.placement | nindent 10 }}
+        components:
+          grafana:
+            enabled: {{ $.Values.components.grafana.enabled }}
+        {{- end }}
         {{- if eq $key "tenantRules" }}
         tenants: {{- toYaml $.Values.tenants | nindent 10 }}
         placement: {{- toYaml $.Values.placement | nindent 10 }}

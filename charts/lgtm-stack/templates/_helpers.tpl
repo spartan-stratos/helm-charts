@@ -124,6 +124,10 @@ tenantRules:
   app: tenant-rules
   wave: 32
   files: []
+tenantOrgs:
+  app: grafana-tenant-orgs
+  wave: 61
+  files: []
 # One ConfigMap per files/dashboards/<folder>/<name>.json; the Grafana sidecar loads them, so no ordering is needed
 dashboards:
   app: dashboards

@@ -1,0 +1,95 @@
+{{- if and (eq .Values.mode "addon") (eq .Values.addon "tenantOrgs") .Values.tenants .Values.components.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-tenant-orgs
+  namespace: {{ .Values.namespace }}
+data:
+  provision.sh: |
+    #!/bin/sh
+    set -eu
+    base=http://grafana.monitoring.svc.cluster.local
+    request() {
+      method=$1
+      shift
+      response=$(curl --silent --show-error --fail-with-body --connect-timeout 5 --max-time 30 \
+        -u "$GF_USER:$GF_PASSWORD" -w '\n%{http_code}' "$@") || {
+        code=$(printf '%s\n' "$response" | sed -n '$p')
+        [ "$code" = 404 ] && [ "$method" = GET ] || exit 1
+      }
+      code=$(printf '%s\n' "$response" | sed -n '$p')
+      body=$(printf '%s\n' "$response" | sed '$d')
+    }
+    attempts=0
+    until curl --silent --show-error --fail-with-body --connect-timeout 5 --max-time 10 \
+      -u "$GF_USER:$GF_PASSWORD" -o /dev/null "$base/api/health"; do
+      attempts=$((attempts + 1))
+      [ "$attempts" -lt 60 ] || exit 1
+      sleep 5
+    done
+    datasource() {
+      request GET -X GET -H "X-Grafana-Org-Id: $org_id" "$base/api/datasources/uid/$1"
+      if [ "$code" = 404 ]; then
+        request POST -X POST -H "X-Grafana-Org-Id: $org_id" \
+          -H 'Content-Type: application/json' -d "$2" "$base/api/datasources"
+      fi
+    }
+{{- range $tenant := .Values.tenants }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9-]*$" $tenant.id) }}{{ fail "tenant id must contain lowercase letters, digits or hyphens and start with a letter or digit" }}{{ end }}
+    request GET -X GET "$base/api/orgs/name/{{ $tenant.id }}"
+    if [ "$code" = 404 ]; then
+      request POST -X POST -H 'Content-Type: application/json' \
+        -d '{"name":{{ $tenant.id | toJson }}}' "$base/api/orgs"
+      org_id=$(printf '%s\n' "$body" | sed -n 's/.*"orgId"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
+    else
+      org_id=$(printf '%s\n' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
+    fi
+    case "$org_id" in ''|*[!0-9]*) exit 1 ;; esac
+    datasource loki '{"name":"Loki","uid":"loki","type":"loki","access":"proxy","url":"http://loki.monitoring.svc.cluster.local:3100","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
+    datasource tempo '{"name":"Tempo","uid":"tempo","type":"tempo","access":"proxy","url":"http://tempo.monitoring.svc.cluster.local:3200","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
+    datasource prometheus '{"name":"Prometheus","uid":"prometheus","type":"prometheus","access":"proxy","url":"http://prom-label-proxy-{{ $tenant.id }}.monitoring.svc.cluster.local:8080","isDefault":true}'
+{{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grafana-tenant-orgs
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      {{- with .Values.placement.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.placement.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: provision
+          image: docker.io/curlimages/curl:8.11.1
+          command: ["/bin/sh", "/scripts/provision.sh"]
+          env:
+            - name: GF_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-user
+            - name: GF_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-password
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: grafana-tenant-orgs
+{{- end }}

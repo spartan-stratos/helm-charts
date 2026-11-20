@@ -23,7 +23,7 @@ tests:
           htpasswdSecret: { name: example-otlp, key: htpasswd }
     asserts:
       - hasDocuments:
-          count: 16
+          count: 17
   - it: emits no rulers without tenants
     template: templates/tenant-rules.yaml
     set:

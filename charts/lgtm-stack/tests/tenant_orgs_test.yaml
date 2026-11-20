@@ -1,0 +1,107 @@
+suite: Tenant organization provisioning
+templates:
+  - templates/tenant-orgs.yaml
+  - templates/applications.yaml
+set:
+  mode: addon
+  addon: tenantOrgs
+tests:
+  - it: renders nothing without tenants
+    template: templates/tenant-orgs.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: provisions tenants without requiring namespaces
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example }]
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: /api/orgs/name/example
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"uid":"loki"'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"uid":"tempo"'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"uid":"prometheus"'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: http://prom-label-proxy-example.monitoring.svc.cluster.local:8080
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"httpHeaderValue1":"example"'
+  - it: runs after sync with admin credentials and placement
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example }]
+      placement.nodeSelector: { workload: monitoring }
+      placement.tolerations: [{ key: workload, operator: Exists }]
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook-delete-policy"]
+          value: BeforeHookCreation
+      - equal:
+          path: spec.backoffLimit
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: docker.io/curlimages/curl:8.11.1
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: GF_USER
+              valueFrom:
+                secretKeyRef: { name: grafana-admin, key: admin-user }
+            - name: GF_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: grafana-admin, key: admin-password }
+      - equal:
+          path: spec.template.spec.nodeSelector
+          value: { workload: monitoring }
+      - equal:
+          path: spec.template.spec.tolerations
+          value: [{ key: workload, operator: Exists }]
+  - it: renders nothing when Grafana is disabled
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example }]
+      components.grafana.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: wires tenant organizations without namespaces
+    template: templates/applications.yaml
+    set:
+      mode: applications
+      argocd.project: example
+      argocd.destination.name: example-cluster
+      cluster.name: example-cluster
+      components.alloyGateway.enabled: false
+      tenants: [{ id: example }]
+      placement.nodeSelector: { workload: monitoring }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana-tenant-orgs
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.addon
+          value: tenantOrgs
+      - equal:
+          path: spec.source.helm.valuesObject.tenants
+          value: [{ id: example }]
+      - equal:
+          path: spec.source.helm.valuesObject.placement.nodeSelector
+          value: { workload: monitoring }

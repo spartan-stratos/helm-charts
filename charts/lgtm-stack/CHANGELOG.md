@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.1 (2026-11-20)
+
+### Features
+
+* A PostSync Job creates tenant Grafana organizations and missing Loki, Tempo and Prometheus datasources.
+* Tenant datasources use fixed tenant headers for logs and traces and a dedicated metrics proxy.
+* Grafana allows organization creation for tenant provisioning. SSO organization mapping remains separate.
+
 ## 0.3.0 (2026-11-20)
 
 ### Features
