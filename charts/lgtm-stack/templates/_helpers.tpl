@@ -44,7 +44,7 @@ kubePrometheusStack:
     - prometheus.prometheusSpec
     - alertmanager.alertmanagerSpec
     - kube-state-metrics
-    - prometheus-node-exporter
+  # node-exporter is absent: it is a DaemonSet reading its own node, so it takes only tolerations (generated below)
   # The admission Jobs patch the webhook caBundle after sync
   ignoreDifferences:
     - group: admissionregistration.k8s.io
@@ -157,6 +157,10 @@ instrumentation:
 {{- $key := index . 1 -}}
 {{- $v := $.Values -}}
 {{- if eq $key "kubePrometheusStack" }}
+{{- with $v.placement.tolerations }}
+prometheus-node-exporter:
+  tolerations: {{- toYaml . | nindent 4 }}
+{{- end }}
 prometheus:
   prometheusSpec:
     externalLabels:

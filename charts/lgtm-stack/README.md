@@ -110,7 +110,7 @@ default. Lists are replaced, not appended.
 | `argocd.namePrefix` | `lgtm-` | Application name prefix |
 | `argocd.syncPolicy` | automated, retry 10 | Shared syncPolicy. `RespectIgnoreDifferences=true` is added where diffs are ignored |
 | `cluster.name` | `""` | `cluster` label on metrics, logs and Slack messages. Required |
-| `placement.nodeSelector` / `.tolerations` | `{}` / `[]` | Pin every pod, e.g. to a dedicated node. Alloy (a DaemonSet that tails each node's logs) takes only the tolerations, so it runs on every node; with a nodeSelector its Service uses `internalTrafficPolicy: Cluster` |
+| `placement.nodeSelector` / `.tolerations` | `{}` / `[]` | Pin every pod, e.g. to a dedicated node. Alloy and node-exporter (DaemonSets that read their own node) take only the tolerations, so they run on every node the tolerations admit; with a nodeSelector Alloy's Service uses `internalTrafficPolicy: Cluster`. To cover node pools with other taints, override both DaemonSets' tolerations under `components` |
 | `grafana.domain` | `""` | `root_url` and Ingress host |
 | `grafana.ingress.enabled` / `.className` / `.annotations` | `false` / `alb` / `{}` | Grafana Ingress |
 | `grafana.sso.provider` | `none` | `keycloak` or `github` adds the matching preset; settings in `grafana.sso.<provider>` |
