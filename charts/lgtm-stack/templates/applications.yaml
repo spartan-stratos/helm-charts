@@ -1,6 +1,9 @@
 {{- if eq .Values.mode "applications" }}
 {{- $_ := required "argocd.project is required" .Values.argocd.project }}
 {{- $_ := required "cluster.name is required" .Values.cluster.name }}
+{{- range $tenant := .Values.tenants }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9-]*$" $tenant.id) }}{{ fail "tenant id must contain lowercase letters, digits or hyphens and start with a letter or digit" }}{{ end }}
+{{- end }}
 {{- $components := include "lgtm-stack.components" . | fromYaml }}
 {{- if hasKey $components "Error" }}{{ fail $components.Error }}{{ end }}
 {{- range $key, $c := $components }}
@@ -35,6 +38,7 @@ spec:
 {{- range $tenant := .Values.tenants }}
 {{- if $tenant.namespaces }}
 {{- $hasTenantNamespaces = true }}
+{{- end }}
 {{- $cv := $.Values.components.promLabelProxy }}
 {{- if $cv.enabled }}
 {{- $name := printf "prom-label-proxy-%s" $tenant.id }}
@@ -57,7 +61,6 @@ spec:
   ignoreDifferences: {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- include "lgtm-stack.syncPolicy" (list $ (not (empty $cv.ignoreDifferences))) | nindent 2 }}
-{{- end }}
 {{- end }}
 {{- end }}
 {{- $addons := include "lgtm-stack.addons" . | fromYaml }}

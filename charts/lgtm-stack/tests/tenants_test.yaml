@@ -14,7 +14,7 @@ tests:
     asserts:
       - hasDocuments:
           count: 15
-  - it: emits no tenant applications without namespaces
+  - it: emits a proxy without the ruler addon for a tenant without namespaces
     template: templates/applications.yaml
     set:
       tenants:
@@ -23,7 +23,24 @@ tests:
           htpasswdSecret: { name: example-otlp, key: htpasswd }
     asserts:
       - hasDocuments:
-          count: 17
+          count: 18
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-prom-label-proxy-example
+          any: true
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-tenant-rules
+        not: true
+  - it: rejects invalid tenant ids in the parent chart
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: Bad_1, port: 4320, htpasswdSecret: { name: x, key: y } }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must contain lowercase letters, digits or hyphens and start with a letter or digit
   - it: emits no rulers without tenants
     template: templates/tenant-rules.yaml
     set:

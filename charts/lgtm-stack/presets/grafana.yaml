@@ -36,9 +36,6 @@ serviceMonitor:
   enabled: true
 
 grafana.ini:
-  users:
-    # Tenant provisioning needs the server admin to create organizations through the API.
-    allow_org_create: true
   server:
     # Set from grafana.domain
     root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
