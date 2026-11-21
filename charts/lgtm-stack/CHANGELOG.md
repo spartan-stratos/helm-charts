@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.5 (2026-11-21)
+
+### Bug Fixes
+
+* The default Instrumentation carries `java.image` from `addons.instrumentation.javaImage` (default autoinstrumentation-java 2.22.0). An operator with no built-in Java image injected an init container with an empty image and every annotated pod was rejected, so the setting now lives in git instead of on the cluster. Set it empty to omit.
+
 ## 0.3.4 (2026-11-21)
 
 ### Features
