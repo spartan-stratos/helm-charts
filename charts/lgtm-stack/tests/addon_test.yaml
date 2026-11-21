@@ -190,3 +190,20 @@ tests:
               matchers:
                 - { name: severity, value: critical }
                 - { name: namespace, matchType: "=~", value: "service-dietfit|service-x" }
+
+  - it: "puts the Java agent image on the default Instrumentation, and omits it when empty"
+    set:
+      addon: instrumentation
+      addons.instrumentation.javaImage: example.invalid/java:1
+    asserts:
+      - equal:
+          path: spec.java.image
+          value: example.invalid/java:1
+
+  - it: "omits java.image when the value is empty"
+    set:
+      addon: instrumentation
+      addons.instrumentation.javaImage: ""
+    asserts:
+      - notExists:
+          path: spec.java.image

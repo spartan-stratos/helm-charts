@@ -114,6 +114,11 @@ spec:
         {{- if or (eq $key "tenantOrgs") (eq $key "gateway") }}
         tenantIsolation: {{- toYaml $.Values.tenantIsolation | nindent 10 }}
         {{- end }}
+        {{- if eq $key "instrumentation" }}
+        addons:
+          instrumentation:
+            javaImage: {{ $.Values.addons.instrumentation.javaImage | quote }}
+        {{- end }}
         {{- if eq $key "tenantOrgs" }}
         {{- $grafana := include "lgtm-stack.values" (list $ "grafana" $components.grafana) | fromYaml }}
         grafanaAdmin:

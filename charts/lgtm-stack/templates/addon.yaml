@@ -29,6 +29,11 @@ data:
   | replace "__SLACK_SECRET_NAME__" $.Values.alerting.slack.secretName
   | replace "__SLACK_SECRET_KEY__" $.Values.alerting.slack.secretKey }}
 {{- $m = replace "__PLATFORM_TENANT__" $.Values.platformTenant $m }}
+{{- with $.Values.addons.instrumentation.javaImage }}
+{{- $m = replace "__JAVA_AGENT_IMAGE__" . $m }}
+{{- else }}
+{{- $m = regexReplaceAll "(?m)^.*__JAVA_AGENT_IMAGE__.*\n?" $m "" }}
+{{- end }}
 {{- with $.Values.alerting.slack.ownedNamespaces }}
 {{- /* Owned namespaces route to their own AlertmanagerConfig: the shared channel keeps only their critical alerts */}}
 {{- $owned := join "|" . }}
