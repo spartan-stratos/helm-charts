@@ -1,0 +1,29 @@
+{{- if .Values.groups }}
+{{- $ns := .Release.Namespace -}}
+{{- $groups := list -}}
+{{- range .Values.groups -}}
+{{- $group := deepCopy . -}}
+{{- $rules := list -}}
+{{- range (default (list) $group.rules) -}}
+{{- $rule := . -}}
+{{- if hasKey $rule "alert" -}}
+{{- $labels := default (dict) $rule.labels -}}
+{{- if not (hasKey $labels "namespace") -}}
+{{- $_ := set $labels "namespace" $ns -}}
+{{- end -}}
+{{- $_ := set $rule "labels" $labels -}}
+{{- end -}}
+{{- $rules = append $rules $rule -}}
+{{- end -}}
+{{- $_ := set $group "rules" $rules -}}
+{{- $groups = append $groups $group -}}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Values.service.name | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  groups:
+{{ toYaml $groups | indent 4 }}
+{{- end }}

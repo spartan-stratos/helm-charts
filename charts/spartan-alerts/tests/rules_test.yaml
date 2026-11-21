@@ -1,0 +1,103 @@
+suite: "consumer rule group tests"
+templates:
+  - "templates/rules.yaml"
+release:
+  namespace: alerts-test
+set:
+  service.name: svc
+tests:
+  - it: "should render no PrometheusRule without groups"
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: "should render groups verbatim and in order"
+    set:
+      groups:
+        - name: g1
+          rules:
+            - record: job:up:sum
+              expr: sum by (job) (up)
+        - name: g2
+          interval: 1m
+          rules:
+            - alert: A
+              expr: up == 0
+              labels:
+                namespace: alerts-test
+    asserts:
+      - isKind:
+          of: PrometheusRule
+      - equal:
+          path: metadata.name
+          value: svc
+      - equal:
+          path: metadata.namespace
+          value: alerts-test
+      - equal:
+          path: spec.groups[0].name
+          value: g1
+      - equal:
+          path: spec.groups[1].name
+          value: g2
+      - equal:
+          path: spec.groups[1].interval
+          value: 1m
+  - it: "should inject the namespace label when absent and keep other labels"
+    set:
+      groups:
+        - name: g
+          rules:
+            - alert: WithLabels
+              expr: up == 0
+              labels:
+                severity: warning
+            - alert: NoLabels
+              expr: up == 0
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].labels
+          value:
+            severity: warning
+            namespace: alerts-test
+      - equal:
+          path: spec.groups[0].rules[1].labels.namespace
+          value: alerts-test
+  - it: "should preserve an explicit namespace label"
+    set:
+      groups:
+        - name: g
+          rules:
+            - alert: HasNs
+              expr: up == 0
+              labels:
+                namespace: other
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].labels.namespace
+          value: other
+  - it: "should leave recording rules untouched"
+    set:
+      groups:
+        - name: g
+          rules:
+            - record: job:up:sum
+              expr: sum by (job) (up)
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0]
+          value:
+            record: job:up:sum
+            expr: sum by (job) (up)
+  - it: "should keep Prometheus template strings literal"
+    set:
+      groups:
+        - name: g
+          rules:
+            - alert: Tpl
+              expr: up == 0
+              annotations:
+                summary: "down {{ $labels.pod }}"
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].annotations.summary
+          value: "down {{ $labels.pod }}"

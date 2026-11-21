@@ -1,0 +1,56 @@
+suite: "alert routing tests"
+templates:
+  - "templates/alertmanager.yaml"
+release:
+  namespace: alerts-test
+tests:
+  - it: "should namespace both routing objects and omit an empty channel"
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: AlertmanagerConfig
+      - equal:
+          path: metadata.namespace
+          value: alerts-test
+      - notExists:
+          path: spec.receivers[0].slackConfigs[0].channel
+  - it: "should render a configured channel on both routing objects"
+    set:
+      slack.channel: alerts
+    asserts:
+      - equal:
+          path: spec.receivers[0].slackConfigs[0].channel
+          value: '#alerts'
+  - it: "should preserve literal Alertmanager templates in both routing objects"
+    set:
+      grafanaUrl: https://grafana.example
+    asserts:
+      - equal:
+          path: spec.receivers[0].slackConfigs[0].title
+          value: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+      - equal:
+          path: spec.receivers[0].slackConfigs[0].titleLink
+          value: 'https://grafana.example/alerting/list?search={{ .CommonLabels.alertname | urlquery }}'
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: '\{\{ range .Alerts \}\}'
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: '\{\{ .Annotations.description \}\}'
+  - it: "should keep the service route off alerts the namespace route already sends"
+    set:
+      service.name: svc
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.route.matchers
+          content:
+            name: service
+            value: svc
+      - contains:
+          path: spec.route.matchers
+          content:
+            name: namespace
+            matchType: "!="
+            value: alerts-test
