@@ -6,6 +6,18 @@ release:
 set:
   service.name: svc
 tests:
+  - it: "should suffix the rule name"
+    set:
+      nameSuffix: prod
+      groups:
+        - name: g
+          rules:
+            - alert: Down
+              expr: up == 0
+    asserts:
+      - equal:
+          path: metadata.name
+          value: svc-prod
   - it: "should render no PrometheusRule without groups"
     asserts:
       - hasDocuments:

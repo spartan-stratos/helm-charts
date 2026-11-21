@@ -1,8 +1,20 @@
 {{- $manifest := .Files.Get "files/alertmanager.yaml" -}}
+{{- $suffix := "" -}}
+{{- if .Values.nameSuffix -}}
+{{- $suffix = printf "-%s" .Values.nameSuffix -}}
+{{- end -}}
+{{- $matchers := "" -}}
+{{- range .Values.routeMatchers -}}
+{{- $matchers = printf "%s      - name: %s\n        value: %s\n" $matchers (.name | quote) (.value | quote) -}}
+{{- if .matchType -}}
+{{- $matchers = printf "%s        matchType: %s\n" $matchers (.matchType | quote) -}}
+{{- end -}}
+{{- end -}}
 {{- if empty .Values.slack.channel -}}
 {{- $manifest = replace "          channel: '#${ALERT_SLACK_CHANNEL}'\n" "" $manifest -}}
 {{- end -}}
 {{- $manifest
+  | replace "${NAME_SUFFIX}" $suffix
   | replace "${NAMESPACE}" .Release.Namespace
   | replace "${SERVICE_NAME}" .Values.service.name
   | replace "${SERVICE_SHORT}" .Values.service.short
@@ -11,4 +23,5 @@
   | replace "${GRAFANA_URL}" .Values.grafanaUrl
   | replace "${ALERT_SLACK_SECRET}" .Values.slack.secretName
   | replace "${ALERT_SLACK_CHANNEL}" .Values.slack.channel
+  | replace "${ROUTE_MATCHERS}\n" $matchers
 }}

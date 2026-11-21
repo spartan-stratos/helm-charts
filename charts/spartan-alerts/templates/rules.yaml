@@ -21,7 +21,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: {{ .Values.service.name | quote }}
+  name: {{ if .Values.nameSuffix }}{{ printf "%s-%s" .Values.service.name .Values.nameSuffix | quote }}{{ else }}{{ .Values.service.name | quote }}{{ end }}
   namespace: {{ .Release.Namespace | quote }}
 spec:
   groups:
