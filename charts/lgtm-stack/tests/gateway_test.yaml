@@ -66,6 +66,12 @@ tests:
       - notMatchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
           pattern: 'include_metadata|grpc \{|max_recv_msg_size'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'context = "datapoint"'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'set\(attributes\[\\"namespace\\"\], resource.attributes\[\\"k8s.namespace.name\\"\]\) where attributes\[\\"namespace\\"\] == nil and resource.attributes\[\\"k8s.namespace.name\\"\] != nil'
   - it: drops logs and traces with isolation disabled
     template: templates/applications.yaml
     set:

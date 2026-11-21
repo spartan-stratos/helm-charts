@@ -26,10 +26,37 @@ tests:
       - isKind:
           of: AlertmanagerConfig
       - equal:
-          path: spec.receivers[0].slackConfigs[0].apiURL.name
+          path: spec.route.receiver
+          value: "null"
+      - notExists:
+          path: spec.route.matchers
+      - equal:
+          path: spec.route.routes
+          value:
+            - receiver: slack
+              continue: true
+              matchers: [{ name: severity, matchType: "=~", value: "warning|critical" }]
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }
+      - equal:
+          path: spec.inhibitRules
+          value:
+            - sourceMatch: [{ name: severity, value: critical }]
+              targetMatch: [{ name: severity, matchType: "=~", value: "warning|info" }]
+              equal: [namespace, alertname, persistentvolumeclaim, service]
+            - sourceMatch: [{ name: severity, value: warning }]
+              targetMatch: [{ name: severity, value: info }]
+              equal: [namespace, alertname, persistentvolumeclaim, service]
+            - sourceMatch: [{ name: alertname, value: InfoInhibitor }]
+              targetMatch: [{ name: severity, value: info }]
+              equal: [namespace]
+            - targetMatch: [{ name: alertname, value: InfoInhibitor }]
+      - equal:
+          path: spec.receivers[1].slackConfigs[0].apiURL.name
           value: my-slack
       - matchRegex:
-          path: spec.receivers[0].slackConfigs[0].text
+          path: spec.receivers[1].slackConfigs[0].text
           pattern: 'cluster=example-cluster\{\{ if \.Labels\.namespace \}\} namespace=\{\{ \.Labels\.namespace \}\}'
 
   - it: "renders both datasources"
@@ -106,13 +133,13 @@ tests:
       grafana.domain: grafana.example.com
     asserts:
       - equal:
-          path: spec.receivers[0].slackConfigs[0].titleLink
+          path: spec.receivers[1].slackConfigs[0].titleLink
           value: https://grafana.example.com/alerting/list?search={{ .CommonLabels.alertname | urlquery }}
       - matchRegex:
-          path: spec.receivers[0].slackConfigs[0].text
+          path: spec.receivers[1].slackConfigs[0].text
           pattern: '<https://grafana\.example\.com/alerting/silence/new\?alertmanager=alertmanager&matcher='
       - matchRegex:
-          path: spec.receivers[0].slackConfigs[0].text
+          path: spec.receivers[1].slackConfigs[0].text
           pattern: '<https://grafana\.example\.com\{\{ \.Annotations\.dashboard_url \}\}\|Dashboard>'
 
   - it: "drops the Grafana links without grafana.domain"
@@ -120,12 +147,12 @@ tests:
       addon: alertmanagerConfig
     asserts:
       - notExists:
-          path: spec.receivers[0].slackConfigs[0].titleLink
+          path: spec.receivers[1].slackConfigs[0].titleLink
       - notMatchRegex:
-          path: spec.receivers[0].slackConfigs[0].text
+          path: spec.receivers[1].slackConfigs[0].text
           pattern: 'GRAFANA|Silence|Dashboard'
       - matchRegex:
-          path: spec.receivers[0].slackConfigs[0].text
+          path: spec.receivers[1].slackConfigs[0].text
           pattern: '\|Runbook>'
 
   - it: "renders the stack rules"

@@ -83,6 +83,10 @@ alloy:
           context = "resource"
           statements = [{{ printf "set(attributes[\"tenant\"], %s)" ($tenant.id | toJson) | quote }}]
         }
+        metric_statements {
+          context = "datapoint"
+          statements = ["set(attributes[\"namespace\"], resource.attributes[\"k8s.namespace.name\"]) where attributes[\"namespace\"] == nil and resource.attributes[\"k8s.namespace.name\"] != nil"]
+        }
 {{- if $.Values.tenantIsolation.enabled }}
         trace_statements {
           context = "resource"

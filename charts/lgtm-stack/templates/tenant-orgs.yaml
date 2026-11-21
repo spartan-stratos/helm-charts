@@ -1,4 +1,5 @@
 {{- if and (eq .Values.mode "addon") (eq .Values.addon "tenantOrgs") .Values.tenants .Values.components.grafana.enabled }}
+{{- $admin := .Values.grafanaAdmin | default dict }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -81,13 +82,13 @@ spec:
             - name: GF_USER
               valueFrom:
                 secretKeyRef:
-                  name: grafana-admin
-                  key: admin-user
+                  name: {{ $admin.secret | default "grafana-admin" | quote }}
+                  key: {{ $admin.userKey | default "admin-user" | quote }}
             - name: GF_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: grafana-admin
-                  key: admin-password
+                  name: {{ $admin.secret | default "grafana-admin" | quote }}
+                  key: {{ $admin.passwordKey | default "admin-password" | quote }}
           volumeMounts:
             - name: script
               mountPath: /scripts

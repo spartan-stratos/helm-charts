@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## 0.3.1 (2026-11-20)
 
+### Bug Fixes
+
+* Give the global Slack AlertmanagerConfig a matcher-free null root, a continuing Slack child route and the four base inhibit rules.
+* Copy the gateway metric resource namespace to the datapoint namespace when missing, so tenant ruler selectors match.
+* Use the effective Grafana admin Secret name and keys for tenant organization provisioning.
+* Document that tenant rules require gateway telemetry and self-contained alerts; tenant rulers do not support recording rules.
+
 ### Features
 
 * A PostSync Job creates tenant Grafana organizations and missing Prometheus datasources when the dedicated metrics proxy is enabled.

@@ -115,6 +115,11 @@ spec:
         tenantIsolation: {{- toYaml $.Values.tenantIsolation | nindent 10 }}
         {{- end }}
         {{- if eq $key "tenantOrgs" }}
+        {{- $grafana := include "lgtm-stack.values" (list $ "grafana" $components.grafana) | fromYaml }}
+        grafanaAdmin:
+          secret: {{ $grafana.admin.existingSecret | quote }}
+          userKey: {{ $grafana.admin.userKey | quote }}
+          passwordKey: {{ $grafana.admin.passwordKey | quote }}
         tenants: {{- toYaml $.Values.tenants | nindent 10 }}
         placement: {{- toYaml $.Values.placement | nindent 10 }}
         components:

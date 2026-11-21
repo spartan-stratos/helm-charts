@@ -2,6 +2,7 @@ suite: "Applications"
 
 templates:
   - "templates/applications.yaml"
+  - "templates/addon.yaml"
 
 set:
   argocd.project: example
@@ -10,6 +11,7 @@ set:
 
 tests:
   - it: "renders one Application per component and addon"
+    template: templates/applications.yaml
     asserts:
       - hasDocuments:
           count: 15
@@ -17,6 +19,7 @@ tests:
           of: Application
 
   - it: "fails without argocd.project"
+    template: templates/applications.yaml
     set:
       argocd.project: ""
     asserts:
@@ -24,13 +27,15 @@ tests:
           errorMessage: "argocd.project is required"
 
   - it: "fails without a destination"
+    template: templates/applications.yaml
     set:
       argocd.destination.name: ""
     asserts:
       - failedTemplate:
           errorMessage: "argocd.destination.name or argocd.destination.server is required"
 
-  - it: "adds the Slack AlertmanagerConfig Application and the matcher strategy when Slack is on"
+  - it: "selects Slack as the global AlertmanagerConfig and restricts tenant configs by namespace"
+    template: templates/applications.yaml
     set:
       alerting.slack.enabled: true
     asserts:
@@ -56,6 +61,7 @@ tests:
           value: lgtm-kube-prometheus-stack
 
   - it: "drops a disabled component"
+    template: templates/applications.yaml
     set:
       components.tempo.enabled: false
     asserts:
@@ -63,6 +69,7 @@ tests:
           count: 14
 
   - it: "sets the cluster label and points addons at this chart version"
+    template: templates/applications.yaml
     asserts:
       - equal:
           path: spec.source.helm.valuesObject.prometheus.prometheusSpec.externalLabels.cluster
@@ -84,6 +91,7 @@ tests:
           value: lgtm-cluster-info
 
   - it: "applies placement to every pod path of kube-prometheus-stack and routes Alloy across nodes"
+    template: templates/applications.yaml
     set:
       placement:
         nodeSelector: { workload: lgtm }
@@ -133,6 +141,7 @@ tests:
           value: lgtm-alloy
 
   - it: "opts Prometheus and Alertmanager out of Reloader's auto-reload"
+    template: templates/applications.yaml
     documentSelector:
       path: metadata.name
       value: lgtm-kube-prometheus-stack
@@ -145,6 +154,7 @@ tests:
           value: "false"
 
   - it: "drops a rule bundle that is turned off"
+    template: templates/applications.yaml
     set:
       alerting.rules.workloads.enabled: false
     asserts:
@@ -155,6 +165,7 @@ tests:
           value: lgtm-workload-rules
 
   - it: "adds the project folder as its own Application"
+    template: templates/applications.yaml
     set:
       project:
         enabled: true
@@ -175,6 +186,7 @@ tests:
           value: monitoring
 
   - it: "loads dashboards from every namespace, datasources only from monitoring"
+    template: templates/applications.yaml
     documentSelector:
       path: metadata.name
       value: lgtm-grafana
@@ -186,6 +198,7 @@ tests:
           path: spec.source.helm.valuesObject.sidecar.datasources.searchNamespace
 
   - it: "keeps health checks and OPTIONS out of span metrics"
+    template: templates/applications.yaml
     documentSelector:
       path: metadata.name
       value: lgtm-tempo
@@ -198,6 +211,7 @@ tests:
           value: { key: span.http.request.method, value: OPTIONS }
 
   - it: "requires a path for the project folder"
+    template: templates/applications.yaml
     set:
       project: { enabled: true, repoURL: https://github.com/example/argocd-observability.git }
     asserts:
@@ -205,6 +219,7 @@ tests:
           errorMessage: project.path is required
 
   - it: "lets component values override presets with false and empty strings"
+    template: templates/applications.yaml
     set:
       grafana.sso.provider: keycloak
       grafana.sso.keycloak: { url: https://auth.example.com, realm: main, clientId: grafana, admin: [sre], member: [] }
@@ -232,6 +247,7 @@ tests:
           content: RespectIgnoreDifferences=true
 
   - it: "keeps the OTel webhook cert out of Helm hooks"
+    template: templates/applications.yaml
     documentSelector:
       path: metadata.name
       value: lgtm-opentelemetry-operator
@@ -245,3 +261,27 @@ tests:
       - lengthEqual:
           path: spec.ignoreDifferences
           count: 3
+
+  - it: renders the global Slack route with continuing tenant routing
+    template: templates/addon.yaml
+    set:
+      mode: addon
+      addon: alertmanagerConfig
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: "null"
+      - notExists:
+          path: spec.route.matchers
+      - equal:
+          path: spec.route.routes[0]
+          value:
+            receiver: slack
+            continue: true
+            matchers: [{ name: severity, matchType: "=~", value: "warning|critical" }]
+      - lengthEqual:
+          path: spec.inhibitRules
+          count: 4
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }

@@ -159,6 +159,10 @@ No tenant log or trace processors or exporters are generated. With `components.p
 the tenant-org Job creates the Prometheus datasource, which queries through the tenant's label-enforcing proxy.
 With `components.promLabelProxy.enabled: false`, no tenant Prometheus datasource is created.
 The Job creates organizations and missing datasources; it does not remove existing ones.
+Its admin Secret name and keys follow the effective Grafana `admin.existingSecret`, `admin.userKey` and `admin.passwordKey` values.
+
+Metrics scraped inside the platform cluster carry no tenant label, so tenant rules cannot see them; tenant telemetry must arrive through the gateway.
+Recording rules are not supported on tenant rulers; alerts must use self-contained expressions.
 
 Set `tenantIsolation.enabled: true` in the same release that enables Loki `auth_enabled` and Tempo multitenancy, never before.
 This restores tenant logs and traces and adds tenant Loki and Tempo datasources with fixed tenant headers.
@@ -281,7 +285,8 @@ project folder's rules, excluding namespaces labelled `lgtm-stack/tenant`) and A
 routes them; Grafana shows them read-only. Grafana contact points do not receive these alerts: they belong to
 Grafana's own Alertmanager.
 
-With `alerting.slack.enabled`, AlertmanagerConfig `slack` sends `severity` warning and critical, grouped by alertname,
+With `alerting.slack.enabled`, AlertmanagerConfig `slack` is the global config with the four base inhibit rules and a matcher-free root.
+Its Slack child route continues so tenant routes still run. It sends `severity` warning and critical, grouped by alertname,
 namespace and service, repeated every 4h, with resolved notices. Info alerts stay in Grafana. With `grafana.domain` set,
 the message links to Grafana:
 
