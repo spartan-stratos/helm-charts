@@ -40,7 +40,7 @@ alloy:
         http {
           endpoint = "0.0.0.0:{{ $tenant.port }}"
           auth = otelcol.auth.basic.tenant_{{ $index }}.handler
-          max_request_body_size = 4194304
+          max_request_body_size = "4MiB"
           traces_url_path = "/{{ $tenant.id }}/v1/traces"
           metrics_url_path = "/{{ $tenant.id }}/v1/metrics"
           logs_url_path = "/{{ $tenant.id }}/v1/logs"

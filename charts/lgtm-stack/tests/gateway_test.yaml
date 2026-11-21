@@ -53,7 +53,7 @@ tests:
           value: example-otlp
       - matchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
-          pattern: 'max_request_body_size = 4194304'
+          pattern: 'max_request_body_size = "4MiB"'
       - matchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
           pattern: 'logs = \[otelcol.exporter.otlphttp.loki_0.input\]'

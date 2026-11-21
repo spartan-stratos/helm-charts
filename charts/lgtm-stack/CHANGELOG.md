@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.2 (2026-11-21)
+
+### Bug Fixes
+
+* Write the gateway receiver `max_request_body_size` as the string `"4MiB"`. Alloy rejects a bare integer (`unknown unit`), so every gateway pod crash-looped on start; the unit test had asserted the integer.
+
 ## 0.3.1 (2026-11-20)
 
 ### Bug Fixes
