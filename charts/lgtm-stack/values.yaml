@@ -87,6 +87,9 @@ alerting:
     enabled: false
     secretName: alert-slack
     secretKey: webhook-url
+    # Namespaces whose own AlertmanagerConfig routes their alerts to a project channel. The shared channel then receives
+    # only their critical alerts, not warnings. Add a namespace only after its own route exists, or its warnings go nowhere.
+    ownedNamespaces: []
   # Shared PrometheusRule bundles. A project's own rules go in its project folder (see `project`)
   rules:
     # RED per service from Tempo span metrics (server spans). Thresholds per severity; drop one to skip that severity

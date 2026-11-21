@@ -32,6 +32,8 @@ spec:
           - name: severity
             matchType: "=~"
             value: warning|critical
+          __SLACK_OWNED_MATCHER__
+      __SLACK_OWNED_CRITICAL_ROUTE__
   receivers:
     - name: "null"
     - name: slack

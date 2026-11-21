@@ -29,6 +29,14 @@ data:
   | replace "__SLACK_SECRET_NAME__" $.Values.alerting.slack.secretName
   | replace "__SLACK_SECRET_KEY__" $.Values.alerting.slack.secretKey }}
 {{- $m = replace "__PLATFORM_TENANT__" $.Values.platformTenant $m }}
+{{- with $.Values.alerting.slack.ownedNamespaces }}
+{{- /* Owned namespaces route to their own AlertmanagerConfig: the shared channel keeps only their critical alerts */}}
+{{- $owned := join "|" . }}
+{{- $m = replace "__SLACK_OWNED_MATCHER__" (printf "- name: namespace\n            matchType: \"!~\"\n            value: %s" $owned) $m }}
+{{- $m = replace "__SLACK_OWNED_CRITICAL_ROUTE__" (printf "- receiver: slack\n        continue: true\n        matchers:\n          - name: severity\n            value: critical\n          - name: namespace\n            matchType: \"=~\"\n            value: %s" $owned) $m }}
+{{- else }}
+{{- $m = regexReplaceAll "(?m)^.*__SLACK_OWNED_[A-Z_]+__.*\n?" $m "" }}
+{{- end }}
 {{- with $.Values.grafana.domain }}
 {{- $m = replace "__GRAFANA_URL__" (printf "https://%s" .) $m }}
 {{- else }}

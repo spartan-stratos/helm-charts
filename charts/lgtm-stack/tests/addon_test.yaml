@@ -171,3 +171,22 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: 'unknown addon "nope"'
+
+  - it: "keeps only critical alerts of owned namespaces on the shared Slack route"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.ownedNamespaces: [service-dietfit, service-x]
+    asserts:
+      - equal:
+          path: spec.route.routes
+          value:
+            - receiver: slack
+              continue: true
+              matchers:
+                - { name: severity, matchType: "=~", value: "warning|critical" }
+                - { name: namespace, matchType: "!~", value: "service-dietfit|service-x" }
+            - receiver: slack
+              continue: true
+              matchers:
+                - { name: severity, value: critical }
+                - { name: namespace, matchType: "=~", value: "service-dietfit|service-x" }
