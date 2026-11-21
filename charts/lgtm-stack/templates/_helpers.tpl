@@ -272,13 +272,20 @@ service:
 {{/* Fields every Application shares: (list $ appName wave) */}}
 {{- define "lgtm-stack.applicationHeader" -}}
 {{- $ := index . 0 -}}
+{{- $annotations := dict "argocd.argoproj.io/sync-wave" (index . 2) -}}
+{{- if gt (len .) 3 -}}
+{{- $_ := mergeOverwrite $annotations (index . 3 | default dict) -}}
+{{- end -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ printf "%s%s" $.Values.argocd.namePrefix (index . 1) }}
   namespace: {{ $.Values.argocd.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: {{ index . 2 | quote }}
+    argocd.argoproj.io/sync-wave: {{ index $annotations "argocd.argoproj.io/sync-wave" | quote }}
+    {{- range $key, $value := omit $annotations "argocd.argoproj.io/sync-wave" }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 {{- end -}}

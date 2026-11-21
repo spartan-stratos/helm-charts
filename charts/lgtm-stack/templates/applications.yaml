@@ -22,7 +22,7 @@
 {{- if and $cv.enabled (or (ne $key "alloyGateway") (not (empty $.Values.tenants))) }}
 {{- $ignores := concat ($c.ignoreDifferences | default list) ($cv.ignoreDifferences | default list) }}
 ---
-{{ include "lgtm-stack.applicationHeader" (list $ $c.app $c.wave) }}
+{{ include "lgtm-stack.applicationHeader" (list $ $c.app $c.wave $cv.annotations) }}
 spec:
   project: {{ $.Values.argocd.project }}
   {{- include "lgtm-stack.destination" $ | nindent 2 }}

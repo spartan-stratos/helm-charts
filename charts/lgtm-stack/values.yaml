@@ -109,50 +109,59 @@ alerting:
 
 # One entry per component. enabled turns its Application off; values is merged over the preset (and over the
 # settings above), so anything the upstream chart accepts can be set here. ignoreDifferences is appended to the
-# built-in list.
+# built-in list. annotations is added to the component Application's metadata.
 components:
   promLabelProxy:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://prometheus-community.github.io/helm-charts, name: prom-label-proxy, version: 0.25.2 }
     values: {}
     ignoreDifferences: []
   prometheusOperatorCrds:
+    annotations: {}
     enabled: true
     # Bump together with kube-prometheus-stack: 32.0.1 ships the CRDs for operator v0.94.1
     chart: { repoURL: https://prometheus-community.github.io/helm-charts, name: prometheus-operator-crds, version: 32.0.1 }
     values: {}
     ignoreDifferences: []
   kubePrometheusStack:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://prometheus-community.github.io/helm-charts, name: kube-prometheus-stack, version: 91.9.0 }
     values: {}
     ignoreDifferences: []
   grafana:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://grafana-community.github.io/helm-charts, name: grafana, version: 13.2.6 }
     values: {}
     ignoreDifferences: []
   loki:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://grafana-community.github.io/helm-charts, name: loki, version: 18.13.7 }
     values: {}
     ignoreDifferences: []
   alloy:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://grafana.github.io/helm-charts, name: alloy, version: 1.13.0 }
     values: {}
     ignoreDifferences: []
   tempo:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://grafana-community.github.io/helm-charts, name: tempo, version: 3.0.0 }
     values: {}
     ignoreDifferences: []
   alloyGateway:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://grafana.github.io/helm-charts, name: alloy, version: 1.13.0 }
     values: {}
     ignoreDifferences: []
   opentelemetryOperator:
+    annotations: {}
     enabled: true
     chart: { repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts, name: opentelemetry-operator, version: 0.123.1 }
     values: {}
