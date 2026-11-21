@@ -148,7 +148,8 @@ a missing webhook Secret also prevents reconciliation. Create the Secret before 
 
 Tenant ids must match `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and contain at most 30 characters.
 They use lowercase letters, digits and internal hyphens, starting and ending with a letter or digit.
-Tenant ids and supplied ports must be unique. Supplied ports must be integers in 1024..65535.
+The configured `platformTenant` (default `platform`) and `fake` are reserved tenant ids, and each tenant requires a port.
+Tenant ids and ports must be unique. Ports must be integers in 1024..65535.
 
 The platform must label each tenant namespace `lgtm-stack/tenant=<id>` BEFORE its rules sync.
 An unlabelled namespace's rules are evaluated by both the main Prometheus and the tenant ruler.

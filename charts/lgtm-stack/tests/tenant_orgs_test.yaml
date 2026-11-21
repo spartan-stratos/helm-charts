@@ -153,7 +153,7 @@ tests:
       cluster.name: example-cluster
       components.alloyGateway.enabled: false
       components.promLabelProxy.enabled: false
-      tenants: [{ id: example }]
+      tenants: [{ id: example, port: 4320 }]
       placement.nodeSelector: { workload: monitoring }
     documentSelector:
       path: metadata.name
@@ -170,7 +170,7 @@ tests:
           value: true
       - equal:
           path: spec.source.helm.valuesObject.tenants
-          value: [{ id: example }]
+          value: [{ id: example, port: 4320 }]
       - equal:
           path: spec.source.helm.valuesObject.placement.nodeSelector
           value: { workload: monitoring }

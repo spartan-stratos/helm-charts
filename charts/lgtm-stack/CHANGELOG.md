@@ -8,8 +8,8 @@ All notable changes to this project will be documented in this file.
 
 * A PostSync Job creates tenant Grafana organizations and missing Prometheus datasources when the dedicated metrics proxy is enabled.
 * `tenantIsolation.enabled` defaults to false, dropping tenant logs and traces and withholding their datasources until backend tenant authentication is enabled.
-* Tenant ids must be DNS-1123 labels of at most 30 characters, with no trailing hyphen.
-* Reject duplicate tenant ids, duplicate supplied ports, and supplied ports that are not integers in 1024..65535.
+* Tenant ids must be DNS-1123 labels of at most 30 characters, with no trailing hyphen; `platformTenant` and `fake` are reserved.
+* Require tenant ports and reject duplicate tenant ids, duplicate ports, and ports that are not integers in 1024..65535.
 
 ## 0.3.0 (2026-11-20)
 

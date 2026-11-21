@@ -7,6 +7,42 @@ set:
   argocd.destination.name: example-cluster
   cluster.name: example-cluster
 tests:
+  - it: rejects the default platform tenant id
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: platform, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+  - it: rejects the reserved single-tenant id
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: fake, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+  - it: rejects a custom platform tenant id
+    template: templates/applications.yaml
+    set:
+      platformTenant: custom
+      tenants: [{ id: custom, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+  - it: rejects a tenant without a port
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port is required
+  - it: rejects a tenant with an empty port
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: "" }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port is required
   - it: rejects duplicate tenant ids
     template: templates/applications.yaml
     set:
@@ -135,7 +171,7 @@ tests:
     template: templates/applications.yaml
     set:
       components.alloyGateway.enabled: false
-      tenants: [{ id: example, namespaces: [example, example-jobs] }]
+      tenants: [{ id: example, port: 4320, namespaces: [example, example-jobs] }]
       placement.nodeSelector: { workload: monitoring }
       placement.tolerations: [{ key: workload, operator: Exists }]
     documentSelector:
@@ -164,7 +200,7 @@ tests:
     template: templates/applications.yaml
     set:
       components.alloyGateway.enabled: false
-      tenants: [{ id: example, namespaces: [example] }]
+      tenants: [{ id: example, port: 4320, namespaces: [example] }]
       placement.nodeSelector: { workload: monitoring }
     documentSelector:
       path: metadata.name
@@ -175,7 +211,7 @@ tests:
           value: tenantRules
       - equal:
           path: spec.source.helm.valuesObject.tenants
-          value: [{ id: example, namespaces: [example] }]
+          value: [{ id: example, port: 4320, namespaces: [example] }]
       - equal:
           path: spec.source.helm.valuesObject.placement.nodeSelector
           value: { workload: monitoring }

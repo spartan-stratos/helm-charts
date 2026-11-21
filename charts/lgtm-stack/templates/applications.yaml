@@ -7,13 +7,13 @@
 {{- if or (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $tenant.id)) (gt (len $tenant.id) 30) }}{{ fail "tenant id must be a DNS-1123 label of at most 30 characters" }}{{ end }}
 {{- if hasKey $tenantIds $tenant.id }}{{ fail "tenant ids must be unique" }}{{ end }}
 {{- $_ := set $tenantIds $tenant.id true }}
-{{- if hasKey $tenant "port" }}
+{{- if or (eq $tenant.id $.Values.platformTenant) (eq $tenant.id "fake") }}{{ fail "tenant id must not equal platformTenant or the reserved id fake" }}{{ end }}
+{{- if empty $tenant.port }}{{ fail "tenant port is required" }}{{ end }}
 {{- $port := toString $tenant.port }}
 {{- if or (kindIs "string" $tenant.port) (not (regexMatch "^[0-9]+$" $port)) (lt (float64 $tenant.port) 1024.0) (gt (float64 $tenant.port) 65535.0) }}{{ fail "tenant port must be an integer in 1024..65535" }}{{ end }}
 {{- $portKey := printf "%d" (int $tenant.port) }}
 {{- if hasKey $tenantPorts $portKey }}{{ fail "tenant ports must be unique" }}{{ end }}
 {{- $_ := set $tenantPorts $portKey true }}
-{{- end }}
 {{- end }}
 {{- $components := include "lgtm-stack.components" . | fromYaml }}
 {{- if hasKey $components "Error" }}{{ fail $components.Error }}{{ end }}
