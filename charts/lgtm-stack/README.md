@@ -110,6 +110,7 @@ default. Lists are replaced, not appended.
 | `argocd.namePrefix` | `lgtm-` | Application name prefix |
 | `argocd.syncPolicy` | automated, retry 10 | Shared syncPolicy. `RespectIgnoreDifferences=true` is added where diffs are ignored |
 | `cluster.name` | `""` | `cluster` label on metrics, logs and Slack messages. Required |
+| `tenantIsolation.enabled` | `false` | Enable tenant logs and traces only when backend tenant authentication is enabled |
 | `placement.nodeSelector` / `.tolerations` | `{}` / `[]` | Pin every pod, e.g. to a dedicated node. Alloy and node-exporter (DaemonSets that read their own node) take only the tolerations, so they run on every node the tolerations admit; with a nodeSelector Alloy's Service uses `internalTrafficPolicy: Cluster`. To cover node pools with other taints, override both DaemonSets' tolerations under `components` |
 | `grafana.domain` | `""` | `root_url` and Ingress host |
 | `grafana.ingress.enabled` / `.className` / `.annotations` | `false` / `alb` / `{}` | Grafana Ingress |
@@ -137,7 +138,24 @@ them by hand.
 | `grafana-admin` | `admin-user`, `admin-password` | Grafana admin. Set `components.grafana.values.admin.existingSecret: ""` to let the Grafana chart generate one |
 | `grafana-secret-key` | `secret-key` | Grafana `secret_key` |
 | `grafana-oauth` | `client-secret` | Grafana SSO, with `grafana.sso.provider` set |
-| `alerting.slack.secretName` | `alerting.slack.secretKey` | Slack webhook URL. Until it exists the operator skips the receiver and Alertmanager keeps running |
+| `alerting.slack.secretName` | `alerting.slack.secretKey` | Slack webhook URL. Required for Alertmanager reconciliation when Slack is enabled |
+
+With `alerting.slack.enabled`, both the webhook Secret and AlertmanagerConfig `slack` must exist in `monitoring`.
+The operator fails reconciliation with `failed to get global AlertmanagerConfig` when the global configuration is missing;
+a missing webhook Secret also prevents reconciliation. Create the Secret before enabling Slack and sync the configuration addon.
+
+### Tenant isolation
+
+Tenant ids must match `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and contain at most 30 characters.
+They use lowercase letters, digits and internal hyphens, starting and ending with a letter or digit.
+
+With `tenantIsolation.enabled: false`, tenant gateway receivers forward only metrics; logs and traces are dropped.
+No tenant log or trace processors or exporters are generated. The tenant-org Job creates only the Prometheus datasource,
+which queries through the tenant's label-enforcing proxy. It creates organizations and missing datasources; it does not remove existing ones.
+
+Set `tenantIsolation.enabled: true` in the same release that enables Loki `auth_enabled` and Tempo multitenancy, never before.
+This restores tenant logs and traces and adds tenant Loki and Tempo datasources with fixed tenant headers.
+The flag does not enable backend authentication itself. Platform Alloy and platform datasources are unaffected.
 
 ### Grafana SSO
 
@@ -244,14 +262,15 @@ the Slack message.
 
 `project` syncs one folder, from the repo that installs the stack. Another project on the same cluster keeps the same
 folder in its own GitOps repo and deploys it with its own Application into its own namespace; nothing changes here.
-Prometheus selects every PrometheusRule (and ServiceMonitor) in the cluster, and Grafana loads dashboards from every
+Prometheus excludes rules in namespaces labelled `lgtm-stack/tenant`; tenant rulers evaluate their configured namespaces.
+ServiceMonitors remain cluster-wide, and Grafana loads dashboards from every
 namespace. Name the Grafana folder after the project and keep dashboard `uid`s unique across projects: two dashboards
 with one `uid` replace each other.
 
 ## Alerting
 
 Prometheus evaluates the PrometheusRules (kube-prometheus-stack's defaults, this chart's bundles below and the
-project folder's rules; every PrometheusRule in the cluster is selected) and Alertmanager
+project folder's rules, excluding namespaces labelled `lgtm-stack/tenant`) and Alertmanager
 routes them; Grafana shows them read-only. Grafana contact points do not receive these alerts: they belong to
 Grafana's own Alertmanager.
 

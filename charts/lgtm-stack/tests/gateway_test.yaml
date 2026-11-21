@@ -33,6 +33,7 @@ tests:
   - it: configures an authenticated receiver and fixed tenant pipeline
     template: templates/applications.yaml
     set:
+      tenantIsolation.enabled: true
       tenants:
         - id: example
           port: 4320
@@ -55,10 +56,34 @@ tests:
           pattern: 'max_request_body_size = 4194304'
       - matchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'logs = \[otelcol.exporter.otlphttp.loki_0.input\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'traces = \[otelcol.exporter.otlp.tempo_0.input\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
           pattern: '"X-Scope-OrgID" = "example"'
       - notMatchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
           pattern: 'include_metadata|grpc \{|max_recv_msg_size'
+  - it: drops logs and traces with isolation disabled
+    template: templates/applications.yaml
+    set:
+      tenantIsolation.enabled: false
+      tenants: [{ id: example, port: 4320, htpasswdSecret: { name: example-otlp, key: htpasswd } }]
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'metrics = \[otelcol.processor.attributes.tenant_0.input\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'metrics = \[otelcol.exporter.otlphttp.prometheus_0.input\]'
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'logs =|traces =|log_statements|trace_statements|"loki_0"|"tempo_0"'
   - it: routes tenant paths to dedicated service ports
     template: templates/gateway.yaml
     set:
@@ -99,6 +124,9 @@ tests:
       - equal:
           path: spec.source.helm.valuesObject.addon
           value: gateway
+      - equal:
+          path: spec.source.helm.valuesObject.tenantIsolation.enabled
+          value: false
       - equal:
           path: spec.source.helm.valuesObject.tenants[0].port
           value: 4320

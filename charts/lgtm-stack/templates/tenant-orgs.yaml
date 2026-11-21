@@ -35,7 +35,7 @@ data:
       fi
     }
 {{- range $tenant := .Values.tenants }}
-{{- if not (regexMatch "^[a-z0-9][a-z0-9-]*$" $tenant.id) }}{{ fail "tenant id must contain lowercase letters, digits or hyphens and start with a letter or digit" }}{{ end }}
+{{- if or (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $tenant.id)) (gt (len $tenant.id) 30) }}{{ fail "tenant id must be a DNS-1123 label of at most 30 characters" }}{{ end }}
     request GET -X GET "$base/api/orgs/name/{{ $tenant.id }}"
     if [ "$code" = 404 ]; then
       request POST -X POST -H 'Content-Type: application/json' \
@@ -45,8 +45,10 @@ data:
       org_id=$(printf '%s\n' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
     fi
     case "$org_id" in ''|*[!0-9]*) exit 1 ;; esac
+{{- if $.Values.tenantIsolation.enabled }}
     datasource loki '{"name":"Loki","uid":"loki","type":"loki","access":"proxy","url":"http://loki.monitoring.svc.cluster.local:3100","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
     datasource tempo '{"name":"Tempo","uid":"tempo","type":"tempo","access":"proxy","url":"http://tempo.monitoring.svc.cluster.local:3200","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
+{{- end }}
     datasource prometheus '{"name":"Prometheus","uid":"prometheus","type":"prometheus","access":"proxy","url":"http://prom-label-proxy-{{ $tenant.id }}.monitoring.svc.cluster.local:8080","isDefault":true}'
 {{- end }}
 ---

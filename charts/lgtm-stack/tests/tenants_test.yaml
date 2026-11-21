@@ -40,7 +40,21 @@ tests:
       tenants: [{ id: Bad_1, port: 4320, htpasswdSecret: { name: x, key: y } }]
     asserts:
       - failedTemplate:
-          errorMessage: tenant id must contain lowercase letters, digits or hyphens and start with a letter or digit
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: rejects a trailing hyphen in tenant ids
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example- }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: rejects a 31 character tenant id
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
   - it: emits no rulers without tenants
     template: templates/tenant-rules.yaml
     set:

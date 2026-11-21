@@ -14,6 +14,7 @@ tests:
   - it: provisions tenants without requiring namespaces
     template: templates/tenant-orgs.yaml
     set:
+      tenantIsolation.enabled: true
       tenants: [{ id: example }]
     documentIndex: 0
     asserts:
@@ -37,6 +38,33 @@ tests:
       - matchRegex:
           path: data["provision.sh"]
           pattern: '"httpHeaderValue1":"example"'
+  - it: provisions only metrics with isolation disabled
+    template: templates/tenant-orgs.yaml
+    set:
+      tenantIsolation.enabled: false
+      tenants: [{ id: example }]
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource prometheus '
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource loki |datasource tempo '
+  - it: rejects a trailing hyphen in addon tenant ids
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example- }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: rejects a 31 character addon tenant id
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
   - it: runs after sync with admin credentials and placement
     template: templates/tenant-orgs.yaml
     set:
@@ -85,6 +113,7 @@ tests:
   - it: wires tenant organizations without namespaces
     template: templates/applications.yaml
     set:
+      tenantIsolation.enabled: true
       mode: applications
       argocd.project: example
       argocd.destination.name: example-cluster
@@ -99,6 +128,9 @@ tests:
       - equal:
           path: spec.source.helm.valuesObject.addon
           value: tenantOrgs
+      - equal:
+          path: spec.source.helm.valuesObject.tenantIsolation.enabled
+          value: true
       - equal:
           path: spec.source.helm.valuesObject.tenants
           value: [{ id: example }]

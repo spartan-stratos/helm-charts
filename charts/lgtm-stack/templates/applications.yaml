@@ -2,7 +2,7 @@
 {{- $_ := required "argocd.project is required" .Values.argocd.project }}
 {{- $_ := required "cluster.name is required" .Values.cluster.name }}
 {{- range $tenant := .Values.tenants }}
-{{- if not (regexMatch "^[a-z0-9][a-z0-9-]*$" $tenant.id) }}{{ fail "tenant id must contain lowercase letters, digits or hyphens and start with a letter or digit" }}{{ end }}
+{{- if or (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $tenant.id)) (gt (len $tenant.id) 30) }}{{ fail "tenant id must be a DNS-1123 label of at most 30 characters" }}{{ end }}
 {{- end }}
 {{- $components := include "lgtm-stack.components" . | fromYaml }}
 {{- if hasKey $components "Error" }}{{ fail $components.Error }}{{ end }}
@@ -100,6 +100,9 @@ spec:
         mode: addon
         addon: {{ $key }}
         namespace: {{ $.Values.namespace }}
+        {{- if or (eq $key "tenantOrgs") (eq $key "gateway") }}
+        tenantIsolation: {{- toYaml $.Values.tenantIsolation | nindent 10 }}
+        {{- end }}
         {{- if eq $key "tenantOrgs" }}
         tenants: {{- toYaml $.Values.tenants | nindent 10 }}
         placement: {{- toYaml $.Values.placement | nindent 10 }}

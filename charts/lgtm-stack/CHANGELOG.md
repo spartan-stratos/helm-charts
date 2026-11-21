@@ -6,8 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-* A PostSync Job creates tenant Grafana organizations and missing Loki, Tempo and Prometheus datasources.
-* Tenant datasources use fixed tenant headers for logs and traces and a dedicated metrics proxy.
+* A PostSync Job creates tenant Grafana organizations and missing Prometheus datasources through a dedicated metrics proxy.
+* `tenantIsolation.enabled` defaults to false, dropping tenant logs and traces and withholding their datasources until backend tenant authentication is enabled.
+* Tenant ids must be DNS-1123 labels of at most 30 characters, with no trailing hyphen.
 
 ## 0.3.0 (2026-11-20)
 
