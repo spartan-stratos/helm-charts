@@ -49,7 +49,9 @@ data:
     datasource loki '{"name":"Loki","uid":"loki","type":"loki","access":"proxy","url":"http://loki.monitoring.svc.cluster.local:3100","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
     datasource tempo '{"name":"Tempo","uid":"tempo","type":"tempo","access":"proxy","url":"http://tempo.monitoring.svc.cluster.local:3200","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
 {{- end }}
+{{- if $.Values.components.promLabelProxy.enabled }}
     datasource prometheus '{"name":"Prometheus","uid":"prometheus","type":"prometheus","access":"proxy","url":"http://prom-label-proxy-{{ $tenant.id }}.monitoring.svc.cluster.local:8080","isDefault":true}'
+{{- end }}
 {{- end }}
 ---
 apiVersion: batch/v1

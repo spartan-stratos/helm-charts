@@ -148,10 +148,16 @@ a missing webhook Secret also prevents reconciliation. Create the Secret before 
 
 Tenant ids must match `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and contain at most 30 characters.
 They use lowercase letters, digits and internal hyphens, starting and ending with a letter or digit.
+Tenant ids and supplied ports must be unique. Supplied ports must be integers in 1024..65535.
+
+The platform must label each tenant namespace `lgtm-stack/tenant=<id>` BEFORE its rules sync.
+An unlabelled namespace's rules are evaluated by both the main Prometheus and the tenant ruler.
 
 With `tenantIsolation.enabled: false`, tenant gateway receivers forward only metrics; logs and traces are dropped.
-No tenant log or trace processors or exporters are generated. The tenant-org Job creates only the Prometheus datasource,
-which queries through the tenant's label-enforcing proxy. It creates organizations and missing datasources; it does not remove existing ones.
+No tenant log or trace processors or exporters are generated. With `components.promLabelProxy.enabled: true`,
+the tenant-org Job creates the Prometheus datasource, which queries through the tenant's label-enforcing proxy.
+With `components.promLabelProxy.enabled: false`, no tenant Prometheus datasource is created.
+The Job creates organizations and missing datasources; it does not remove existing ones.
 
 Set `tenantIsolation.enabled: true` in the same release that enables Loki `auth_enabled` and Tempo multitenancy, never before.
 This restores tenant logs and traces and adds tenant Loki and Tempo datasources with fixed tenant headers.

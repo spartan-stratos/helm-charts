@@ -7,6 +7,64 @@ set:
   argocd.destination.name: example-cluster
   cluster.name: example-cluster
 tests:
+  - it: rejects duplicate tenant ids
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 4320 }, { id: example, port: 4321 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant ids must be unique
+  - it: rejects duplicate tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: second, port: 4320 }, { id: first, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant ports must be unique
+  - it: rejects privileged tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 80 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects tenant ports above the maximum
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 70000 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects fractional tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 4320.5 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects string tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: "4320" }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: accepts distinct tenants at both port boundaries
+    template: templates/applications.yaml
+    set:
+      components.alloyGateway.enabled: false
+      tenants: [{ id: second, port: 65535 }, { id: first, port: 1024 }]
+    asserts:
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-prom-label-proxy-first
+          any: true
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-prom-label-proxy-second
+          any: true
   - it: emits no tenant applications without tenants
     template: templates/applications.yaml
     set:
