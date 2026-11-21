@@ -47,6 +47,32 @@ alloy:
         }
         output {
 {{- if $.Values.tenantIsolation.enabled }}
+          logs = [otelcol.processor.filter.tenant_{{ $index }}.input]
+{{- end }}
+          metrics = [otelcol.processor.filter.tenant_{{ $index }}.input]
+{{- if $.Values.tenantIsolation.enabled }}
+          traces = [otelcol.processor.filter.tenant_{{ $index }}.input]
+{{- end }}
+        }
+      }
+      // A credential may only write its own namespaces: drop any telemetry naming another namespace, in the resource or in
+      // the datapoint, log or span attributes, so one tenant cannot forge series that another tenant's or the platform's
+      // rules select by namespace.
+      otelcol.processor.filter "tenant_{{ $index }}" {
+        error_mode = "ignore"
+        metrics {
+          datapoint = [{{ printf "resource.attributes[\"k8s.namespace.name\"] != nil and not IsMatch(resource.attributes[\"k8s.namespace.name\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}, {{ printf "attributes[\"namespace\"] != nil and not IsMatch(attributes[\"namespace\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}]
+        }
+{{- if $.Values.tenantIsolation.enabled }}
+        logs {
+          log_record = [{{ printf "resource.attributes[\"k8s.namespace.name\"] != nil and not IsMatch(resource.attributes[\"k8s.namespace.name\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}, {{ printf "attributes[\"namespace\"] != nil and not IsMatch(attributes[\"namespace\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}]
+        }
+        traces {
+          span = [{{ printf "resource.attributes[\"k8s.namespace.name\"] != nil and not IsMatch(resource.attributes[\"k8s.namespace.name\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}, {{ printf "attributes[\"namespace\"] != nil and not IsMatch(attributes[\"namespace\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}]
+        }
+{{- end }}
+        output {
+{{- if $.Values.tenantIsolation.enabled }}
           logs = [otelcol.processor.attributes.tenant_{{ $index }}.input]
 {{- end }}
           metrics = [otelcol.processor.attributes.tenant_{{ $index }}.input]

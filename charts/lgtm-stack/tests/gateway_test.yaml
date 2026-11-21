@@ -72,6 +72,30 @@ tests:
       - matchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
           pattern: 'set\(attributes\[\\"namespace\\"\], resource.attributes\[\\"k8s.namespace.name\\"\]\) where attributes\[\\"namespace\\"\] == nil and resource.attributes\[\\"k8s.namespace.name\\"\] != nil'
+  - it: drops telemetry that names a namespace outside the tenant
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - id: example
+          port: 4320
+          namespaces: [ns-a, ns-b]
+          htpasswdSecret: { name: example-otlp, key: htpasswd }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'metrics = \[otelcol.processor.filter.tenant_0.input\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'otelcol.processor.filter "tenant_0"'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'IsMatch\(resource.attributes\[\\"k8s.namespace.name\\"\], \\"\^\(ns-a\|ns-b\)\$\\"\)'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'attributes\[\\"namespace\\"\] != nil and not IsMatch\(attributes\[\\"namespace\\"\]'
   - it: drops logs and traces with isolation disabled
     template: templates/applications.yaml
     set:
