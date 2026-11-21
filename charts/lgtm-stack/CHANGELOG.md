@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.3 (2026-11-21)
+
+### Bug Fixes
+
+* The gateway drops telemetry whose `k8s.namespace.name` is outside the tenant's `namespaces`. Before this, a tenant credential could write series for another namespace, which that namespace's alert rules would then select.
+
 ## 0.3.2 (2026-11-21)
 
 ### Bug Fixes
