@@ -545,6 +545,17 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/spartan-0.1.0/spartan-0.1.0.tgz
     version: 0.1.0
+  spartan-alerts:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-11-21T02:27:27.103788746Z"
+    description: Tenant alert rules, Slack routing and optional webhook secret management
+    digest: 6e84b19ab6be9801ed3d4becb4aad91072482675f2499d86c1829f7c5126464d
+    name: spartan-alerts
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/spartan-alerts-0.1.0/spartan-alerts-0.1.0.tgz
+    version: 0.1.0
   strimzi-user-operator:
   - apiVersion: v2
     appVersion: 0.45.1
@@ -671,4 +682,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-11-20T13:17:05.940387268Z"
+generated: "2026-11-21T02:27:27.103888863Z"
