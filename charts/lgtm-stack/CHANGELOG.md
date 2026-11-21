@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.4 (2026-11-21)
+
+### Features
+
+* `alerting.slack.ownedNamespaces` splits the shared Slack route: warning and critical alerts from unowned namespaces still post there, while an owned namespace posts only its critical alerts, so its own AlertmanagerConfig can route warnings to a project channel. Empty by default, which changes nothing. Add a namespace only after its own route exists.
+
 ## 0.3.3 (2026-11-21)
 
 ### Bug Fixes
