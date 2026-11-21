@@ -10,6 +10,35 @@ set:
   cluster.name: example-cluster
 
 tests:
+  - it: "keeps only the sync-wave annotation by default"
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-opentelemetry-operator
+    asserts:
+      - equal:
+          path: metadata.annotations
+          value:
+            argocd.argoproj.io/sync-wave: "61"
+
+  - it: "adds annotations only to the selected component Application"
+    template: templates/applications.yaml
+    set:
+      components.opentelemetryOperator.annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=false
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/compare-options"]
+          value: ServerSideDiff=false
+        documentSelector:
+          path: metadata.name
+          value: lgtm-opentelemetry-operator
+      - notExists:
+          path: metadata.annotations["argocd.argoproj.io/compare-options"]
+        documentSelector:
+          path: metadata.name
+          value: lgtm-grafana
+
   - it: "renders one Application per component and addon"
     template: templates/applications.yaml
     asserts:
@@ -85,7 +114,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.3.5
+          value: 0.3.6
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info

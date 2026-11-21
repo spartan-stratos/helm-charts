@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.6 (2026-11-22)
+
+### Features
+
+* Per-component Application annotations via `components.<key>.annotations` let one Application opt out of controller-wide server-side diff. This avoids dry-run failures when an `ignoreDifferences` rule for `/data` strips a Secret's required keys.
+
 ## 0.3.5 (2026-11-21)
 
 ### Bug Fixes
