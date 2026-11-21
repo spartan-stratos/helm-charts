@@ -22,11 +22,6 @@ helm template charts/lgtm-stack -f charts/lgtm-stack/ci/test-values.yaml
 
 CI uses helm-check for linting and rendering, then helm-unittest.
 It also checks lgtm-stack rules and bundled dashboards.
-Run the PR body checker tests when changing description governance:
-
-```sh
-python3 -m unittest discover -s .github/scripts/pr-body -p 'test_*.py'
-```
 
 ## Releases
 
@@ -49,5 +44,4 @@ python3 -m unittest discover -s .github/scripts/pr-body -p 'test_*.py'
 - No AI attribution or co-author trailers.
 - No en or em dashes or horizontal bars; use plain hyphens.
 - Stay under 300 prose words, excluding code, tables, checkboxes and comments.
-- Fix a red PR Body check by editing the description, never by an admin merge.
 - Posted review bodies carry the verdict and unanchored findings only, under 1200 characters; detail goes inline.

@@ -1,4 +1,4 @@
-<!-- PR Body fails on missing, reordered or empty sections, unticked types, long dashes, attribution, internal references, missing diagram choice or over 300 prose words. See AGENTS.md. -->
+<!-- Follow AGENTS.md: sections in order, a Mermaid diagram or a line starting No diagram:, no long dashes, attribution or internal references, under 300 prose words. -->
 ## Summary
 <!-- What changed and why: 1 to 3 bullets plus a Mermaid diagram, or a line starting No diagram: with the reason. -->
 
