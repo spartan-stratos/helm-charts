@@ -1,8 +1,9 @@
+<!-- PR Body fails on missing, reordered or empty sections, unticked types, long dashes, attribution, internal references, missing diagram choice or over 300 prose words. See AGENTS.md. -->
 ## Summary
-<!--- Summary of changes --->
+<!-- What changed and why: 1 to 3 bullets plus a Mermaid diagram, or a line starting No diagram: with the reason. -->
 
 ## Types of Changes
-<!--- What types of changes does your code introduce? Put an `x` in all the boxes that apply: --->
+<!-- Tick every applicable type with x. -->
 
 - [ ] New feature (non-breaking change which adds functionality)
 - [ ] Bug fix (non-breaking change which fixes an issue)
@@ -11,7 +12,7 @@
 - [ ] Domestic (documentation, non-breaking change that doesn't change code behavior, can skip testing)
 
 ## Test Plan:
-<!--- How do you test your changes? (unit test, integration test, dev test) or skip_test if it's not applicable  --->
+<!-- List commands run and their results, or human-verifiable steps. -->
 
 ## Jira Issues:
-<!--- Link to your YouTrack ticket --->
+<!-- Link issues, or write n/a. -->
