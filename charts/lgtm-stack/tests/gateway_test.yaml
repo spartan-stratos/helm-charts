@@ -93,6 +93,9 @@ tests:
       - matchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
           pattern: 'IsMatch\(resource.attributes\[\\"k8s.namespace.name\\"\], \\"\^\(ns-a\|ns-b\)\$\\"\)'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'attributes\[\\"namespace\\"\] != nil and not IsMatch\(attributes\[\\"namespace\\"\]'
   - it: drops logs and traces with isolation disabled
     template: templates/applications.yaml
     set:
