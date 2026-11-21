@@ -32,6 +32,8 @@ All objects use the release namespace. Without external secret synchronization, 
 | `env` | `""` | Environment suffix in receiver names. |
 | `workloadCluster` | `""` | Cluster name displayed in Slack messages. |
 | `grafanaUrl` | `""` | Base URL for alert and dashboard links. |
+| `nameSuffix` | `""` | Optional suffix appended with a hyphen to both AlertmanagerConfig names and the PrometheusRule name. Empty preserves existing names. |
+| `routeMatchers` | `[]` | Additional `{name, value, matchType}` matchers appended to both routes. `matchType` is optional and omitted when empty. |
 | `slack` | `{secretName: alert-slack, channel: ""}` | Webhook and channel settings. |
 | `slack.secretName` | `alert-slack` | Webhook Secret name; also names the optional ExternalSecret and SecretStore. |
 | `slack.channel` | `""` | Channel name without `#`; empty omits the channel override. |
@@ -63,6 +65,44 @@ slack:
 
 No PrometheusRule or secret synchronization objects render by default. An empty channel uses the webhook's default destination.
 Alertmanager message templates remain literal for Alertmanager to evaluate.
+
+### Shared Namespace Example
+
+Install dev and prod releases into the same `notifications` namespace with separate values files:
+
+```yaml
+# dev.yaml
+env: dev
+nameSuffix: dev
+slack:
+  secretName: alert-slack-dev
+  channel: alerts-dev
+externalSecrets:
+  serviceAccount: alert-secrets-dev
+routeMatchers:
+  - name: env
+    value: dev
+---
+# prod.yaml
+env: prod
+nameSuffix: prod
+slack:
+  secretName: alert-slack-prod
+  channel: alerts-prod
+externalSecrets:
+  serviceAccount: alert-secrets-prod
+routeMatchers:
+  - name: env
+    value: prod
+```
+
+```sh
+helm install alerts-dev ./charts/spartan-alerts -n notifications -f dev.yaml
+helm install alerts-prod ./charts/spartan-alerts -n notifications -f prod.yaml
+```
+
+Alerts must carry the matching `env` label; set it explicitly in each release's alert rule labels.
+Create both webhook Secrets, or enable external secret synchronization with the required settings below for each release.
 
 ### Rule Groups Example
 

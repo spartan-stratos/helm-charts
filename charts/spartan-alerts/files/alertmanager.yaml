@@ -7,7 +7,7 @@
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
-  name: ${SERVICE_SHORT}-namespace
+  name: ${SERVICE_SHORT}-namespace${NAME_SUFFIX}
   namespace: ${NAMESPACE}
 spec:
   route:
@@ -22,6 +22,7 @@ spec:
       - name: severity
         matchType: "=~"
         value: warning|critical
+${ROUTE_MATCHERS}
   receivers:
     - name: slack-${SERVICE_SHORT}-${ENV}
       slackConfigs:
@@ -43,7 +44,7 @@ spec:
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
-  name: ${SERVICE_SHORT}-service
+  name: ${SERVICE_SHORT}-service${NAME_SUFFIX}
   namespace: ${NAMESPACE}
 spec:
   route:
@@ -61,6 +62,7 @@ spec:
       - name: severity
         matchType: "=~"
         value: warning|critical
+${ROUTE_MATCHERS}
   receivers:
     - name: slack-${SERVICE_SHORT}-${ENV}
       slackConfigs:

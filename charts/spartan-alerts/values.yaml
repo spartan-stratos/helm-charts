@@ -4,6 +4,8 @@ service:
 env: ""
 workloadCluster: ""
 grafanaUrl: ""
+nameSuffix: ""
+routeMatchers: []
 slack:
   secretName: alert-slack
   channel: ""
