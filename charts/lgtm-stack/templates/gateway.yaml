@@ -1,0 +1,30 @@
+{{- if and (eq .Values.mode "addon") (eq .Values.addon "gateway") .Values.tenants .Values.gateway.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: alloy-gateway
+  namespace: {{ .Values.namespace }}
+  annotations:
+    alb.ingress.kubernetes.io/group.name: external
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/success-codes: 200-499
+spec:
+  ingressClassName: {{ .Values.gateway.ingress.className }}
+  rules:
+    - host: {{ required "gateway.ingress.host is required" .Values.gateway.ingress.host | quote }}
+      http:
+        paths:
+{{- range $index, $tenant := .Values.tenants }}
+          - path: /{{ $tenant.id }}
+            pathType: Prefix
+            backend:
+              service:
+                name: alloy-gateway
+                port:
+                  name: tenant-{{ $index }}
+{{- end }}
+{{- end }}

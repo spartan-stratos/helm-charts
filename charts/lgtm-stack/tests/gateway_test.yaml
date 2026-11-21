@@ -1,0 +1,138 @@
+suite: Tenant gateway
+templates:
+  - templates/applications.yaml
+  - templates/gateway.yaml
+set:
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+tests:
+  - it: emits no gateway resources without tenants
+    template: templates/applications.yaml
+    set:
+      tenants: []
+      gateway.ingress.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 15
+      - isKind:
+          of: Application
+      - notEqual:
+          path: metadata.name
+          value: lgtm-alloy-gateway
+  - it: emits no ingress or deployment without tenants
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      tenants: []
+      gateway.ingress.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: configures an authenticated receiver and fixed tenant pipeline
+    template: templates/applications.yaml
+    set:
+      tenantIsolation.enabled: true
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: example-otlp, key: htpasswd }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.controller.type
+          value: deployment
+      - equal:
+          path: spec.source.helm.valuesObject.controller.replicas
+          value: 2
+      - equal:
+          path: spec.source.helm.valuesObject.controller.volumes.extra[0].secret.secretName
+          value: example-otlp
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'max_request_body_size = 4194304'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'logs = \[otelcol.exporter.otlphttp.loki_0.input\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'traces = \[otelcol.exporter.otlp.tempo_0.input\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '"X-Scope-OrgID" = "example"'
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'include_metadata|grpc \{|max_recv_msg_size'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'context = "datapoint"'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'set\(attributes\[\\"namespace\\"\], resource.attributes\[\\"k8s.namespace.name\\"\]\) where attributes\[\\"namespace\\"\] == nil and resource.attributes\[\\"k8s.namespace.name\\"\] != nil'
+  - it: drops logs and traces with isolation disabled
+    template: templates/applications.yaml
+    set:
+      tenantIsolation.enabled: false
+      tenants: [{ id: example, port: 4320, htpasswdSecret: { name: example-otlp, key: htpasswd } }]
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'metrics = \[otelcol.processor.attributes.tenant_0.input\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'metrics = \[otelcol.exporter.otlphttp.prometheus_0.input\]'
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'logs =|traces =|log_statements|trace_statements|"loki_0"|"tempo_0"'
+  - it: routes tenant paths to dedicated service ports
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: example-otlp, key: htpasswd }
+      gateway.ingress.enabled: true
+      gateway.ingress.host: otlp.example.com
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0]
+          value:
+            path: /example
+            pathType: Prefix
+            backend:
+              service:
+                name: alloy-gateway
+                port: { name: tenant-0 }
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/success-codes"]
+          value: 200-499
+  - it: syncs the ingress addon into the destination cluster
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: example-otlp, key: htpasswd }
+      gateway.ingress.enabled: true
+      gateway.ingress.host: otlp.example.com
+    documentSelector:
+      path: metadata.name
+      value: lgtm-gateway
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.addon
+          value: gateway
+      - equal:
+          path: spec.source.helm.valuesObject.tenantIsolation.enabled
+          value: false
+      - equal:
+          path: spec.source.helm.valuesObject.tenants[0].port
+          value: 4320

@@ -1,0 +1,227 @@
+suite: Tenant organization provisioning
+templates:
+  - templates/tenant-orgs.yaml
+  - templates/applications.yaml
+set:
+  mode: addon
+  addon: tenantOrgs
+tests:
+  - it: uses overridden admin Secret references
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example }]
+      grafanaAdmin: { secret: custom-admin, userKey: username, passwordKey: password }
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: GF_USER
+              valueFrom:
+                secretKeyRef: { name: custom-admin, key: username }
+            - name: GF_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: custom-admin, key: password }
+  - it: passes merged admin overrides to the organization addon
+    template: templates/applications.yaml
+    set:
+      mode: applications
+      argocd.project: example
+      argocd.destination.name: example-cluster
+      cluster.name: example-cluster
+      tenants: [{ id: example, port: 4320, htpasswdSecret: { name: example-otlp, key: htpasswd } }]
+      components.grafana.values.admin: { existingSecret: custom-admin, userKey: username, passwordKey: password }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana-tenant-orgs
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.grafanaAdmin
+          value: { secret: custom-admin, userKey: username, passwordKey: password }
+  - it: retains preset admin keys with a partial override
+    template: templates/applications.yaml
+    set:
+      mode: applications
+      argocd.project: example
+      argocd.destination.name: example-cluster
+      cluster.name: example-cluster
+      tenants: [{ id: example, port: 4320, htpasswdSecret: { name: example-otlp, key: htpasswd } }]
+      components.grafana.values.admin.existingSecret: custom-admin
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana-tenant-orgs
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.grafanaAdmin
+          value: { secret: custom-admin, userKey: admin-user, passwordKey: admin-password }
+  - it: provisions logs and traces without metrics when the proxy is disabled
+    template: templates/tenant-orgs.yaml
+    set:
+      components.promLabelProxy.enabled: false
+      tenantIsolation.enabled: true
+      tenants: [{ id: example }]
+    documentIndex: 0
+    asserts:
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource prometheus '
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource loki '
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource tempo '
+  - it: provisions no datasources with isolation and proxy disabled
+    template: templates/tenant-orgs.yaml
+    set:
+      components.promLabelProxy.enabled: false
+      tenantIsolation.enabled: false
+      tenants: [{ id: example }]
+    documentIndex: 0
+    asserts:
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource prometheus |datasource loki |datasource tempo '
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: /api/orgs/name/example
+  - it: renders nothing without tenants
+    template: templates/tenant-orgs.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: provisions tenants without requiring namespaces
+    template: templates/tenant-orgs.yaml
+    set:
+      tenantIsolation.enabled: true
+      components.promLabelProxy.enabled: true
+      tenants: [{ id: example }]
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: /api/orgs/name/example
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"uid":"loki"'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"uid":"tempo"'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"uid":"prometheus"'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: http://prom-label-proxy-example.monitoring.svc.cluster.local:8080
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"httpHeaderValue1":"example"'
+  - it: provisions only metrics with isolation disabled
+    template: templates/tenant-orgs.yaml
+    set:
+      tenantIsolation.enabled: false
+      components.promLabelProxy.enabled: true
+      tenants: [{ id: example }]
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource prometheus '
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'datasource loki |datasource tempo '
+  - it: rejects a trailing hyphen in addon tenant ids
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example- }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: rejects a 31 character addon tenant id
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: runs after sync with admin credentials and placement
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example }]
+      placement.nodeSelector: { workload: monitoring }
+      placement.tolerations: [{ key: workload, operator: Exists }]
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook-delete-policy"]
+          value: BeforeHookCreation
+      - equal:
+          path: spec.backoffLimit
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: docker.io/curlimages/curl:8.11.1
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: GF_USER
+              valueFrom:
+                secretKeyRef: { name: grafana-admin, key: admin-user }
+            - name: GF_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: grafana-admin, key: admin-password }
+      - equal:
+          path: spec.template.spec.nodeSelector
+          value: { workload: monitoring }
+      - equal:
+          path: spec.template.spec.tolerations
+          value: [{ key: workload, operator: Exists }]
+  - it: renders nothing when Grafana is disabled
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: example }]
+      components.grafana.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: wires tenant organizations without namespaces
+    template: templates/applications.yaml
+    set:
+      tenantIsolation.enabled: true
+      mode: applications
+      argocd.project: example
+      argocd.destination.name: example-cluster
+      cluster.name: example-cluster
+      components.alloyGateway.enabled: false
+      components.promLabelProxy.enabled: false
+      tenants: [{ id: example, port: 4320 }]
+      placement.nodeSelector: { workload: monitoring }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana-tenant-orgs
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.grafanaAdmin
+          value: { secret: grafana-admin, userKey: admin-user, passwordKey: admin-password }
+      - equal:
+          path: spec.source.helm.valuesObject.addon
+          value: tenantOrgs
+      - equal:
+          path: spec.source.helm.valuesObject.components.promLabelProxy.enabled
+          value: false
+      - equal:
+          path: spec.source.helm.valuesObject.tenantIsolation.enabled
+          value: true
+      - equal:
+          path: spec.source.helm.valuesObject.tenants
+          value: [{ id: example, port: 4320 }]
+      - equal:
+          path: spec.source.helm.valuesObject.placement.nodeSelector
+          value: { workload: monitoring }

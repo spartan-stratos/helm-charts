@@ -1,0 +1,289 @@
+suite: Tenant rule isolation
+templates:
+  - templates/applications.yaml
+  - templates/tenant-rules.yaml
+set:
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+tests:
+  - it: rejects the default platform tenant id
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: platform, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+  - it: rejects the reserved single-tenant id
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: fake, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+  - it: rejects a custom platform tenant id
+    template: templates/applications.yaml
+    set:
+      platformTenant: custom
+      tenants: [{ id: custom, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+  - it: rejects a tenant without a port
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port is required
+  - it: rejects a tenant with an empty port
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: "" }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port is required
+  - it: rejects duplicate tenant ids
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 4320 }, { id: example, port: 4321 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant ids must be unique
+  - it: rejects duplicate tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: second, port: 4320 }, { id: first, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant ports must be unique
+  - it: rejects privileged tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 80 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects tenant ports above the maximum
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 70000 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects fractional tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 4320.5 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects string tenant ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: "4320" }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: accepts distinct tenants at both port boundaries
+    template: templates/applications.yaml
+    set:
+      components.alloyGateway.enabled: false
+      tenants: [{ id: second, port: 65535 }, { id: first, port: 1024 }]
+    asserts:
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-prom-label-proxy-first
+          any: true
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-prom-label-proxy-second
+          any: true
+  - it: emits no tenant applications without tenants
+    template: templates/applications.yaml
+    set:
+      tenants: []
+    asserts:
+      - hasDocuments:
+          count: 15
+  - it: emits a proxy without the ruler addon for a tenant without namespaces
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: example-otlp, key: htpasswd }
+    asserts:
+      - hasDocuments:
+          count: 18
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-prom-label-proxy-example
+          any: true
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-tenant-rules
+        not: true
+  - it: rejects invalid tenant ids in the parent chart
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: Bad_1, port: 4320, htpasswdSecret: { name: x, key: y } }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: rejects a trailing hyphen in tenant ids
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example- }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: rejects a 31 character tenant id
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must be a DNS-1123 label of at most 30 characters
+  - it: emits no rulers without tenants
+    template: templates/tenant-rules.yaml
+    set:
+      mode: addon
+      addon: tenantRules
+      tenants: []
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: emits no rulers without namespaces
+    template: templates/tenant-rules.yaml
+    set:
+      mode: addon
+      addon: tenantRules
+      tenants: [{ id: example }]
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: pins proxy queries to the tenant and passes placement
+    template: templates/applications.yaml
+    set:
+      components.alloyGateway.enabled: false
+      tenants: [{ id: example, port: 4320, namespaces: [example, example-jobs] }]
+      placement.nodeSelector: { workload: monitoring }
+      placement.tolerations: [{ key: workload, operator: Exists }]
+    documentSelector:
+      path: metadata.name
+      value: lgtm-prom-label-proxy-example
+    asserts:
+      - equal:
+          path: spec.source.helm.releaseName
+          value: prom-label-proxy-example
+      - equal:
+          path: spec.source.helm.valuesObject.fullnameOverride
+          value: prom-label-proxy-example
+      - equal:
+          path: spec.source.helm.valuesObject.config
+          value:
+            upstream: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+            label: tenant
+            extraArgs: [--label-value=example, --enable-label-apis=true, --error-on-replace=true]
+      - equal:
+          path: spec.source.helm.valuesObject.nodeSelector
+          value: { workload: monitoring }
+      - equal:
+          path: spec.source.helm.valuesObject.tolerations
+          value: [{ key: workload, operator: Exists }]
+  - it: wires the ruler addon with tenant namespaces and placement
+    template: templates/applications.yaml
+    set:
+      components.alloyGateway.enabled: false
+      tenants: [{ id: example, port: 4320, namespaces: [example] }]
+      placement.nodeSelector: { workload: monitoring }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-tenant-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.addon
+          value: tenantRules
+      - equal:
+          path: spec.source.helm.valuesObject.tenants
+          value: [{ id: example, port: 4320, namespaces: [example] }]
+      - equal:
+          path: spec.source.helm.valuesObject.placement.nodeSelector
+          value: { workload: monitoring }
+  - it: bounds rule selection and query access to the tenant
+    template: templates/tenant-rules.yaml
+    set:
+      mode: addon
+      addon: tenantRules
+      tenants: [{ id: example, namespaces: [example, example-jobs] }]
+      placement.nodeSelector: { workload: monitoring }
+      placement.tolerations: [{ key: workload, operator: Exists }]
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ThanosRuler
+      - equal:
+          path: metadata.name
+          value: example-ruler
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+      - equal:
+          path: spec.ruleSelector
+          value: {}
+      - equal:
+          path: spec.ruleNamespaceSelector.matchExpressions
+          value:
+            - key: kubernetes.io/metadata.name
+              operator: In
+              values: [example, example-jobs]
+      - equal:
+          path: spec.queryEndpoints
+          value: [http://prom-label-proxy-example.monitoring.svc.cluster.local:8080]
+      - equal:
+          path: spec.alertmanagersUrl
+          value: [http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093]
+      - equal:
+          path: spec.enforcedNamespaceLabel
+          value: namespace
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.evaluationInterval
+          value: 1m
+      - notExists:
+          path: spec.image
+      - equal:
+          path: spec.nodeSelector
+          value: { workload: monitoring }
+      - equal:
+          path: spec.tolerations
+          value: [{ key: workload, operator: Exists }]
+  - it: keeps tenant rules out of the main evaluator
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus.prometheusSpec.ruleNamespaceSelector.matchExpressions
+          value:
+            - key: lgtm-stack/tenant
+              operator: DoesNotExist
+  - it: emits no rulers when their proxy is disabled
+    template: templates/tenant-rules.yaml
+    set:
+      mode: addon
+      addon: tenantRules
+      components.promLabelProxy.enabled: false
+      tenants: [{ id: example, namespaces: [example] }]
+    asserts:
+      - hasDocuments:
+          count: 0

@@ -40,6 +40,19 @@ self:
 # Fixed: the presets wire components together through monitoring.svc.cluster.local URLs
 namespace: monitoring
 
+platformTenant: platform
+# Each credential binds to one receiver port and a server-selected tenant; namespaces lists the tenant namespaces whose rules run in its own ruler.
+# Entry: { id: example, port: 4320, namespaces: [example], htpasswdSecret: { name: example-otlp, key: htpasswd } }
+tenants: []
+# Keep tenant logs and traces disabled until their backends enforce tenant authentication.
+tenantIsolation:
+  enabled: false
+gateway:
+  ingress:
+    enabled: false
+    className: alb
+    host: ""
+
 cluster:
   # Cluster label on every metric and log line (Prometheus externalLabels, Alloy, Slack messages). Required
   name: ""
@@ -69,7 +82,7 @@ grafana:
 
 alerting:
   # AlertmanagerConfig sending warning and critical alerts to Slack. The webhook URL lives in a Secret created outside
-  # git; until it exists the operator skips the receiver and Alertmanager keeps running.
+  # git; reconciliation requires both that Secret and the slack AlertmanagerConfig.
   slack:
     enabled: false
     secretName: alert-slack
@@ -95,6 +108,11 @@ alerting:
 # settings above), so anything the upstream chart accepts can be set here. ignoreDifferences is appended to the
 # built-in list.
 components:
+  promLabelProxy:
+    enabled: true
+    chart: { repoURL: https://prometheus-community.github.io/helm-charts, name: prom-label-proxy, version: 0.25.2 }
+    values: {}
+    ignoreDifferences: []
   prometheusOperatorCrds:
     enabled: true
     # Bump together with kube-prometheus-stack: 32.0.1 ships the CRDs for operator v0.94.1
@@ -124,6 +142,11 @@ components:
   tempo:
     enabled: true
     chart: { repoURL: https://grafana-community.github.io/helm-charts, name: tempo, version: 3.0.0 }
+    values: {}
+    ignoreDifferences: []
+  alloyGateway:
+    enabled: true
+    chart: { repoURL: https://grafana.github.io/helm-charts, name: alloy, version: 1.13.0 }
     values: {}
     ignoreDifferences: []
   opentelemetryOperator:

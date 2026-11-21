@@ -5,3 +5,11 @@ argocd:
     name: example-cluster
 cluster:
   name: example-cluster
+tenants:
+  - id: example
+    port: 4320
+    htpasswdSecret: { name: example-otlp, key: htpasswd }
+gateway:
+  ingress:
+    enabled: true
+    host: otlp.example.com

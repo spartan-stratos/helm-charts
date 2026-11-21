@@ -1,0 +1,131 @@
+fullnameOverride: alloy-gateway
+controller:
+  type: deployment
+  replicas: 2
+  volumes:
+    extra:
+{{- range $index, $tenant := .Values.tenants }}
+      - name: tenant-{{ $index }}
+        secret:
+          secretName: {{ required "tenant htpasswdSecret.name is required" $tenant.htpasswdSecret.name | quote }}
+          items:
+            - key: {{ required "tenant htpasswdSecret.key is required" $tenant.htpasswdSecret.key | quote }}
+              path: htpasswd
+{{- end }}
+alloy:
+  mounts:
+    extra:
+{{- range $index, $tenant := .Values.tenants }}
+      - name: tenant-{{ $index }}
+        mountPath: /etc/alloy/tenants/{{ $index }}
+        readOnly: true
+{{- end }}
+  extraPorts:
+{{- range $index, $tenant := .Values.tenants }}
+    - name: tenant-{{ $index }}
+      port: {{ $tenant.port }}
+      targetPort: {{ $tenant.port }}
+      protocol: TCP
+{{- end }}
+  configMap:
+    create: true
+    content: |
+{{- range $index, $tenant := .Values.tenants }}
+      otelcol.auth.basic "tenant_{{ $index }}" {
+        htpasswd {
+          file = "/etc/alloy/tenants/{{ $index }}/htpasswd"
+        }
+      }
+      otelcol.receiver.otlp "tenant_{{ $index }}" {
+        http {
+          endpoint = "0.0.0.0:{{ $tenant.port }}"
+          auth = otelcol.auth.basic.tenant_{{ $index }}.handler
+          max_request_body_size = 4194304
+          traces_url_path = "/{{ $tenant.id }}/v1/traces"
+          metrics_url_path = "/{{ $tenant.id }}/v1/metrics"
+          logs_url_path = "/{{ $tenant.id }}/v1/logs"
+        }
+        output {
+{{- if $.Values.tenantIsolation.enabled }}
+          logs = [otelcol.processor.attributes.tenant_{{ $index }}.input]
+{{- end }}
+          metrics = [otelcol.processor.attributes.tenant_{{ $index }}.input]
+{{- if $.Values.tenantIsolation.enabled }}
+          traces = [otelcol.processor.attributes.tenant_{{ $index }}.input]
+{{- end }}
+        }
+      }
+      otelcol.processor.attributes "tenant_{{ $index }}" {
+        action {
+          key = "tenant"
+          value = {{ $tenant.id | quote }}
+          action = "upsert"
+        }
+        output {
+{{- if $.Values.tenantIsolation.enabled }}
+          logs = [otelcol.processor.transform.tenant_{{ $index }}.input]
+{{- end }}
+          metrics = [otelcol.processor.transform.tenant_{{ $index }}.input]
+{{- if $.Values.tenantIsolation.enabled }}
+          traces = [otelcol.processor.transform.tenant_{{ $index }}.input]
+{{- end }}
+        }
+      }
+      // Prometheus promotes resource attributes, so stamp the resource too.
+      otelcol.processor.transform "tenant_{{ $index }}" {
+{{- if $.Values.tenantIsolation.enabled }}
+        log_statements {
+          context = "resource"
+          statements = [{{ printf "set(attributes[\"tenant\"], %s)" ($tenant.id | toJson) | quote }}]
+        }
+{{- end }}
+        metric_statements {
+          context = "resource"
+          statements = [{{ printf "set(attributes[\"tenant\"], %s)" ($tenant.id | toJson) | quote }}]
+        }
+        metric_statements {
+          context = "datapoint"
+          statements = ["set(attributes[\"namespace\"], resource.attributes[\"k8s.namespace.name\"]) where attributes[\"namespace\"] == nil and resource.attributes[\"k8s.namespace.name\"] != nil"]
+        }
+{{- if $.Values.tenantIsolation.enabled }}
+        trace_statements {
+          context = "resource"
+          statements = [{{ printf "set(attributes[\"tenant\"], %s)" ($tenant.id | toJson) | quote }}]
+        }
+{{- end }}
+        output {
+{{- if $.Values.tenantIsolation.enabled }}
+          logs = [otelcol.exporter.otlphttp.loki_{{ $index }}.input]
+{{- end }}
+          metrics = [otelcol.exporter.otlphttp.prometheus_{{ $index }}.input]
+{{- if $.Values.tenantIsolation.enabled }}
+          traces = [otelcol.exporter.otlp.tempo_{{ $index }}.input]
+{{- end }}
+        }
+      }
+{{- if $.Values.tenantIsolation.enabled }}
+      otelcol.exporter.otlphttp "loki_{{ $index }}" {
+        client {
+          endpoint = "http://loki.monitoring.svc.cluster.local:3100/otlp"
+          headers = { "X-Scope-OrgID" = {{ $tenant.id | quote }} }
+        }
+      }
+{{- end }}
+      otelcol.exporter.otlphttp "prometheus_{{ $index }}" {
+        client {
+          endpoint = "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/otlp"
+          headers = { "X-Scope-OrgID" = {{ $tenant.id | quote }} }
+        }
+      }
+{{- if $.Values.tenantIsolation.enabled }}
+      otelcol.exporter.otlp "tempo_{{ $index }}" {
+        client {
+          endpoint = "tempo.monitoring.svc.cluster.local:4317"
+          headers = { "X-Scope-OrgID" = {{ $tenant.id | quote }} }
+          tls {
+            insecure = true
+          }
+        }
+      }
+{{- end }}
+{{- end }}

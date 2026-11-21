@@ -110,6 +110,7 @@ default. Lists are replaced, not appended.
 | `argocd.namePrefix` | `lgtm-` | Application name prefix |
 | `argocd.syncPolicy` | automated, retry 10 | Shared syncPolicy. `RespectIgnoreDifferences=true` is added where diffs are ignored |
 | `cluster.name` | `""` | `cluster` label on metrics, logs and Slack messages. Required |
+| `tenantIsolation.enabled` | `false` | Enable tenant logs and traces only when backend tenant authentication is enabled |
 | `placement.nodeSelector` / `.tolerations` | `{}` / `[]` | Pin every pod, e.g. to a dedicated node. Alloy and node-exporter (DaemonSets that read their own node) take only the tolerations, so they run on every node the tolerations admit; with a nodeSelector Alloy's Service uses `internalTrafficPolicy: Cluster`. To cover node pools with other taints, override both DaemonSets' tolerations under `components` |
 | `grafana.domain` | `""` | `root_url` and Ingress host |
 | `grafana.ingress.enabled` / `.className` / `.annotations` | `false` / `alb` / `{}` | Grafana Ingress |
@@ -137,7 +138,35 @@ them by hand.
 | `grafana-admin` | `admin-user`, `admin-password` | Grafana admin. Set `components.grafana.values.admin.existingSecret: ""` to let the Grafana chart generate one |
 | `grafana-secret-key` | `secret-key` | Grafana `secret_key` |
 | `grafana-oauth` | `client-secret` | Grafana SSO, with `grafana.sso.provider` set |
-| `alerting.slack.secretName` | `alerting.slack.secretKey` | Slack webhook URL. Until it exists the operator skips the receiver and Alertmanager keeps running |
+| `alerting.slack.secretName` | `alerting.slack.secretKey` | Slack webhook URL. Required for Alertmanager reconciliation when Slack is enabled |
+
+With `alerting.slack.enabled`, both the webhook Secret and AlertmanagerConfig `slack` must exist in `monitoring`.
+The operator fails reconciliation with `failed to get global AlertmanagerConfig` when the global configuration is missing;
+a missing webhook Secret also prevents reconciliation. Create the Secret before enabling Slack and sync the configuration addon.
+
+### Tenant isolation
+
+Tenant ids must match `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and contain at most 30 characters.
+They use lowercase letters, digits and internal hyphens, starting and ending with a letter or digit.
+The configured `platformTenant` (default `platform`) and `fake` are reserved tenant ids, and each tenant requires a port.
+Tenant ids and ports must be unique. Ports must be integers in 1024..65535.
+
+The platform must label each tenant namespace `lgtm-stack/tenant=<id>` BEFORE its rules sync.
+An unlabelled namespace's rules are evaluated by both the main Prometheus and the tenant ruler.
+
+With `tenantIsolation.enabled: false`, tenant gateway receivers forward only metrics; logs and traces are dropped.
+No tenant log or trace processors or exporters are generated. With `components.promLabelProxy.enabled: true`,
+the tenant-org Job creates the Prometheus datasource, which queries through the tenant's label-enforcing proxy.
+With `components.promLabelProxy.enabled: false`, no tenant Prometheus datasource is created.
+The Job creates organizations and missing datasources; it does not remove existing ones.
+Its admin Secret name and keys follow the effective Grafana `admin.existingSecret`, `admin.userKey` and `admin.passwordKey` values.
+
+Metrics scraped inside the platform cluster carry no tenant label, so tenant rules cannot see them; tenant telemetry must arrive through the gateway.
+Recording rules are not supported on tenant rulers; alerts must use self-contained expressions.
+
+Set `tenantIsolation.enabled: true` in the same release that enables Loki `auth_enabled` and Tempo multitenancy, never before.
+This restores tenant logs and traces and adds tenant Loki and Tempo datasources with fixed tenant headers.
+The flag does not enable backend authentication itself. Platform Alloy and platform datasources are unaffected.
 
 ### Grafana SSO
 
@@ -244,18 +273,20 @@ the Slack message.
 
 `project` syncs one folder, from the repo that installs the stack. Another project on the same cluster keeps the same
 folder in its own GitOps repo and deploys it with its own Application into its own namespace; nothing changes here.
-Prometheus selects every PrometheusRule (and ServiceMonitor) in the cluster, and Grafana loads dashboards from every
+Prometheus excludes rules in namespaces labelled `lgtm-stack/tenant`; tenant rulers evaluate their configured namespaces.
+ServiceMonitors remain cluster-wide, and Grafana loads dashboards from every
 namespace. Name the Grafana folder after the project and keep dashboard `uid`s unique across projects: two dashboards
 with one `uid` replace each other.
 
 ## Alerting
 
 Prometheus evaluates the PrometheusRules (kube-prometheus-stack's defaults, this chart's bundles below and the
-project folder's rules; every PrometheusRule in the cluster is selected) and Alertmanager
+project folder's rules, excluding namespaces labelled `lgtm-stack/tenant`) and Alertmanager
 routes them; Grafana shows them read-only. Grafana contact points do not receive these alerts: they belong to
 Grafana's own Alertmanager.
 
-With `alerting.slack.enabled`, AlertmanagerConfig `slack` sends `severity` warning and critical, grouped by alertname,
+With `alerting.slack.enabled`, AlertmanagerConfig `slack` is the global config with the four base inhibit rules and a matcher-free root.
+Its Slack child route continues so tenant routes still run. It sends `severity` warning and critical, grouped by alertname,
 namespace and service, repeated every 4h, with resolved notices. Info alerts stay in Grafana. With `grafana.domain` set,
 the message links to Grafana:
 

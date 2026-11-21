@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.1 (2026-11-20)
+
+### Bug Fixes
+
+* Give the global Slack AlertmanagerConfig a matcher-free null root, a continuing Slack child route and the four base inhibit rules.
+* Copy the gateway metric resource namespace to the datapoint namespace when missing, so tenant ruler selectors match.
+* Use the effective Grafana admin Secret name and keys for tenant organization provisioning.
+* Document that tenant rules require gateway telemetry and self-contained alerts; tenant rulers do not support recording rules.
+
+### Features
+
+* A PostSync Job creates tenant Grafana organizations and missing Prometheus datasources when the dedicated metrics proxy is enabled.
+* `tenantIsolation.enabled` defaults to false, dropping tenant logs and traces and withholding their datasources until backend tenant authentication is enabled.
+* Tenant ids must be DNS-1123 labels of at most 30 characters, with no trailing hyphen; `platformTenant` and `fake` are reserved.
+* Require tenant ports and reject duplicate tenant ids, duplicate ports, and ports that are not integers in 1024..65535.
+
+## 0.3.0 (2026-11-20)
+
+### Features
+
+* Optional authenticated OTLP/HTTP gateway with dedicated receivers and fixed tenant headers.
+* Platform Alloy and Grafana datasources send tenant headers. Backend tenant authentication remains disabled.
+* Slack uses the global Alertmanager configuration; other routes are restricted by namespace.
+
 ## [0.2.4](https://github.com/spartan-stratos/helm-charts/releases/tag/lgtm-stack-0.2.4) (2026-11-20)
 
 ### Bug Fixes
