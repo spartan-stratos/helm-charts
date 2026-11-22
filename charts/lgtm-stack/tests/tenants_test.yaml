@@ -230,9 +230,12 @@ tests:
       tenants: [{ id: example, namespaces: [example, example-jobs] }]
       placement.nodeSelector: { workload: monitoring }
       placement.tolerations: [{ key: workload, operator: Exists }]
+    documentSelector:
+      path: kind
+      value: ThanosRuler
     asserts:
       - hasDocuments:
-          count: 1
+          count: 3
       - isKind:
           of: ThanosRuler
       - equal:

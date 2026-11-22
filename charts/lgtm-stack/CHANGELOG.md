@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.7.0 (2026-11-22)
+
+### Features
+
+* Scrape tenant rulers and alert on unavailable rulers, rule evaluation failures and alert delivery failures in the shared channel.
+
 ## 0.6.0 (2026-11-22)
 
 ### Features

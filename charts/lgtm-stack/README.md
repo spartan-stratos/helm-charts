@@ -164,6 +164,10 @@ Its admin Secret name and keys follow the effective Grafana `admin.existingSecre
 Metrics scraped inside the platform cluster carry no tenant label, so tenant rules cannot see them; tenant telemetry must arrive through the gateway.
 Recording rules are not supported on tenant rulers; alerts must use self-contained expressions.
 
+When tenant rulers are enabled and at least one tenant has namespaces, one ServiceMonitor scrapes their metrics with a `ruler` label.
+Shared-channel alerts report each unavailable tenant ruler after 5m, plus rule evaluation and alert delivery failures sustained for 10m.
+Check the affected ruler pod and its `prom-label-proxy-<id>` pod in `monitoring` first.
+
 Set `tenantIsolation.enabled: true` in the same release that enables Loki `auth_enabled` and Tempo multitenancy, never before.
 This restores tenant logs and traces and adds tenant Loki and Tempo datasources with fixed tenant headers.
 The flag does not enable backend authentication itself. Platform Alloy and platform datasources are unaffected.

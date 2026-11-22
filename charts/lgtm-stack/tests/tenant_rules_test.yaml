@@ -1,0 +1,124 @@
+suite: Tenant ruler monitoring
+templates:
+  - templates/tenant-rules.yaml
+set:
+  mode: addon
+  addon: tenantRules
+  tenants: [{ id: example, namespaces: [example] }]
+tests:
+  - it: scrapes the governing service and identifies each ruler
+    documentSelector:
+      path: kind
+      value: ServiceMonitor
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            operated-thanos-ruler: "true"
+            app.kubernetes.io/managed-by: prometheus-operator
+      - equal:
+          path: spec.endpoints
+          value:
+            - port: web
+              path: /metrics
+              relabelings:
+                - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+                  targetLabel: ruler
+  - it: alerts on the tenant ruler and shared failure counters
+    documentSelector:
+      path: kind
+      value: PrometheusRule
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 3
+      - equal:
+          path: spec.groups[0].rules[0].alert
+          value: TenantRulerDown
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: absent(up{job="thanos-ruler-operated", ruler="example-ruler"} == 1)
+      - equal:
+          path: spec.groups[0].rules[0].for
+          value: 5m
+      - equal:
+          path: spec.groups[0].rules[0].labels
+          value: { severity: critical, tenant: example, namespace: monitoring }
+      - equal:
+          path: spec.groups[0].rules[1].alert
+          value: TenantRulerRuleEvaluationFailures
+      - equal:
+          path: spec.groups[0].rules[1].expr
+          value: increase(prometheus_rule_evaluation_failures_total{job="thanos-ruler-operated"}[10m]) > 0
+      - equal:
+          path: spec.groups[0].rules[1].for
+          value: 10m
+      - equal:
+          path: spec.groups[0].rules[1].labels
+          value: { severity: warning, namespace: monitoring }
+      - equal:
+          path: spec.groups[0].rules[2].alert
+          value: TenantRulerAlertSendFailures
+      - equal:
+          path: spec.groups[0].rules[2].expr
+          value: increase(thanos_alert_sender_errors_total{job="thanos-ruler-operated"}[10m]) > 0
+      - equal:
+          path: spec.groups[0].rules[2].for
+          value: 10m
+      - equal:
+          path: spec.groups[0].rules[2].labels
+          value: { severity: warning, namespace: monitoring }
+  - it: emits one monitor and rule bundle for two tenant rulers
+    set:
+      tenants: [{ id: first, namespaces: [first] }, { id: second, namespaces: [second] }]
+    asserts:
+      - hasDocuments:
+          count: 4
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 4
+        documentSelector:
+          path: kind
+          value: PrometheusRule
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: absent(up{job="thanos-ruler-operated", ruler="first-ruler"} == 1)
+        documentSelector:
+          path: kind
+          value: PrometheusRule
+      - equal:
+          path: spec.groups[0].rules[1].alert
+          value: TenantRulerDown
+        documentSelector:
+          path: kind
+          value: PrometheusRule
+      - equal:
+          path: spec.groups[0].rules[1].expr
+          value: absent(up{job="thanos-ruler-operated", ruler="second-ruler"} == 1)
+        documentSelector:
+          path: kind
+          value: PrometheusRule
+  - it: emits no resources without tenants
+    set:
+      tenants: []
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: emits no resources without namespaces
+    set:
+      tenants: [{ id: example }]
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: emits no resources when the proxy is disabled
+    set:
+      components.promLabelProxy.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

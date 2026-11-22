@@ -1,4 +1,8 @@
 {{- if and (eq .Values.mode "addon") (eq .Values.addon "tenantRules") .Values.components.promLabelProxy.enabled }}
+{{- $active := list }}
+{{- range .Values.tenants }}
+{{- if .namespaces }}{{ $active = append $active . }}{{ end }}
+{{- end }}
 {{- range $tenant := .Values.tenants }}
 {{- if $tenant.namespaces }}
 ---
@@ -28,5 +32,65 @@ spec:
   tolerations: {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
+{{- end }}
+{{- if $active }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: lgtm-tenant-rulers
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      operated-thanos-ruler: "true"
+      app.kubernetes.io/managed-by: prometheus-operator
+  endpoints:
+    - port: web
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+          targetLabel: ruler
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lgtm-tenant-rulers
+  namespace: {{ .Values.namespace }}
+spec:
+  groups:
+    - name: lgtm-tenant-rulers
+      rules:
+{{- $o := "{{" }}{{ $c := "}}" }}
+{{- range $active }}
+        - alert: TenantRulerDown
+          expr: absent(up{job="thanos-ruler-operated", ruler="{{ .id }}-ruler"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+            tenant: {{ .id | quote }}
+            namespace: {{ $.Values.namespace }}
+          annotations:
+            summary: '0 healthy ruler targets for 5m; expected 1.'
+            description: 'Tenant {{ .id }} alert rules are silenced. Check the {{ .id }}-ruler pod and prom-label-proxy-{{ .id }} pod in {{ $.Values.namespace }} first.'
+{{- end }}
+        - alert: TenantRulerRuleEvaluationFailures
+          expr: increase(prometheus_rule_evaluation_failures_total{job="thanos-ruler-operated"}[10m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+            namespace: {{ .Values.namespace }}
+          annotations:
+            summary: '{{ $o }} $value {{ $c }} rule evaluation failures in 10m; expected 0.'
+            description: 'Tenant {{ $o }} reReplaceAll "-ruler$" "" $labels.ruler {{ $c }} alert rules may be silenced. Check the {{ $o }} $labels.ruler {{ $c }} pod and prom-label-proxy-{{ $o }} reReplaceAll "-ruler$" "" $labels.ruler {{ $c }} pod in {{ .Values.namespace }} first.'
+        - alert: TenantRulerAlertSendFailures
+          expr: increase(thanos_alert_sender_errors_total{job="thanos-ruler-operated"}[10m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+            namespace: {{ .Values.namespace }}
+          annotations:
+            summary: '{{ $o }} $value {{ $c }} alert send failures in 10m; expected 0.'
+            description: 'Tenant {{ $o }} reReplaceAll "-ruler$" "" $labels.ruler {{ $c }} alert rules may be silenced. Check the {{ $o }} $labels.ruler {{ $c }} pod and prom-label-proxy-{{ $o }} reReplaceAll "-ruler$" "" $labels.ruler {{ $c }} pod in {{ .Values.namespace }} first.'
 {{- end }}
 {{- end }}
