@@ -4,6 +4,70 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
+  # Mapped defaults fire once per severity and kind; mapped overrides retain tighter thresholds.
+  - interval: 1m
+    input_series:
+      - series: 'traces_spanmetrics_calls_total{service="checkout",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_UNSET"}'
+        values: '0+60x30'
+      - series: 'traces_spanmetrics_calls_total{service="checkout",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_ERROR"}'
+        values: '0+6x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="checkout",span_kind="SPAN_KIND_SERVER",le="1"}'
+        values: '0+33x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="checkout",span_kind="SPAN_KIND_SERVER",le="5"}'
+        values: '0+66x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="checkout",span_kind="SPAN_KIND_SERVER",le="+Inf"}'
+        values: '0+66x30'
+      - series: 'traces_spanmetrics_calls_total{service="catalog",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_UNSET"}'
+        values: '0+60x30'
+      - series: 'traces_spanmetrics_calls_total{service="catalog",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_ERROR"}'
+        values: '0+1x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="catalog",span_kind="SPAN_KIND_SERVER",le="1"}'
+        values: '0+61x30'
+      - series: 'traces_spanmetrics_latency_bucket{service="catalog",span_kind="SPAN_KIND_SERVER",le="+Inf"}'
+        values: '0+61x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ServiceErrorRateHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, service: checkout, namespace: shop-prod }
+            exp_annotations:
+              summary: Service checkout is failing 9.091% of requests
+              description: Server spans with status ERROR are above 2% for 10m. Open the Service overview (RED) dashboard and the error traces for this service.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+              dashboard_url: /d/lgtm-service-red/service-overview-red?var-service=checkout
+          - exp_labels: { severity: critical, service: checkout, namespace: shop-prod }
+            exp_annotations:
+              summary: Service checkout is failing 9.091% of requests
+              description: Server spans with status ERROR are above 5% for 10m. Open the Service overview (RED) dashboard and the error traces for this service.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+              dashboard_url: /d/lgtm-service-red/service-overview-red?var-service=checkout
+          - exp_labels: { severity: critical, service: catalog, namespace: shop-data }
+            exp_annotations:
+              summary: Service catalog is failing 1.639% of requests
+              description: Server spans with status ERROR are above 1% for 10m. Open the Service overview (RED) dashboard and the error traces for this service.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+              dashboard_url: /d/lgtm-service-red/service-overview-red?var-service=catalog
+      - eval_time: 20m
+        alertname: ServiceLatencyHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, service: checkout, namespace: shop-prod }
+            exp_annotations:
+              summary: Service checkout p95 latency is 4.6s
+              description: p95 of server spans is above 1s for 10m. Check the slowest routes on the Service overview (RED) dashboard.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+              dashboard_url: /d/lgtm-service-red/service-overview-red?var-service=checkout
+          - exp_labels: { severity: critical, service: checkout, namespace: shop-prod }
+            exp_annotations:
+              summary: Service checkout p95 latency is 4.6s
+              description: p95 of server spans is above 3s for 10m. Check the slowest routes on the Service overview (RED) dashboard.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+              dashboard_url: /d/lgtm-service-red/service-overview-red?var-service=checkout
+          - exp_labels: { severity: critical, service: catalog, namespace: shop-data }
+            exp_annotations:
+              summary: Service catalog p95 latency is 950ms
+              description: p95 of server spans is above 0.5s for 10m. Check the slowest routes on the Service overview (RED) dashboard.
+              runbook_url: https://github.com/spartan-stratos/helm-charts/blob/master/charts/lgtm-stack/README.md#service-alerts
+              dashboard_url: /d/lgtm-service-red/service-overview-red?var-service=catalog
   # 1 req/s per service unless noted
   - interval: 1m
     input_series:
