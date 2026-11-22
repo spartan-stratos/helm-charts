@@ -1,4 +1,4 @@
-# Pre-auth history belongs to tenant fake; keep log and trace links inside that tenant until retention expires.
+# Pre-auth traces belong to tenant single-tenant (Tempo's id when auth is off; Loki uses fake); keep trace links inside it until retention expires.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,4 +33,4 @@ data:
             tags:
               - { key: service.name, value: service }
         secureJsonData:
-          httpHeaderValue1: "fake"
+          httpHeaderValue1: "single-tenant"

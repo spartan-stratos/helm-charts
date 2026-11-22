@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.5.1 (2026-11-22)
+
+### Bug Fixes
+
+* The legacy Tempo datasource now sends `X-Scope-OrgID: single-tenant`, the id Tempo gives pre-flip traces when authentication is off. It sent `fake` (Loki's id), so legacy trace searches found nothing. The legacy Loki datasource is unchanged.
+* `single-tenant` is now a reserved tenant id alongside `fake`: a tenant with that id would read the pre-flip traces.
+
 ## 0.5.0 (2026-11-22)
 
 ### Breaking changes

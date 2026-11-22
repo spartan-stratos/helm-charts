@@ -262,7 +262,7 @@ tests:
           value: grafana-datasource-tempo
         documentIndex: 1
 
-  - it: "renders legacy datasources in fake with reciprocal links"
+  - it: "renders legacy datasources in the pre-flip tenants with reciprocal links"
     set:
       addon: grafanaDatasourcesLegacy
       addons.grafanaDatasourcesLegacy.enabled: true
@@ -314,7 +314,7 @@ tests:
         documentIndex: 1
       - matchRegex:
           path: data["tempo-legacy.yaml"]
-          pattern: 'httpHeaderValue1: "fake"'
+          pattern: 'httpHeaderValue1: "single-tenant"'
         documentIndex: 1
       - matchRegex:
           path: data["tempo-legacy.yaml"]
