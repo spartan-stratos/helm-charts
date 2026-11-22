@@ -148,7 +148,7 @@ a missing webhook Secret also prevents reconciliation. Create the Secret before 
 
 Tenant ids must match `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and contain at most 30 characters.
 They use lowercase letters, digits and internal hyphens, starting and ending with a letter or digit.
-The configured `platformTenant` (default `platform`) and `fake` are reserved tenant ids, and each tenant requires a port.
+The configured `platformTenant` (default `platform`) `fake` (Loki) and `single-tenant` (Tempo) are reserved tenant ids, and each tenant requires a port.
 Tenant ids and ports must be unique. Ports must be integers in 1024..65535.
 
 The platform must label each tenant namespace `lgtm-stack/tenant=<id>` BEFORE its rules sync.
@@ -178,7 +178,7 @@ The flag does not enable backend authentication itself. Platform Alloy and platf
 - Platform Alloy and platform Grafana datasources already send the platform tenant header. The tenant gateway
   starts accepting logs and traces, and tenant Loki and Tempo datasources appear.
 - Check ad-hoc readers and writers first: any other Loki or Tempo client without `X-Scope-OrgID` fails once auth is on.
-- Pre-flip data belongs to tenant `fake`; read it through the legacy datasources. Remove them once the configured
+- Pre-flip data belongs to tenant `fake` in Loki and `single-tenant` in Tempo; read it through the legacy datasources. Remove them once the configured
   retention has passed since the flip date. Defaults: Loki `336h` (14 days, `presets/loki.yaml`) and Tempo `168h`
   (7 days, `presets/tempo.yaml`). Deployments may override these; read the deployment's own retention values and
   count from its flip date.

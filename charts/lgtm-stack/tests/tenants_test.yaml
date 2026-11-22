@@ -13,14 +13,21 @@ tests:
       tenants: [{ id: platform, port: 4320 }]
     asserts:
       - failedTemplate:
-          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+          errorMessage: tenant id must not equal platformTenant or the reserved ids fake and single-tenant
   - it: rejects the reserved single-tenant id
     template: templates/applications.yaml
     set:
       tenants: [{ id: fake, port: 4320 }]
     asserts:
       - failedTemplate:
-          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+          errorMessage: tenant id must not equal platformTenant or the reserved ids fake and single-tenant
+  - it: rejects the Tempo single-tenant id
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: single-tenant, port: 4320 }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant id must not equal platformTenant or the reserved ids fake and single-tenant
   - it: rejects a custom platform tenant id
     template: templates/applications.yaml
     set:
@@ -28,7 +35,7 @@ tests:
       tenants: [{ id: custom, port: 4320 }]
     asserts:
       - failedTemplate:
-          errorMessage: tenant id must not equal platformTenant or the reserved id fake
+          errorMessage: tenant id must not equal platformTenant or the reserved ids fake and single-tenant
   - it: rejects a tenant without a port
     template: templates/applications.yaml
     set:
