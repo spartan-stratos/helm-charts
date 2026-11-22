@@ -83,11 +83,11 @@ tests:
         documentIndex: 1
       - equal:
           path: spec.podSelector.matchLabels
-          value: { app.kubernetes.io/name: prometheus, prometheus: kube-prometheus-stack }
+          value: { app.kubernetes.io/name: prometheus, prometheus: kube-prometheus-stack-prometheus }
         documentIndex: 2
       - equal:
           path: spec.podSelector.matchLabels
-          value: { app.kubernetes.io/name: alertmanager, alertmanager: kube-prometheus-stack }
+          value: { app.kubernetes.io/name: alertmanager, alertmanager: kube-prometheus-stack-alertmanager }
         documentIndex: 3
   - it: adds allowed namespaces to every backend
     template: templates/addon.yaml

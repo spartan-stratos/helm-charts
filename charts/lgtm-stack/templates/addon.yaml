@@ -17,7 +17,7 @@ spec:
       {{- if has $backend (list "loki" "tempo") }}
       app.kubernetes.io/instance: {{ $backend }}
       {{- else }}
-      {{ $backend }}: kube-prometheus-stack
+      {{ $backend }}: kube-prometheus-stack-{{ $backend }}
       {{- end }}
   policyTypes: [Ingress]
   ingress:
