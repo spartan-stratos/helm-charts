@@ -24,7 +24,20 @@ data:
 {{ include (printf "lgtm-stack.rules.%s" .) $ }}
 {{- end }}
 {{- range $a.files }}
-{{- $m := $.Files.Get (printf "files/manifests/%s" .)
+{{- $m := $.Files.Get (printf "files/manifests/%s" .) }}
+{{- if and (eq . "alertmanager-slack.yaml") $.Values.alerting.slack.toolNamespaces }}
+{{- if not $.Values.alerting.slack.sharedNamespaces }}
+{{- fail "alerting.slack.sharedNamespaces must be non-empty when alerting.slack.toolNamespaces is set" }}
+{{- end }}
+{{- $tools := join "|" $.Values.alerting.slack.toolNamespaces }}
+{{- $receiver := regexFind "(?s)    - name: slack\n.*" $m
+  | replace "    - name: slack\n" "    - name: slack-tools\n"
+  | replace "__SLACK_SECRET_NAME__" $.Values.alerting.slack.toolSecretName }}
+{{- $route := printf "      - receiver: slack-tools\n        continue: true\n        matchers:\n          - name: severity\n            matchType: \"=~\"\n            value: warning|critical\n          - name: namespace\n            matchType: \"=~\"\n            value: %s\n" $tools }}
+{{- $m = replace "  receivers:\n" (printf "%s  receivers:\n" $route) $m }}
+{{- $m = printf "%s\n%s" (trimSuffix "\n" $m) $receiver }}
+{{- end }}
+{{- $m = $m
   | replace "__CLUSTER_NAME__" (required "cluster.name is required" $.Values.cluster.name)
   | replace "__SLACK_SECRET_NAME__" $.Values.alerting.slack.secretName
   | replace "__SLACK_SECRET_KEY__" $.Values.alerting.slack.secretKey }}
