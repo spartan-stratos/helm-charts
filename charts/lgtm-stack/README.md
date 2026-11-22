@@ -128,6 +128,20 @@ default. Lists are replaced, not appended.
 | `project.repoURL` / `.path` / `.targetRevision` | `""` / `""` / `HEAD` | Where that folder is. `repoURL` and `path` are required |
 | `self.*` | this chart's repo and version | Where the addon Applications pull this chart; set `repoURL` (git), `path` and `targetRevision` to test a branch |
 
+### NetworkPolicy
+
+`networkPolicy.enabled` defaults to `false`. Enabling it creates a separate `lgtm-network-policy` addon Application.
+Its four ingress-only policies fence Loki, Tempo, Prometheus and Alertmanager pods in `namespace`.
+They allow pods from that namespace and namespaces in `networkPolicy.allowFromNamespaces` (default `[]`) on all ports.
+Grafana, the gateway, Alloy and prom-label-proxy are not fenced. Egress is unchanged.
+This is a no-op unless the cluster CNI enforces NetworkPolicy. Check kubelet probe reachability when enforcement is turned on.
+
+Rollback: set `networkPolicy.enabled: false`, sync, and verify the `lgtm-network-policy` child Application and its four NetworkPolicies are pruned.
+Before turning the gateway's log or trace forwarding on for a tenant, check that each SDK's logs and spans carry the resource `k8s.namespace.name`; otherwise they are dropped.
+
+Tenant receiver lists must contain at least one receiver, and receiver paths must start with `/`.
+Gateway logs and traces without a resource namespace are dropped; namespace-less metrics remain accepted for ruler namespace injection.
+
 ### Secrets
 
 The presets expect these Secrets in `monitoring`. They are not created by the chart; use External Secrets or create
@@ -185,7 +199,7 @@ Receiver paths default to `/<id>/<name>`; `ingress` defaults to true. Paths must
 and ingress paths cannot contain another ingress path at a `/` boundary. With `ingress: false`, send directly to
 `http://alloy-gateway.monitoring.svc.cluster.local:<port>/<id>/<name>/v1/{metrics,logs,traces}`
 (use the configured path when overridden). Public receivers use the ingress host and the same signal suffixes.
-Namespace-less telemetry still passes the filters; separate receivers do not close that existing gap.
+Namespace-less metrics still pass the filters; separate receivers do not close that existing gap. Logs and spans without a resource `k8s.namespace.name` are dropped.
 
 The platform must label each tenant namespace `lgtm-stack/tenant=<id>` BEFORE its rules sync.
 An unlabelled namespace's rules are evaluated by both the main Prometheus and the tenant ruler.

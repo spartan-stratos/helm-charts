@@ -40,6 +40,11 @@ self:
 # Fixed: the presets wire components together through monitoring.svc.cluster.local URLs
 namespace: monitoring
 
+networkPolicy:
+  # Only effective where the CNI enforces NetworkPolicy, which prod does not yet.
+  enabled: false
+  allowFromNamespaces: []
+
 platformTenant: platform
 # See README.md Tenant gateway receivers for credential and namespace isolation configuration.
 tenants: []

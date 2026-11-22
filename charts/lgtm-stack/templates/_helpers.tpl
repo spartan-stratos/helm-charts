@@ -134,6 +134,10 @@ clusterInfo:
   app: cluster-info
   wave: 10
   files: [cluster-info.yaml]
+networkPolicy:
+  app: network-policy
+  wave: 10
+  files: []
 gateway:
   app: gateway
   wave: 54

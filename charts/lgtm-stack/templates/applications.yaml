@@ -10,8 +10,10 @@
 {{- if or (eq $tenant.id $.Values.platformTenant) (eq $tenant.id "fake") (eq $tenant.id "single-tenant") }}{{ fail "tenant id must not equal platformTenant or the reserved ids fake and single-tenant" }}{{ end }}
 {{- if hasKey $tenant "receivers" }}
 {{- if or (hasKey $tenant "port") (hasKey $tenant "htpasswdSecret") }}{{ fail "tenant receivers and tenant-level port/htpasswdSecret are mutually exclusive" }}{{ end }}
+{{- if empty $tenant.receivers }}{{ fail "a receivers tenant needs at least one receiver" }}{{ end }}
 {{- $names := dict }}
 {{- range $receiver := $tenant.receivers }}
+{{- if and $receiver.path (not (hasPrefix "/" $receiver.path)) }}{{ fail "receiver path must start with /" }}{{ end }}
 {{- if or (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" ($receiver.name | default ""))) (gt (len ($receiver.name | default "")) 63) }}{{ fail "receiver name must be a DNS-1123 label of at most 63 characters" }}{{ end }}
 {{- if hasKey $names $receiver.name }}{{ fail "receiver names must be unique per tenant" }}{{ end }}
 {{- $_ := set $names $receiver.name true }}
@@ -106,6 +108,8 @@ spec:
 {{- $enabled := false }}
 {{- if eq $key "alertmanagerConfig" }}
 {{- $enabled = $.Values.alerting.slack.enabled }}
+{{- else if eq $key "networkPolicy" }}
+{{- $enabled = $.Values.networkPolicy.enabled }}
 {{- else if eq $key "gateway" }}
 {{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.alloyGateway.enabled $.Values.gateway.ingress.enabled }}
 {{- else if eq $key "tenantRules" }}
@@ -138,6 +142,9 @@ spec:
         mode: addon
         addon: {{ $key }}
         namespace: {{ $.Values.namespace }}
+        {{- if eq $key "networkPolicy" }}
+        networkPolicy: {{- toYaml $.Values.networkPolicy | nindent 10 }}
+        {{- end }}
         {{- if or (eq $key "tenantOrgs") (eq $key "gateway") }}
         tenantIsolation: {{- toYaml $.Values.tenantIsolation | nindent 10 }}
         {{- end }}

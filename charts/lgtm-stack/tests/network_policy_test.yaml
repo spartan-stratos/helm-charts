@@ -1,0 +1,105 @@
+suite: Backend NetworkPolicy
+templates:
+  - templates/addon.yaml
+  - templates/applications.yaml
+set:
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+tests:
+  - it: renders no policies by default
+    template: templates/addon.yaml
+    set: { mode: addon, addon: networkPolicy }
+    asserts:
+      - hasDocuments: { count: 0 }
+  - it: renders no policy Application by default
+    template: templates/applications.yaml
+    asserts:
+      - notEqual:
+          path: metadata.name
+          value: lgtm-network-policy
+  - it: wires the independent addon and forwards namespace permissions
+    template: templates/applications.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.allowFromNamespaces: [tenant-rulers]
+    documentSelector:
+      path: metadata.name
+      value: lgtm-network-policy
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject
+          value:
+            mode: addon
+            addon: networkPolicy
+            namespace: monitoring
+            networkPolicy: { enabled: true, allowFromNamespaces: [tenant-rulers] }
+            cluster: { name: example-cluster }
+            alerting:
+              slack:
+                enabled: false
+                secretName: alert-slack
+                secretKey: webhook-url
+                unrouted: { enabled: true }
+                ownedNamespaces: []
+                sharedNamespaces: []
+              rules:
+                services:
+                  enabled: true
+                  minRequestRate: 0.1
+                  errorRate: { warning: 0.02, critical: 0.05, for: 10m }
+                  latencyP95: { warning: 1, critical: 3, for: 10m }
+                  overrides: {}
+                  namespaces: {}
+                workloads: { enabled: true, memoryLimitRatio: 0.9 }
+            grafana: { domain: "" }
+  - it: fences exactly four backends with ingress only in the configured namespace
+    template: templates/addon.yaml
+    set:
+      mode: addon
+      addon: networkPolicy
+      namespace: observability
+      networkPolicy.enabled: true
+    asserts:
+      - hasDocuments: { count: 4 }
+      - isKind: { of: NetworkPolicy }
+      - equal:
+          path: metadata.namespace
+          value: observability
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress]
+      - notExists: { path: spec.egress }
+      - equal:
+          path: spec.ingress
+          value: [{ from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: observability } } }] }]
+      - equal:
+          path: spec.podSelector.matchLabels
+          value: { app.kubernetes.io/name: loki, app.kubernetes.io/instance: loki }
+        documentIndex: 0
+      - equal:
+          path: spec.podSelector.matchLabels
+          value: { app.kubernetes.io/name: tempo, app.kubernetes.io/instance: tempo }
+        documentIndex: 1
+      - equal:
+          path: spec.podSelector.matchLabels
+          value: { app.kubernetes.io/name: prometheus, prometheus: kube-prometheus-stack }
+        documentIndex: 2
+      - equal:
+          path: spec.podSelector.matchLabels
+          value: { app.kubernetes.io/name: alertmanager, alertmanager: kube-prometheus-stack }
+        documentIndex: 3
+  - it: adds allowed namespaces to every backend
+    template: templates/addon.yaml
+    set:
+      mode: addon
+      addon: networkPolicy
+      networkPolicy.enabled: true
+      networkPolicy.allowFromNamespaces: [tenant-a, tenant-b]
+    asserts:
+      - equal:
+          path: spec.ingress[0].from
+          value:
+            - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
+            - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: tenant-a } }
+            - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: tenant-b } }

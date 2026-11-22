@@ -65,10 +65,10 @@ alloy:
         }
 {{- if $.Values.tenantIsolation.enabled }}
         logs {
-          log_record = [{{ printf "resource.attributes[\"k8s.namespace.name\"] != nil and not IsMatch(resource.attributes[\"k8s.namespace.name\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}, {{ printf "attributes[\"namespace\"] != nil and not IsMatch(attributes[\"namespace\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}]
+          log_record = ["resource.attributes[\"k8s.namespace.name\"] == nil", {{ printf "resource.attributes[\"k8s.namespace.name\"] != nil and not IsMatch(resource.attributes[\"k8s.namespace.name\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}, {{ printf "attributes[\"namespace\"] != nil and not IsMatch(attributes[\"namespace\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}]
         }
         traces {
-          span = [{{ printf "resource.attributes[\"k8s.namespace.name\"] != nil and not IsMatch(resource.attributes[\"k8s.namespace.name\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}, {{ printf "attributes[\"namespace\"] != nil and not IsMatch(attributes[\"namespace\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}]
+          span = ["resource.attributes[\"k8s.namespace.name\"] == nil", {{ printf "resource.attributes[\"k8s.namespace.name\"] != nil and not IsMatch(resource.attributes[\"k8s.namespace.name\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}, {{ printf "attributes[\"namespace\"] != nil and not IsMatch(attributes[\"namespace\"], \"^(%s)$\")" (join "|" $tenant.namespaces) | quote }}]
         }
 {{- end }}
         output {

@@ -10,6 +10,23 @@ set:
   cluster.name: example-cluster
 
 tests:
+  - it: rejects an empty receivers tenant
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, namespaces: [example], receivers: [] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: a receivers tenant needs at least one receiver
+  - it: rejects receiver paths without a leading slash
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - id: example
+          namespaces: [example]
+          receivers: [{ name: dev, port: 4320, path: example/dev, namespaces: [example] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: receiver path must start with /
   - it: "keeps only the sync-wave annotation by default"
     template: templates/applications.yaml
     documentSelector:
@@ -114,7 +131,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.8.0
+          value: 0.9.0
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info

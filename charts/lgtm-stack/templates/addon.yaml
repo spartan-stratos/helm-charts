@@ -2,6 +2,33 @@
 {{- if eq .Values.mode "addon" }}
 {{- $a := index (include "lgtm-stack.addons" . | fromYaml) .Values.addon }}
 {{- if not $a }}{{ fail (printf "unknown addon %q" .Values.addon) }}{{ end }}
+{{- if and (eq .Values.addon "networkPolicy") .Values.networkPolicy.enabled }}
+{{- range $backend := list "loki" "tempo" "prometheus" "alertmanager" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lgtm-{{ $backend }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $backend }}
+      {{- if has $backend (list "loki" "tempo") }}
+      app.kubernetes.io/instance: {{ $backend }}
+      {{- else }}
+      {{ $backend }}: kube-prometheus-stack
+      {{- end }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range prepend $.Values.networkPolicy.allowFromNamespaces $.Values.namespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
+{{- end }}
+{{- end }}
 {{- if $a.dashboards }}
 {{- range $path, $_ := $.Files.Glob "files/dashboards/*/*.json" }}
 {{- $name := base $path | trimSuffix ".json" }}
