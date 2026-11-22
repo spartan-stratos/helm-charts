@@ -148,8 +148,44 @@ a missing webhook Secret also prevents reconciliation. Create the Secret before 
 
 Tenant ids must match `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and contain at most 30 characters.
 They use lowercase letters, digits and internal hyphens, starting and ending with a letter or digit.
-The configured `platformTenant` (default `platform`) `fake` (Loki) and `single-tenant` (Tempo) are reserved tenant ids, and each tenant requires a port.
-Tenant ids and ports must be unique. Ports must be integers in 1024..65535.
+The configured `platformTenant` (default `platform`) `fake` (Loki) and `single-tenant` (Tempo) are reserved tenant ids.
+Tenant ids and gateway receiver ports must be unique. Ports must be integers in 1024..65535.
+
+#### Tenant gateway receivers
+
+A legacy tenant uses tenant-level `port` and `htpasswdSecret`, with ingress path `/<id>`.
+To isolate environments under one tenant id, use `receivers` instead of those two tenant-level fields:
+
+```yaml
+tenants:
+  - id: example
+    namespaces: [example-dev, example-prod]
+    receivers:
+      - name: dev
+        port: 4320
+        path: /example
+        namespaces: [example-dev]
+        htpasswdSecret: { name: example-dev-otlp, key: htpasswd }
+      - name: prod
+        port: 4321
+        ingress: false
+        namespaces: [example-prod]
+        htpasswdSecret: { name: example-prod-otlp, key: htpasswd }
+gateway:
+  ingress:
+    enabled: true
+    host: otlp.example.com
+```
+
+Each receiver has its own port, auth file and namespace filter, while all receivers write the same tenant id.
+Receiver names must be unique within a tenant and DNS-1123 labels of at most 63 characters.
+Each receiver requires a non-empty namespace list drawn from the tenant's namespaces.
+The tenant-level namespace union still controls rulers, the label proxy and Grafana organizations.
+Receiver paths default to `/<id>/<name>`; `ingress` defaults to true. Paths must be unique across all lanes,
+and ingress paths cannot contain another ingress path at a `/` boundary. With `ingress: false`, send directly to
+`http://alloy-gateway.monitoring.svc.cluster.local:<port>/<id>/<name>/v1/{metrics,logs,traces}`
+(use the configured path when overridden). Public receivers use the ingress host and the same signal suffixes.
+Namespace-less telemetry still passes the filters; separate receivers do not close that existing gap.
 
 The platform must label each tenant namespace `lgtm-stack/tenant=<id>` BEFORE its rules sync.
 An unlabelled namespace's rules are evaluated by both the main Prometheus and the tenant ruler.

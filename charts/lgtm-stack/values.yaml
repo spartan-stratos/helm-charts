@@ -41,8 +41,7 @@ self:
 namespace: monitoring
 
 platformTenant: platform
-# Each credential binds to one receiver port and a server-selected tenant; namespaces lists the tenant namespaces whose rules run in its own ruler.
-# Entry: { id: example, port: 4320, namespaces: [example], htpasswdSecret: { name: example-otlp, key: htpasswd } }
+# See README.md Tenant gateway receivers for credential and namespace isolation configuration.
 tenants: []
 # Keep tenant logs and traces disabled until their backends enforce tenant authentication.
 tenantIsolation:

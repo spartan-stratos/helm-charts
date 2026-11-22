@@ -8,12 +8,39 @@
 {{- if hasKey $tenantIds $tenant.id }}{{ fail "tenant ids must be unique" }}{{ end }}
 {{- $_ := set $tenantIds $tenant.id true }}
 {{- if or (eq $tenant.id $.Values.platformTenant) (eq $tenant.id "fake") (eq $tenant.id "single-tenant") }}{{ fail "tenant id must not equal platformTenant or the reserved ids fake and single-tenant" }}{{ end }}
-{{- if empty $tenant.port }}{{ fail "tenant port is required" }}{{ end }}
-{{- $port := toString $tenant.port }}
-{{- if or (kindIs "string" $tenant.port) (not (regexMatch "^[0-9]+$" $port)) (lt (float64 $tenant.port) 1024.0) (gt (float64 $tenant.port) 65535.0) }}{{ fail "tenant port must be an integer in 1024..65535" }}{{ end }}
-{{- $portKey := printf "%d" (int $tenant.port) }}
+{{- if hasKey $tenant "receivers" }}
+{{- if or (hasKey $tenant "port") (hasKey $tenant "htpasswdSecret") }}{{ fail "tenant receivers and tenant-level port/htpasswdSecret are mutually exclusive" }}{{ end }}
+{{- $names := dict }}
+{{- range $receiver := $tenant.receivers }}
+{{- if or (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" ($receiver.name | default ""))) (gt (len ($receiver.name | default "")) 63) }}{{ fail "receiver name must be a DNS-1123 label of at most 63 characters" }}{{ end }}
+{{- if hasKey $names $receiver.name }}{{ fail "receiver names must be unique per tenant" }}{{ end }}
+{{- $_ := set $names $receiver.name true }}
+{{- if empty $receiver.namespaces }}{{ fail "receiver namespaces must be non-empty" }}{{ end }}
+{{- range $receiver.namespaces }}
+{{- if not (has . ($tenant.namespaces | default list)) }}{{ fail "receiver namespaces must be a subset of tenant namespaces" }}{{ end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $lanes := include "lgtm-stack.gatewayLanes" . | fromYamlArray }}
+{{- $paths := dict }}
+{{- $ingressPaths := list }}
+{{- range $lane := $lanes }}
+{{- if empty $lane.port }}{{ fail "tenant port is required" }}{{ end }}
+{{- $port := toString $lane.port }}
+{{- if or (kindIs "string" $lane.port) (not (regexMatch "^[0-9]+$" $port)) (lt (float64 $lane.port) 1024.0) (gt (float64 $lane.port) 65535.0) }}{{ fail "tenant port must be an integer in 1024..65535" }}{{ end }}
+{{- $portKey := printf "%d" (int $lane.port) }}
 {{- if hasKey $tenantPorts $portKey }}{{ fail "tenant ports must be unique" }}{{ end }}
 {{- $_ := set $tenantPorts $portKey true }}
+{{- if hasKey $paths $lane.path }}{{ fail "gateway lane paths must be unique" }}{{ end }}
+{{- $_ := set $paths $lane.path true }}
+{{- if $lane.ingress }}
+{{- $path := trimSuffix "/" $lane.path }}
+{{- range $ingressPaths }}
+{{- if or (hasPrefix (printf "%s/" .) $path) (hasPrefix (printf "%s/" $path) .) (eq . $path) }}{{ fail "gateway ingress paths must not overlap at a / boundary" }}{{ end }}
+{{- end }}
+{{- $ingressPaths = append $ingressPaths $path }}
+{{- end }}
 {{- end }}
 {{- $components := include "lgtm-stack.components" . | fromYaml }}
 {{- if hasKey $components "Error" }}{{ fail $components.Error }}{{ end }}
