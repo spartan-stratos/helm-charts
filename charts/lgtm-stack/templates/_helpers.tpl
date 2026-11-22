@@ -161,6 +161,10 @@ grafanaDatasources:
   app: grafana-datasources
   wave: 51
   files: [grafana-datasource-loki.yaml, grafana-datasource-tempo.yaml]
+grafanaDatasourcesLegacy:
+  app: grafana-datasources-legacy
+  wave: 51
+  files: [grafana-datasource-loki-legacy.yaml, grafana-datasource-tempo-legacy.yaml]
 # Needs the operator's CRD and webhook
 instrumentation:
   app: instrumentation
