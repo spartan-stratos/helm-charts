@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.1 (2026-11-22)
+
+### Features
+
+* Set `alerting.slack.sharedNamespaces` to send only listed namespaces and cluster-level warning and critical alerts to the shared Slack channel. When set, it overrides `ownedNamespaces`.
+
 ## 0.4.0 (2026-11-22)
 
 ### Features

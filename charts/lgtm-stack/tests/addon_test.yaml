@@ -191,6 +191,45 @@ tests:
                 - { name: severity, value: critical }
                 - { name: namespace, matchType: "=~", value: "service-dietfit|service-x" }
 
+  - it: "includes only shared namespaces and cluster-level alerts on the shared Slack route"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.sharedNamespaces: [service-a, service-b]
+    asserts:
+      - equal:
+          path: spec.route.routes
+          value:
+            - receiver: slack
+              continue: true
+              matchers:
+                - { name: severity, matchType: "=~", value: "warning|critical" }
+                - { name: namespace, matchType: "=~", value: "service-a|service-b" }
+            - receiver: slack
+              continue: true
+              matchers:
+                - { name: severity, matchType: "=~", value: "warning|critical" }
+                - { name: namespace, value: "" }
+
+  - it: "ignores owned namespaces when shared namespaces are set"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.sharedNamespaces: [service-a, service-b]
+      alerting.slack.ownedNamespaces: [service-a, service-c]
+    asserts:
+      - equal:
+          path: spec.route.routes
+          value:
+            - receiver: slack
+              continue: true
+              matchers:
+                - { name: severity, matchType: "=~", value: "warning|critical" }
+                - { name: namespace, matchType: "=~", value: "service-a|service-b" }
+            - receiver: slack
+              continue: true
+              matchers:
+                - { name: severity, matchType: "=~", value: "warning|critical" }
+                - { name: namespace, value: "" }
+
   - it: "puts the Java agent image on the default Instrumentation, and omits it when empty"
     set:
       addon: instrumentation

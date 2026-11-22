@@ -34,9 +34,13 @@ data:
 {{- else }}
 {{- $m = regexReplaceAll "(?m)^.*__JAVA_AGENT_IMAGE__.*\n?" $m "" }}
 {{- end }}
-{{- with $.Values.alerting.slack.ownedNamespaces }}
+{{- if $.Values.alerting.slack.sharedNamespaces }}
+{{- $shared := join "|" $.Values.alerting.slack.sharedNamespaces }}
+{{- $m = replace "__SLACK_OWNED_MATCHER__" (printf "- name: namespace\n            matchType: \"=~\"\n            value: %s" $shared) $m }}
+{{- $m = replace "__SLACK_OWNED_CRITICAL_ROUTE__" "- receiver: slack\n        continue: true\n        matchers:\n          - name: severity\n            matchType: \"=~\"\n            value: warning|critical\n          - name: namespace\n            value: \"\"" $m }}
+{{- else if $.Values.alerting.slack.ownedNamespaces }}
 {{- /* Owned namespaces route to their own AlertmanagerConfig: the shared channel keeps only their critical alerts */}}
-{{- $owned := join "|" . }}
+{{- $owned := join "|" $.Values.alerting.slack.ownedNamespaces }}
 {{- $m = replace "__SLACK_OWNED_MATCHER__" (printf "- name: namespace\n            matchType: \"!~\"\n            value: %s" $owned) $m }}
 {{- $m = replace "__SLACK_OWNED_CRITICAL_ROUTE__" (printf "- receiver: slack\n        continue: true\n        matchers:\n          - name: severity\n            value: critical\n          - name: namespace\n            matchType: \"=~\"\n            value: %s" $owned) $m }}
 {{- else }}
