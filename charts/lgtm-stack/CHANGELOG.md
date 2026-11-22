@@ -2,11 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.4.3 (2026-11-22)
+## 0.5.0 (2026-11-22)
 
-### Features
+### Breaking changes
 
-* Route warning and critical alerts from `alerting.slack.toolNamespaces` to a second Slack channel using `toolSecretName`. Requires non-empty `sharedNamespaces` and reuses the shared message template and webhook key.
+* Removed `alerting.slack.toolNamespaces` and `alerting.slack.toolSecretName` (added in 0.4.3). Routing a set of namespaces to their own channel is deployment config: give each namespace its own AlertmanagerConfig with the `spartan-alerts` chart. Rendering with neither value set is unchanged.
 
 ## 0.4.2 (2026-11-22)
 

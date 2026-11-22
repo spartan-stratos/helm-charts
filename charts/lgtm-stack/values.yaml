@@ -93,10 +93,6 @@ alerting:
     # When non-empty, only these namespaces and cluster-level alerts reach the shared channel; ownedNamespaces is ignored.
     # Any namespace not listed and without its own route is silent.
     sharedNamespaces: []
-    # Tool namespaces send warning and critical alerts to a second channel; requires non-empty sharedNamespaces.
-    toolNamespaces: []
-    # Webhook Secret for the tools channel, using the same secretKey as the shared channel.
-    toolSecretName: alert-slack-tools
   # Shared PrometheusRule bundles. A project's own rules go in its project folder (see `project`)
   rules:
     # RED per service from Tempo span metrics (server spans). Thresholds per severity; drop one to skip that severity
