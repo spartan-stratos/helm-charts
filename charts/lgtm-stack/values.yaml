@@ -87,11 +87,14 @@ alerting:
     enabled: false
     secretName: alert-slack
     secretKey: webhook-url
+    unrouted:
+      # Surface unclaimed alerts so missing namespace routes cannot silently drop them.
+      enabled: true
     # Namespaces whose own AlertmanagerConfig routes their alerts to a project channel. The shared channel then receives
-    # only their critical alerts, not warnings. Add a namespace only after its own route exists, or its warnings go nowhere.
+    # only their critical alerts, not warnings. Missing routes fall back to UNROUTED unless unrouted.enabled is false.
     ownedNamespaces: []
     # When non-empty, only these namespaces and cluster-level alerts reach the shared channel; ownedNamespaces is ignored.
-    # Any namespace not listed and without its own route is silent.
+    # Any namespace not listed and without its own route falls back to UNROUTED unless unrouted.enabled is false.
     sharedNamespaces: []
   # Shared PrometheusRule bundles. A project's own rules go in its project folder (see `project`)
   rules:

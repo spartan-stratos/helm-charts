@@ -320,6 +320,12 @@ the message links to Grafana:
 To silence a noisy kube-prometheus-stack default, set
 `components.kubePrometheusStack.values.defaultRules.disabled.<AlertName>: true`.
 
+`alerting.slack.sharedNamespaces` limits the shared route to listed namespaces and cluster-level alerts, overriding
+`ownedNamespaces`, which keeps only critical alerts from namespaces with their own routes.
+`alerting.slack.unrouted.enabled` defaults to true: alerts claimed by no tenant or shared route post to the same webhook
+with an `[UNROUTED]` title and guidance to add a `spartan-alerts` release or list the namespace in `sharedNamespaces`.
+Severity `info` and `none` never reach this fallback; missing or other severities can. Set it false to keep the old silent drop.
+
 ### Service alerts
 
 `alerting.rules.services` turns Tempo span metrics (server spans) into four recording rules per service
