@@ -207,3 +207,136 @@ tests:
     asserts:
       - notExists:
           path: spec.java.image
+
+  - it: "omits legacy datasources from the default addon"
+    set:
+      addon: grafanaDatasources
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: grafana-datasource-loki
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: grafana-datasource-tempo
+        documentIndex: 1
+
+  - it: "renders legacy datasources in fake with reciprocal links"
+    set:
+      addon: grafanaDatasourcesLegacy
+      addons.grafanaDatasourcesLegacy.enabled: true
+      platformTenant: custom-platform
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: grafana-datasource-loki-legacy
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki-legacy.yaml"]
+          pattern: 'uid: loki-legacy\n'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki-legacy.yaml"]
+          pattern: 'httpHeaderName1: X-Scope-OrgID'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki-legacy.yaml"]
+          pattern: 'httpHeaderValue1: "fake"'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki-legacy.yaml"]
+          pattern: 'datasourceUid: tempo-legacy\n'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki-legacy.yaml"]
+          pattern: 'isDefault: false'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki-legacy.yaml"]
+          pattern: 'name: Loki \(legacy\)'
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: grafana-datasource-tempo-legacy
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo-legacy.yaml"]
+          pattern: 'uid: tempo-legacy\n'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo-legacy.yaml"]
+          pattern: 'httpHeaderName1: X-Scope-OrgID'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo-legacy.yaml"]
+          pattern: 'httpHeaderValue1: "fake"'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo-legacy.yaml"]
+          pattern: 'datasourceUid: loki-legacy\n'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo-legacy.yaml"]
+          pattern: 'isDefault: false'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo-legacy.yaml"]
+          pattern: 'name: Tempo \(legacy\)'
+        documentIndex: 1
+
+  - it: "preserves platform datasources when legacy is enabled"
+    set:
+      addon: grafanaDatasources
+      addons.grafanaDatasourcesLegacy.enabled: true
+      platformTenant: custom-platform
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: grafana-datasource-loki
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki.yaml"]
+          pattern: 'uid: loki\n'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki.yaml"]
+          pattern: 'httpHeaderName1: X-Scope-OrgID'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki.yaml"]
+          pattern: 'httpHeaderValue1: "custom-platform"'
+        documentIndex: 0
+      - matchRegex:
+          path: data["loki.yaml"]
+          pattern: 'datasourceUid: tempo\n'
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: grafana-datasource-tempo
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo.yaml"]
+          pattern: 'uid: tempo\n'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo.yaml"]
+          pattern: 'httpHeaderName1: X-Scope-OrgID'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo.yaml"]
+          pattern: 'httpHeaderValue1: "custom-platform"'
+        documentIndex: 1
+      - matchRegex:
+          path: data["tempo.yaml"]
+          pattern: 'datasourceUid: loki\n'
+        documentIndex: 1
