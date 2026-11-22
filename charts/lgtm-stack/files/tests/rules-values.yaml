@@ -4,6 +4,10 @@ cluster:
 alerting:
   rules:
     services:
+      namespaces:
+        checkout: shop-prod
+        catalog: shop-data
       overrides:
+        catalog: { errorRate: { critical: 0.01 }, latencyP95: { critical: 0.5 } }
         payments: { errorRate: { critical: 0.01 } }
         batch.jobs: { enabled: false }

@@ -109,6 +109,8 @@ alerting:
       latencyP95: { warning: 1, critical: 3, for: 10m }
       # Per service, merged over the above, e.g. payments: { errorRate: { critical: 0.01 } } or batch: { enabled: false }
       overrides: {}
+      # Per service, namespace label on its own alert set; unmapped services keep no namespace label, e.g. checkout: shop-prod
+      namespaces: {}
     # Image pull failures, OOM kills, memory near the limit, pods annotated for injection but without an agent
     workloads:
       enabled: true
