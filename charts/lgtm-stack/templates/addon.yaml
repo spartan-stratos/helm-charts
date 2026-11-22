@@ -46,6 +46,19 @@ data:
 {{- else }}
 {{- $m = regexReplaceAll "(?m)^.*__SLACK_OWNED_[A-Z_]+__.*\n?" $m "" }}
 {{- end }}
+{{- if $.Values.alerting.slack.unrouted.enabled }}
+{{- $m = replace "__SLACK_ROOT_RECEIVER__" "slack-unrouted" $m }}
+{{- $m = replace "__SLACK_UNROUTED_NULL_ROUTE__" "- receiver: \"null\"\n        continue: true\n        matchers:\n          - name: severity\n            matchType: \"=~\"\n            value: info|none" $m }}
+{{- /* Reuse the Slack body so both receivers retain identical links and per-alert text. */}}
+{{- $receiver := regexFind "(?s)    - name: slack\\n.*" $m | trimSuffix "    __SLACK_UNROUTED_RECEIVER__\n" }}
+{{- $receiver = replace "- name: slack\n" "- name: slack-unrouted\n" $receiver }}
+{{- $receiver = replace "title: '[" "title: '[UNROUTED] [" $receiver }}
+{{- $receiver = replace "text: |-\n" "text: |-\n            No route claimed this alert. Add a spartan-alerts release for namespace {{ if .CommonLabels.namespace }}{{ .CommonLabels.namespace }}{{ else }}none{{ end }}, or list it in alerting.slack.sharedNamespaces.\n" $receiver }}
+{{- $m = replace "    __SLACK_UNROUTED_RECEIVER__\n" $receiver $m }}
+{{- else }}
+{{- $m = replace "__SLACK_ROOT_RECEIVER__" "\"null\"" $m }}
+{{- $m = regexReplaceAll "(?m)^.*__SLACK_UNROUTED_[A-Z_]+__.*\\n?" $m "" }}
+{{- end }}
 {{- with $.Values.grafana.domain }}
 {{- $m = replace "__GRAFANA_URL__" (printf "https://%s" .) $m }}
 {{- else }}

@@ -8,6 +8,173 @@ set:
   cluster.name: example-cluster
 
 tests:
+
+  - it: "renders unrouted on with shared namespaces"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.secretName: custom-slack
+      alerting.slack.secretKey: custom-key
+      alerting.slack.unrouted.enabled: true
+      alerting.slack.sharedNamespaces: [service-a]
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: slack-unrouted
+      - lengthEqual:
+          path: spec.route.routes
+          count: 3
+      - lengthEqual:
+          path: spec.receivers
+          count: 3
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }
+      - equal:
+          path: spec.route.routes[2]
+          value:
+            receiver: "null"
+            continue: true
+            matchers: [{ name: severity, matchType: "=~", value: "info|none" }]
+      - equal:
+          path: spec.receivers[2].name
+          value: slack-unrouted
+      - equal:
+          path: spec.receivers[2].slackConfigs[0].apiURL
+          value: { name: custom-slack, key: custom-key }
+
+  - it: "renders unrouted off with shared namespaces"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.secretName: custom-slack
+      alerting.slack.secretKey: custom-key
+      alerting.slack.unrouted.enabled: false
+      alerting.slack.sharedNamespaces: [service-a]
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: "null"
+      - lengthEqual:
+          path: spec.route.routes
+          count: 2
+      - lengthEqual:
+          path: spec.receivers
+          count: 2
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }
+      - notExists:
+          path: spec.receivers[2]
+
+  - it: "renders unrouted on with owned namespaces"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.secretName: custom-slack
+      alerting.slack.secretKey: custom-key
+      alerting.slack.unrouted.enabled: true
+      alerting.slack.ownedNamespaces: [service-a]
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: slack-unrouted
+      - lengthEqual:
+          path: spec.route.routes
+          count: 3
+      - lengthEqual:
+          path: spec.receivers
+          count: 3
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }
+      - equal:
+          path: spec.route.routes[2]
+          value:
+            receiver: "null"
+            continue: true
+            matchers: [{ name: severity, matchType: "=~", value: "info|none" }]
+      - equal:
+          path: spec.receivers[2].name
+          value: slack-unrouted
+      - equal:
+          path: spec.receivers[2].slackConfigs[0].apiURL
+          value: { name: custom-slack, key: custom-key }
+
+  - it: "renders unrouted off with owned namespaces"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.secretName: custom-slack
+      alerting.slack.secretKey: custom-key
+      alerting.slack.unrouted.enabled: false
+      alerting.slack.ownedNamespaces: [service-a]
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: "null"
+      - lengthEqual:
+          path: spec.route.routes
+          count: 2
+      - lengthEqual:
+          path: spec.receivers
+          count: 2
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }
+      - notExists:
+          path: spec.receivers[2]
+
+  - it: "renders unrouted on with neither namespaces"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.secretName: custom-slack
+      alerting.slack.secretKey: custom-key
+      alerting.slack.unrouted.enabled: true
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: slack-unrouted
+      - lengthEqual:
+          path: spec.route.routes
+          count: 2
+      - lengthEqual:
+          path: spec.receivers
+          count: 3
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }
+      - equal:
+          path: spec.route.routes[1]
+          value:
+            receiver: "null"
+            continue: true
+            matchers: [{ name: severity, matchType: "=~", value: "info|none" }]
+      - equal:
+          path: spec.receivers[2].name
+          value: slack-unrouted
+      - equal:
+          path: spec.receivers[2].slackConfigs[0].apiURL
+          value: { name: custom-slack, key: custom-key }
+
+  - it: "renders unrouted off with neither namespaces"
+    set:
+      addon: alertmanagerConfig
+      alerting.slack.secretName: custom-slack
+      alerting.slack.secretKey: custom-key
+      alerting.slack.unrouted.enabled: false
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: "null"
+      - lengthEqual:
+          path: spec.route.routes
+          count: 1
+      - lengthEqual:
+          path: spec.receivers
+          count: 2
+      - equal:
+          path: spec.receivers[0]
+          value: { name: "null" }
+      - notExists:
+          path: spec.receivers[2]
+
   - it: "renders cluster-info with the cluster name"
     set:
       addon: clusterInfo
@@ -22,12 +189,13 @@ tests:
     set:
       addon: alertmanagerConfig
       alerting.slack.secretName: my-slack
+      alerting.slack.secretKey: my-key
     asserts:
       - isKind:
           of: AlertmanagerConfig
       - equal:
           path: spec.route.receiver
-          value: "null"
+          value: slack-unrouted
       - notExists:
           path: spec.route.matchers
       - equal:
@@ -36,6 +204,24 @@ tests:
             - receiver: slack
               continue: true
               matchers: [{ name: severity, matchType: "=~", value: "warning|critical" }]
+            - receiver: "null"
+              continue: true
+              matchers: [{ name: severity, matchType: "=~", value: "info|none" }]
+      - equal:
+          path: spec.receivers[2].name
+          value: slack-unrouted
+      - equal:
+          path: spec.receivers[2].slackConfigs[0].apiURL
+          value: { name: my-slack, key: my-key }
+      - equal:
+          path: spec.receivers[2].slackConfigs[0].sendResolved
+          value: true
+      - equal:
+          path: spec.receivers[2].slackConfigs[0].title
+          value: '[UNROUTED] [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+      - matchRegex:
+          path: spec.receivers[2].slackConfigs[0].text
+          pattern: '^No route claimed this alert\. Add a spartan-alerts release for namespace \{\{ if \.CommonLabels\.namespace \}\}\{\{ \.CommonLabels\.namespace \}\}\{\{ else \}\}none\{\{ end \}\}, or list it in alerting\.slack\.sharedNamespaces\.\n\{\{ range \.Alerts \}\}'
       - equal:
           path: spec.receivers[0]
           value: { name: "null" }
@@ -175,6 +361,7 @@ tests:
   - it: "keeps only critical alerts of owned namespaces on the shared Slack route"
     set:
       addon: alertmanagerConfig
+      alerting.slack.unrouted.enabled: false
       alerting.slack.ownedNamespaces: [service-dietfit, service-x]
     asserts:
       - equal:
@@ -194,6 +381,7 @@ tests:
   - it: "includes only shared namespaces and cluster-level alerts on the shared Slack route"
     set:
       addon: alertmanagerConfig
+      alerting.slack.unrouted.enabled: false
       alerting.slack.sharedNamespaces: [service-a, service-b]
     asserts:
       - equal:
@@ -213,6 +401,7 @@ tests:
   - it: "ignores owned namespaces when shared namespaces are set"
     set:
       addon: alertmanagerConfig
+      alerting.slack.unrouted.enabled: false
       alerting.slack.sharedNamespaces: [service-a, service-b]
       alerting.slack.ownedNamespaces: [service-a, service-c]
     asserts:

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.6.0 (2026-11-22)
+
+### Features
+
+* Unclaimed warning and critical alerts now post to the shared webhook as `[UNROUTED]` by default. Set `alerting.slack.unrouted.enabled: false` to keep the old drop.
+
 ## 0.5.1 (2026-11-22)
 
 ### Bug Fixes

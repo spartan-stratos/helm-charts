@@ -19,7 +19,7 @@ spec:
       equal: [namespace]
     - targetMatch: [{ name: alertname, value: InfoInhibitor }]
   route:
-    receiver: "null"
+    receiver: __SLACK_ROOT_RECEIVER__
     # service: the RED alerts have no namespace, so without it every service's alert lands in one message
     groupBy: [alertname, namespace, service]
     groupWait: 30s
@@ -34,6 +34,7 @@ spec:
             value: warning|critical
           __SLACK_OWNED_MATCHER__
       __SLACK_OWNED_CRITICAL_ROUTE__
+      __SLACK_UNROUTED_NULL_ROUTE__
   receivers:
     - name: "null"
     - name: slack
@@ -52,3 +53,4 @@ spec:
             {{- if .Annotations.dashboard_url }} · <__GRAFANA_URL__{{ .Annotations.dashboard_url }}|Dashboard>{{ end }}
             {{ end }}
             <__GRAFANA_URL__/alerting/silence/new?alertmanager=alertmanager&matcher={{ printf "alertname=%s" .CommonLabels.alertname | urlquery }}{{ if .CommonLabels.namespace }}&matcher={{ printf "namespace=%s" .CommonLabels.namespace | urlquery }}{{ end }}{{ if .CommonLabels.service }}&matcher={{ printf "service=%s" .CommonLabels.service | urlquery }}{{ end }}|Silence>
+    __SLACK_UNROUTED_RECEIVER__
