@@ -1,0 +1,27 @@
+# Pre-auth history belongs to tenant fake; keep log and trace links inside that tenant until retention expires.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-loki-legacy
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  loki-legacy.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki (legacy)
+        uid: loki-legacy
+        isDefault: false
+        type: loki
+        url: http://loki.monitoring.svc.cluster.local:3100
+        jsonData:
+          httpHeaderName1: X-Scope-OrgID
+          derivedFields:
+            - name: trace_id
+              matcherType: label
+              matcherRegex: trace_id
+              datasourceUid: tempo-legacy
+              url: "$${__value.raw}"
+        secureJsonData:
+          httpHeaderValue1: "fake"

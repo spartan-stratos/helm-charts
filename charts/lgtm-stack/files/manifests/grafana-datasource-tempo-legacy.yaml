@@ -1,0 +1,36 @@
+# Pre-auth history belongs to tenant fake; keep log and trace links inside that tenant until retention expires.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-tempo-legacy
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  tempo-legacy.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Tempo (legacy)
+        uid: tempo-legacy
+        isDefault: false
+        type: tempo
+        url: http://tempo.monitoring.svc.cluster.local:3200
+        jsonData:
+          httpHeaderName1: X-Scope-OrgID
+          serviceMap:
+            datasourceUid: prometheus
+          nodeGraph:
+            enabled: true
+          tracesToLogsV2:
+            datasourceUid: loki-legacy
+            spanStartTimeShift: -5m
+            spanEndTimeShift: 5m
+            filterByTraceID: true
+            tags:
+              - { key: service.name, value: service_name }
+          tracesToMetrics:
+            datasourceUid: prometheus
+            tags:
+              - { key: service.name, value: service }
+        secureJsonData:
+          httpHeaderValue1: "fake"

@@ -168,6 +168,26 @@ Set `tenantIsolation.enabled: true` in the same release that enables Loki `auth_
 This restores tenant logs and traces and adds tenant Loki and Tempo datasources with fixed tenant headers.
 The flag does not enable backend authentication itself. Platform Alloy and platform datasources are unaffected.
 
+#### Auth flip
+
+- Set all four values together in one release:
+  - `tenantIsolation.enabled: true`
+  - `components.loki.values.loki.auth_enabled: true`
+  - `components.tempo.values.tempo.multitenancyEnabled: true` (under `tempo`; a top-level key does nothing)
+  - `addons.grafanaDatasourcesLegacy.enabled: true`
+- Platform Alloy and platform Grafana datasources already send the platform tenant header. The tenant gateway
+  starts accepting logs and traces, and tenant Loki and Tempo datasources appear.
+- Check ad-hoc readers and writers first: any other Loki or Tempo client without `X-Scope-OrgID` fails once auth is on.
+- Pre-flip data belongs to tenant `fake`; read it through the legacy datasources. Remove them once the configured
+  retention has passed since the flip date. Defaults: Loki `336h` (14 days, `presets/loki.yaml`) and Tempo `168h`
+  (7 days, `presets/tempo.yaml`). Deployments may override these; read the deployment's own retention values and
+  count from its flip date.
+- Rollback: revert the same four values together. Data written after the flip under `platform` or tenant ids is
+  invisible to single-tenant Loki or Tempo, leaving a gap for that window after rollback.
+- Verify Loki `/loki/api/v1/query_range` and Tempo `/api/search` with an explicit `X-Scope-OrgID: platform` or
+  `X-Scope-OrgID: <tenant>` header per tenant. Platform queries must see platform data; each tenant must see only
+  its own data, excluding data known to belong to another tenant.
+
 ### Grafana SSO
 
 Keycloak (`provider: keycloak`): `url`, `realm`, `clientId`, `admin` and `member` (Keycloak group names). The client

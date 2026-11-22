@@ -184,6 +184,10 @@ addons:
     enabled: true
   grafanaDatasources:
     enabled: true
+  # Turn on in the release that enables Loki auth and Tempo multitenancy.
+  # Remove after retention has passed: the configured retention (chart defaults: Loki 14 days, Tempo 7 days).
+  grafanaDatasourcesLegacy:
+    enabled: false
   instrumentation:
     enabled: true
     # Java agent image for the default Instrumentation. Operators without a built-in default inject an empty image and

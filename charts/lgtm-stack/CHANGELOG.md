@@ -2,11 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.3.7 (2026-11-22)
+## 0.4.1 (2026-11-22)
 
 ### Features
 
 * Set `alerting.slack.sharedNamespaces` to send only listed namespaces and cluster-level warning and critical alerts to the shared Slack channel. When set, it overrides `ownedNamespaces`.
+
+## 0.4.0 (2026-11-22)
+
+### Features
+
+* Add default-off `addons.grafanaDatasourcesLegacy`: Loki and Tempo datasources send `X-Scope-OrgID: fake` so history written before the auth flip stays readable.
+* Document the coordinated auth flip, retention, rollback data gap and tenant verification. No defaults change; the default render differs from 0.3.6 only in the child Applications' `targetRevision`, which tracks the chart version.
 
 ## 0.3.6 (2026-11-22)
 
