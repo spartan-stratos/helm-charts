@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.3 (2026-11-22)
+
+### Features
+
+* Route warning and critical alerts from `alerting.slack.toolNamespaces` to a second Slack channel using `toolSecretName`. Requires non-empty `sharedNamespaces` and reuses the shared message template and webhook key.
+
 ## 0.4.2 (2026-11-22)
 
 ### Features
