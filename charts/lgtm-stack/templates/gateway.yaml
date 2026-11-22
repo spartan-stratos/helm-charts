@@ -18,13 +18,15 @@ spec:
     - host: {{ required "gateway.ingress.host is required" .Values.gateway.ingress.host | quote }}
       http:
         paths:
-{{- range $index, $tenant := .Values.tenants }}
-          - path: /{{ $tenant.id }}
+{{- range $index, $tenant := (include "lgtm-stack.gatewayLanes" . | fromYamlArray) }}
+{{- if $tenant.ingress }}
+          - path: {{ $tenant.path }}
             pathType: Prefix
             backend:
               service:
                 name: alloy-gateway
                 port:
                   name: tenant-{{ $index }}
+{{- end }}
 {{- end }}
 {{- end }}

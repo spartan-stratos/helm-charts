@@ -7,6 +7,130 @@ set:
   argocd.destination.name: example-cluster
   cluster.name: example-cluster
 tests:
+  - it: rejects receivers with a tenant port
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, port: 4320, receivers: [] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant receivers and tenant-level port/htpasswdSecret are mutually exclusive
+  - it: rejects receivers with tenant credentials
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, htpasswdSecret: { name: x, key: y }, receivers: [] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant receivers and tenant-level port/htpasswdSecret are mutually exclusive
+  - it: rejects invalid receiver names
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, receivers: [{ name: Bad_1 }] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: receiver name must be a DNS-1123 label of at most 63 characters
+  - it: rejects duplicate receiver names
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, namespaces: [dev], receivers: [{ name: dev, namespaces: [dev] }, { name: dev, namespaces: [dev] }] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: receiver names must be unique per tenant
+  - it: rejects empty receiver namespaces
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, receivers: [{ name: dev, namespaces: [] }] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: receiver namespaces must be non-empty
+  - it: rejects receiver namespaces outside the tenant union
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, namespaces: [dev], receivers: [{ name: prod, namespaces: [prod] }] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: receiver namespaces must be a subset of tenant namespaces
+  - it: rejects ports shared between legacy and receiver lanes
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - { id: legacy, port: 4320 }
+        - { id: example, namespaces: [dev], receivers: [{ name: dev, port: 4320, namespaces: [dev] }] }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant ports must be unique
+  - it: rejects ports shared between receivers
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - id: example
+          namespaces: [dev, prod]
+          receivers:
+            - { name: dev, port: 4320, namespaces: [dev] }
+            - { name: prod, port: 4320, namespaces: [prod] }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant ports must be unique
+  - it: rejects privileged receiver ports
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, namespaces: [dev], receivers: [{ name: dev, port: 1023, namespaces: [dev] }] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects receiver ports above the maximum
+    template: templates/applications.yaml
+    set:
+      tenants: [{ id: example, namespaces: [dev], receivers: [{ name: dev, port: 65536, namespaces: [dev] }] }]
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant port must be an integer in 1024..65535
+  - it: rejects duplicate lane paths even without ingress
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - id: example
+          namespaces: [dev]
+          receivers:
+            - { name: dev, port: 4320, path: /same, ingress: false, namespaces: [dev] }
+            - { name: prod, port: 4321, path: /same, ingress: false, namespaces: [dev] }
+    asserts:
+      - failedTemplate:
+          errorMessage: gateway lane paths must be unique
+  - it: rejects ingress paths beneath a legacy path
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - { id: legacy, port: 4320 }
+        - { id: example, namespaces: [dev], receivers: [{ name: dev, port: 4321, path: /legacy/dev, namespaces: [dev] }] }
+    asserts:
+      - failedTemplate:
+          errorMessage: gateway ingress paths must not overlap at a / boundary
+  - it: rejects ingress prefixes in reverse order
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - { id: example, namespaces: [dev], receivers: [{ name: dev, port: 4321, path: /legacy/dev, namespaces: [dev] }] }
+        - { id: legacy, port: 4320 }
+    asserts:
+      - failedTemplate:
+          errorMessage: gateway ingress paths must not overlap at a / boundary
+  - it: accepts shared string prefixes without a slash boundary and internal subpaths
+    template: templates/applications.yaml
+    set:
+      components.alloyGateway.enabled: false
+      tenants:
+        - { id: legacy, port: 1024 }
+        - id: example
+          namespaces: [dev]
+          receivers:
+            - { name: dev, port: 65535, path: /legacy-other, namespaces: [dev] }
+            - { name: prod, port: 4321, path: /legacy/prod, ingress: false, namespaces: [dev] }
+    asserts:
+      - containsDocument:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          name: lgtm-prom-label-proxy-example
+          any: true
   - it: rejects the default platform tenant id
     template: templates/applications.yaml
     set:

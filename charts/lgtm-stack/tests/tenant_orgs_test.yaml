@@ -6,6 +6,32 @@ set:
   mode: addon
   addon: tenantOrgs
 tests:
+  - it: provisions one organization and tenant datasources for multiple receivers
+    template: templates/tenant-orgs.yaml
+    set:
+      tenantIsolation.enabled: true
+      tenants:
+        - id: example
+          namespaces: [example-dev, example-prod]
+          receivers:
+            - { name: dev, port: 4320, namespaces: [example-dev] }
+            - { name: prod, port: 4321, namespaces: [example-prod] }
+    documentIndex: 0
+    asserts:
+      - hasDocuments:
+          count: 2
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: /api/orgs/name/example
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: http://prom-label-proxy-example.monitoring.svc.cluster.local:8080
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: '"httpHeaderValue1":"example"'
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'example-dev|example-prod|4320|4321'
   - it: uses overridden admin Secret references
     template: templates/tenant-orgs.yaml
     set:

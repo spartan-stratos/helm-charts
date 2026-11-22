@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.8.0 (2026-11-22)
+
+### Features
+
+* Add per-environment gateway receivers with separate credentials, ports and namespace allowlists under one tenant id, with optional ingress paths.
+
 ## 0.7.0 (2026-11-22)
 
 ### Features

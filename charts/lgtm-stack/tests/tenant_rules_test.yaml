@@ -6,6 +6,32 @@ set:
   addon: tenantRules
   tenants: [{ id: example, namespaces: [example] }]
 tests:
+  - it: keeps the tenant namespace union with per-environment receivers
+    set:
+      tenants:
+        - id: example
+          namespaces: [example-dev, example-prod]
+          receivers:
+            - { name: dev, port: 4320, namespaces: [example-dev] }
+            - { name: prod, port: 4321, namespaces: [example-prod] }
+    documentSelector:
+      path: kind
+      value: ThanosRuler
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: metadata.name
+          value: example-ruler
+      - equal:
+          path: spec.ruleNamespaceSelector.matchExpressions
+          value:
+            - key: kubernetes.io/metadata.name
+              operator: In
+              values: [example-dev, example-prod]
+      - equal:
+          path: spec.queryEndpoints
+          value: [http://prom-label-proxy-example.monitoring.svc.cluster.local:8080]
   - it: scrapes the governing service and identifies each ruler
     documentSelector:
       path: kind

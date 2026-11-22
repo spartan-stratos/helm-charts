@@ -7,6 +7,79 @@ set:
   argocd.destination.name: example-cluster
   cluster.name: example-cluster
 tests:
+  - it: isolates two receiver credentials and allowlists under one tenant
+    template: templates/applications.yaml
+    set:
+      tenantIsolation.enabled: true
+      tenants:
+        - id: example
+          namespaces: [ns-dev, ns-prod]
+          receivers:
+            - { name: dev, port: 4320, path: /example, namespaces: [ns-dev], htpasswdSecret: { name: dev-otlp, key: dev } }
+            - { name: prod, port: 4321, ingress: false, namespaces: [ns-prod], htpasswdSecret: { name: prod-otlp, key: prod } }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.alloy.extraPorts
+          value:
+            - { name: tenant-0, port: 4320, targetPort: 4320, protocol: TCP }
+            - { name: tenant-1, port: 4321, targetPort: 4321, protocol: TCP }
+      - equal:
+          path: spec.source.helm.valuesObject.controller.volumes.extra
+          value:
+            - name: tenant-0
+              secret: { secretName: dev-otlp, items: [{ key: dev, path: htpasswd }] }
+            - name: tenant-1
+              secret: { secretName: prod-otlp, items: [{ key: prod, path: htpasswd }] }
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)otelcol.auth.basic "tenant_0".*file = "/etc/alloy/tenants/0/htpasswd".*otelcol.receiver.otlp "tenant_0".*endpoint = "0.0.0.0:4320".*auth = otelcol.auth.basic.tenant_0.handler.*traces_url_path = "/example/v1/traces".*metrics_url_path = "/example/v1/metrics".*logs_url_path = "/example/v1/logs"'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)otelcol.auth.basic "tenant_1".*file = "/etc/alloy/tenants/1/htpasswd".*otelcol.receiver.otlp "tenant_1".*endpoint = "0.0.0.0:4321".*auth = otelcol.auth.basic.tenant_1.handler.*traces_url_path = "/example/prod/v1/traces".*metrics_url_path = "/example/prod/v1/metrics".*logs_url_path = "/example/prod/v1/logs"'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)otelcol.processor.filter "tenant_0"[^}]*ns-dev'
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'otelcol.processor.filter "tenant_0"[^}]*ns-prod'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)otelcol.processor.filter "tenant_1".*ns-prod'
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'otelcol.processor.filter "tenant_1"[^}]*ns-dev'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)otelcol.processor.attributes "tenant_0".*value = "example".*otelcol.processor.attributes "tenant_1".*value = "example"'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)"prometheus_0".*"X-Scope-OrgID" = "example".*"prometheus_1".*"X-Scope-OrgID" = "example"'
+  - it: exposes only ingress enabled receivers
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      gateway.ingress.enabled: true
+      gateway.ingress.host: otlp.example.com
+      tenants:
+        - id: example
+          namespaces: [ns-dev, ns-prod]
+          receivers:
+            - { name: dev, port: 4320, namespaces: [ns-dev] }
+            - { name: prod, port: 4321, ingress: false, namespaces: [ns-prod] }
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths
+          value:
+            - path: /example/dev
+              pathType: Prefix
+              backend:
+                service:
+                  name: alloy-gateway
+                  port: { name: tenant-0 }
   - it: emits no gateway resources without tenants
     template: templates/applications.yaml
     set:

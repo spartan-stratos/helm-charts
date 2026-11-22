@@ -4,7 +4,7 @@ controller:
   replicas: 2
   volumes:
     extra:
-{{- range $index, $tenant := .Values.tenants }}
+{{- range $index, $tenant := (include "lgtm-stack.gatewayLanes" . | fromYamlArray) }}
       - name: tenant-{{ $index }}
         secret:
           secretName: {{ required "tenant htpasswdSecret.name is required" $tenant.htpasswdSecret.name | quote }}
@@ -15,13 +15,13 @@ controller:
 alloy:
   mounts:
     extra:
-{{- range $index, $tenant := .Values.tenants }}
+{{- range $index, $tenant := (include "lgtm-stack.gatewayLanes" . | fromYamlArray) }}
       - name: tenant-{{ $index }}
         mountPath: /etc/alloy/tenants/{{ $index }}
         readOnly: true
 {{- end }}
   extraPorts:
-{{- range $index, $tenant := .Values.tenants }}
+{{- range $index, $tenant := (include "lgtm-stack.gatewayLanes" . | fromYamlArray) }}
     - name: tenant-{{ $index }}
       port: {{ $tenant.port }}
       targetPort: {{ $tenant.port }}
@@ -30,7 +30,7 @@ alloy:
   configMap:
     create: true
     content: |
-{{- range $index, $tenant := .Values.tenants }}
+{{- range $index, $tenant := (include "lgtm-stack.gatewayLanes" . | fromYamlArray) }}
       otelcol.auth.basic "tenant_{{ $index }}" {
         htpasswd {
           file = "/etc/alloy/tenants/{{ $index }}/htpasswd"
@@ -41,9 +41,9 @@ alloy:
           endpoint = "0.0.0.0:{{ $tenant.port }}"
           auth = otelcol.auth.basic.tenant_{{ $index }}.handler
           max_request_body_size = "4MiB"
-          traces_url_path = "/{{ $tenant.id }}/v1/traces"
-          metrics_url_path = "/{{ $tenant.id }}/v1/metrics"
-          logs_url_path = "/{{ $tenant.id }}/v1/logs"
+          traces_url_path = "{{ $tenant.path }}/v1/traces"
+          metrics_url_path = "{{ $tenant.path }}/v1/metrics"
+          logs_url_path = "{{ $tenant.path }}/v1/logs"
         }
         output {
 {{- if $.Values.tenantIsolation.enabled }}
