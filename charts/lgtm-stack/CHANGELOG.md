@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.2 (2026-11-22)
+
+### Features
+
+* Set `alerting.rules.services.namespaces.<service>: <namespace>` to stamp a `namespace` label on that service's RED alerts. Mapped services get their own alert set (the default set excludes them); unmapped services render unchanged. Needed when Alertmanager uses the OnNamespace matcher strategy.
+
 ## 0.4.1 (2026-11-22)
 
 ### Features

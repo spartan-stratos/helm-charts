@@ -26,23 +26,36 @@ spec:
           expr: histogram_quantile(0.95, sum by (service, le) (rate(traces_spanmetrics_latency_bucket{ {{- $sel -}} }[5m])))
     - name: lgtm-service-red
       rules:
-{{- /* One set of rules for the defaults (minus overridden services), then one per override */}}
-{{- $sets := list (dict "matcher" "" "t" $cfg) }}
-{{- $names := keys ($cfg.overrides | default dict) | sortAlpha }}
+{{- /* One default set excludes services with overrides or namespace mappings, then one per special service */}}
+{{- $overrides := $cfg.overrides | default dict }}
+{{- $namespaces := $cfg.namespaces | default dict }}
+{{- range $service, $namespace := $namespaces }}
+{{- if not (kindIs "string" $namespace) }}
+{{- fail (printf "Invalid namespace for service %s: must be a non-empty DNS label string" $service) }}
+{{- end }}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $namespace) }}
+{{- fail (printf "Invalid namespace for service %s: must be a non-empty DNS label string" $service) }}
+{{- end }}
+{{- end }}
+{{- $sets := list (dict "matcher" "" "t" $cfg "namespace" "") }}
+{{- $names := concat (keys $overrides) (keys $namespaces) | uniq | sortAlpha }}
 {{- if $names }}
 {{- /* PromQL raw string, so the regex escapes from regexQuoteMeta stay as they are */}}
 {{- $quoted := list }}
 {{- range $names }}{{ $quoted = append $quoted (regexQuoteMeta .) }}{{ end }}
-{{- $sets = list (dict "matcher" (printf ",service!~`%s`" (join "|" $quoted)) "t" $cfg) }}
+{{- $sets = list (dict "matcher" (printf ",service!~`%s`" (join "|" $quoted)) "t" $cfg "namespace" "") }}
 {{- end }}
 {{- range $names }}
-{{- $t := deepCopy (omit $cfg "overrides") }}
-{{- include "lgtm-stack.merge" (list $t (index $cfg.overrides .)) }}
-{{- $sets = append $sets (dict "matcher" (printf `,service="%s"` .) "t" $t) }}
+{{- $t := deepCopy (omit $cfg "overrides" "namespaces") }}
+{{- with index $overrides . }}
+{{- include "lgtm-stack.merge" (list $t .) }}
+{{- end }}
+{{- $sets = append $sets (dict "matcher" (printf `,service="%s"` .) "t" $t "namespace" (index $namespaces . | default "")) }}
 {{- end }}
 {{- range $sets }}
 {{- $m := .matcher }}
 {{- $t := .t }}
+{{- $namespace := .namespace }}
 {{- if $t.enabled }}
 {{- $traffic := printf "service:traces_spanmetrics_calls:rate5m{%s} > %v" (trimPrefix "," $m) $t.minRequestRate }}
 {{- range $sev := list "warning" "critical" }}
@@ -54,6 +67,9 @@ spec:
           for: {{ $t.errorRate.for }}
           labels:
             severity: {{ $sev }}
+{{- if $namespace }}
+            namespace: {{ $namespace | quote }}
+{{- end }}
           annotations:
             summary: Service {{ $o }} $labels.service {{ $c }} is failing {{ $o }} $value | humanizePercentage {{ $c }} of requests
             description: >-
@@ -70,6 +86,9 @@ spec:
           for: {{ $t.latencyP95.for }}
           labels:
             severity: {{ $sev }}
+{{- if $namespace }}
+            namespace: {{ $namespace | quote }}
+{{- end }}
           annotations:
             summary: Service {{ $o }} $labels.service {{ $c }} p95 latency is {{ $o }} $value | humanizeDuration {{ $c }}
             description: >-

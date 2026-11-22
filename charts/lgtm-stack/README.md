@@ -331,6 +331,8 @@ critical:
 | `ServiceErrorRateHigh` | share of server spans with status ERROR is above the threshold for `errorRate.for` | 2% / 5%, 10m |
 | `ServiceLatencyHigh` | p95 of server spans is above the threshold (seconds) for `latencyP95.for` | 1s / 3s, 10m |
 
+`namespaces.<service>: <namespace>` adds a static `namespace` label to that service's alerts, so tenant routes that match on namespace (OnNamespace strategy) receive them. A mapped service gets its own alert set and is excluded from the default set; unmapped services are unchanged.
+
 Services below `minRequestRate` (0.1 req/s) are not alerted on. `overrides.<service>` is merged over the defaults for
 that service, e.g. `payments: { errorRate: { critical: 0.01 } }`, or `batch: { enabled: false }` to skip it; drop a
 severity's threshold to skip that severity. The alerts carry `service` (inhibition matches on it, so one service's
