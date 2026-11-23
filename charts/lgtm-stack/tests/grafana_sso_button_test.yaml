@@ -1,0 +1,56 @@
+suite: Grafana SSO login button
+templates:
+  - templates/applications.yaml
+set:
+  mode: applications
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+  tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
+  grafana.sso.provider: keycloak
+  grafana.sso.keycloak:
+    url: https://sso.example.com
+    realm: example
+    clientId: grafana
+    admin: [sre]
+    member: [member]
+tests:
+  - it: defaults the login button label to SSO and preserves unresolved OAuth settings
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.sso.keycloak.buttonName
+          value: SSO
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].name
+          value: '{{ .Values.sso.keycloak.buttonName }}'
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].client_id
+          value: '{{ .Values.sso.keycloak.clientId }}'
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].scopes
+          value: openid email profile
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].enabled
+          value: true
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].use_pkce
+          value: true
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].auth_url
+          value: '{{ .Values.sso.keycloak.url }}/realms/{{ .Values.sso.keycloak.realm }}/protocol/openid-connect/auth'
+  - it: accepts a custom login button label while leaving its downstream template unresolved
+    set:
+      grafana.sso.keycloak.buttonName: Login
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.sso.keycloak.buttonName
+          value: Login
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].name
+          value: '{{ .Values.sso.keycloak.buttonName }}'

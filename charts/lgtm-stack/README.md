@@ -249,6 +249,8 @@ needs redirect URI `https://<domain>/login/generic_oauth` and a **Group Membersh
 **Full group path off**; with it on, Keycloak sends `/sre` instead of `sre` and login fails with "IdP did not return
 a role attribute". `admin` groups get Grafana Admin, `member` groups Editor, anyone else is refused.
 
+Optional `grafana.sso.keycloak.buttonName` (default `SSO`) sets the login button label; the provider id and redirect URI are unchanged.
+
 For optional tenant organization membership from Keycloak groups, see [Tenant Grafana access](#tenant-grafana-access).
 
 GitHub (`provider: github`): `organization`, `clientId`, `admin` and `member` (team slugs); callback
