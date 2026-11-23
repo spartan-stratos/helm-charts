@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.10.0 (2026-11-23)
+
+### Features
+
+* Add optional gateway htpasswd ExternalSecrets per receiver or legacy tenant, including when gateway ingress is disabled.
+
 ## 0.9.1 (2026-11-23)
 
 ### Bug Fixes

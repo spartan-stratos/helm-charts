@@ -7,6 +7,246 @@ set:
   argocd.destination.name: example-cluster
   cluster.name: example-cluster
 tests:
+  - it: renders separate receiver ExternalSecrets with defaults and overrides
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      namespace: monitoring
+      gateway.ingress.host: otlp.example.com
+      gateway.ingress.enabled: true
+      tenants:
+        - id: example
+          receivers:
+            - name: first
+              port: 4320
+              htpasswdSecret: { name: first-otlp }
+              htpasswdExternalSecret:
+                secretStore: { name: example-store, kind: SecretStore }
+                remoteKey: first-entry
+            - name: second
+              port: 4321
+              htpasswdSecret: { name: second-otlp, key: credentials }
+              htpasswdExternalSecret:
+                secretStore: { name: example-store, kind: ClusterSecretStore }
+                remoteKey: second-entry
+                property: credentials
+                refreshInterval: 30m
+    asserts:
+      - hasDocuments:
+          count: 3
+      - isKind:
+          of: Ingress
+        documentIndex: 0
+      - equal:
+          path: apiVersion
+          value: external-secrets.io/v1
+        documentIndex: 1
+      - isKind:
+          of: ExternalSecret
+        documentIndex: 1
+      - equal:
+          path: metadata
+          value: { name: first-otlp, namespace: monitoring }
+        documentIndex: 1
+      - equal:
+          path: spec
+          value:
+            refreshInterval: 1h
+            secretStoreRef: { name: example-store, kind: SecretStore }
+            target: { name: first-otlp, creationPolicy: Owner, deletionPolicy: Retain }
+            data:
+              - secretKey: htpasswd
+                remoteRef: { key: first-entry, property: htpasswd }
+        documentIndex: 1
+      - equal:
+          path: apiVersion
+          value: external-secrets.io/v1
+        documentIndex: 2
+      - isKind:
+          of: ExternalSecret
+        documentIndex: 2
+      - equal:
+          path: metadata
+          value: { name: second-otlp, namespace: monitoring }
+        documentIndex: 2
+      - equal:
+          path: spec
+          value:
+            refreshInterval: 30m
+            secretStoreRef: { name: example-store, kind: ClusterSecretStore }
+            target: { name: second-otlp, creationPolicy: Owner, deletionPolicy: Retain }
+            data:
+              - secretKey: credentials
+                remoteRef: { key: second-entry, property: credentials }
+        documentIndex: 2
+  - it: renders a legacy tenant ExternalSecret without ingress
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      namespace: monitoring
+      gateway.ingress.host: otlp.example.com
+      gateway.ingress.enabled: false
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: legacy-otlp }
+          htpasswdExternalSecret:
+            secretStore: { name: example-store, kind: SecretStore }
+            remoteKey: legacy-entry
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ExternalSecret
+      - equal:
+          path: metadata
+          value: { name: legacy-otlp, namespace: monitoring }
+      - equal:
+          path: spec
+          value:
+            refreshInterval: 1h
+            secretStoreRef: { name: example-store, kind: SecretStore }
+            target: { name: legacy-otlp, creationPolicy: Owner, deletionPolicy: Retain }
+            data:
+              - secretKey: htpasswd
+                remoteRef: { key: legacy-entry, property: htpasswd }
+  - it: renders only receiver ExternalSecrets when ingress is disabled
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      namespace: monitoring
+      gateway.ingress.host: otlp.example.com
+      gateway.ingress.enabled: false
+      tenants:
+        - id: example
+          receivers:
+            - name: first
+              port: 4320
+              htpasswdSecret: { name: first-otlp }
+              htpasswdExternalSecret:
+                secretStore: { name: example-store, kind: SecretStore }
+                remoteKey: first-entry
+            - name: second
+              port: 4321
+              htpasswdSecret: { name: second-otlp }
+              htpasswdExternalSecret:
+                secretStore: { name: example-store, kind: SecretStore }
+                remoteKey: second-entry
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ExternalSecret
+  - it: keeps only the ingress when ExternalSecrets are unset
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      namespace: monitoring
+      gateway.ingress.enabled: true
+      gateway.ingress.host: otlp.example.com
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: example-otlp }
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Ingress
+  - it: enables the gateway addon for receiver ExternalSecrets without ingress
+    template: templates/applications.yaml
+    set:
+      namespace: monitoring
+      gateway.ingress.enabled: false
+      gateway.ingress.host: otlp.example.com
+      tenants:
+        - id: example
+          namespaces: [ns-dev]
+          receivers:
+            - name: first
+              port: 4320
+              namespaces: [ns-dev]
+              htpasswdSecret: { name: first-otlp, key: htpasswd }
+              htpasswdExternalSecret:
+                secretStore: { name: example-store, kind: SecretStore }
+                remoteKey: first-entry
+    documentSelector:
+      path: metadata.name
+      value: lgtm-gateway
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.addon
+          value: gateway
+      - equal:
+          path: spec.source.helm.valuesObject.gateway.ingress.enabled
+          value: false
+      - equal:
+          path: spec.source.helm.valuesObject.tenants[0].receivers[0].htpasswdExternalSecret.remoteKey
+          value: first-entry
+  - it: enables the gateway addon for legacy ExternalSecrets without ingress
+    template: templates/applications.yaml
+    set:
+      namespace: monitoring
+      gateway.ingress.enabled: false
+      gateway.ingress.host: otlp.example.com
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: legacy-otlp, key: htpasswd }
+          htpasswdExternalSecret:
+            secretStore: { name: example-store, kind: SecretStore }
+            remoteKey: legacy-entry
+    documentSelector:
+      path: metadata.name
+      value: lgtm-gateway
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.addon
+          value: gateway
+      - equal:
+          path: spec.source.helm.valuesObject.gateway.ingress.enabled
+          value: false
+  - it: rejects an ExternalSecret without a remote key
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      namespace: monitoring
+      gateway.ingress.host: otlp.example.com
+      gateway.ingress.enabled: false
+      tenants:
+        - id: example
+          receivers:
+            - name: first
+              port: 4320
+              htpasswdSecret: { name: first-otlp }
+              htpasswdExternalSecret:
+                secretStore: { name: example-store, kind: SecretStore }
+    asserts:
+      - failedTemplate:
+          errorMessage: htpasswdExternalSecret.remoteKey is required
+  - it: rejects an ExternalSecret without a store name
+    template: templates/gateway.yaml
+    set:
+      mode: addon
+      addon: gateway
+      namespace: monitoring
+      gateway.ingress.host: otlp.example.com
+      gateway.ingress.enabled: false
+      tenants:
+        - id: example
+          port: 4320
+          htpasswdSecret: { name: legacy-otlp }
+          htpasswdExternalSecret:
+            secretStore: { kind: SecretStore }
+            remoteKey: legacy-entry
+    asserts:
+      - failedTemplate:
+          errorMessage: htpasswdExternalSecret.secretStore.name is required
   - it: drops namespace-less logs and spans while preserving the metric filter
     template: templates/applications.yaml
     set:

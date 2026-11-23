@@ -18,7 +18,7 @@ name: lgtm-stack-<cluster>
 version: 1.0.0
 dependencies:
   - name: lgtm-stack
-    version: 0.9.1
+    version: 0.10.0
     repository: https://spartan-stratos.github.io/helm-charts
 ```
 
@@ -261,7 +261,7 @@ A tenant is a project. Every env namespace of the project writes metrics, logs a
 
 1. Namespaces: one namespace per env, unique names, each labelled `lgtm-stack/tenant=<id>` before its rules sync.
 2. Stack values: add `tenants[]` with the id and the env namespaces. Give each env its own `receivers[]` entry (port, namespaces, auth Secret) so one credential cannot write another env's namespace. Public receivers need `gateway.ingress`; receivers on the platform cluster use `ingress: false`.
-3. Credentials: one htpasswd line per receiver, stored in the Secret named by `htpasswdSecret` in `monitoring` (key `htpasswd`). The gateway pods stay Pending until that Secret exists. The matching plaintext goes to the sender as a Secret with keys `username` and `password`.
+3. Credentials: one htpasswd line per receiver, stored in the Secret named by `htpasswdSecret` in `monitoring` (key `htpasswd`). Optionally set `htpasswdExternalSecret` to sync it from a secret store. The gateway pods stay Pending until that Secret exists. The matching plaintext goes to the sender as a Secret with keys `username` and `password`.
 4. Telemetry: the app namespace runs an OpenTelemetry Instrumentation or SDK that exports OTLP to the tenant receiver. Logs and spans must carry the resource attribute `k8s.namespace.name`, or the gateway drops them.
 5. Rules and alert routes: one `spartan-alerts` release per env namespace. The tenant ruler adds `namespace=<rule namespace>` to every selector, so a rule needs no namespace matcher. Alerts with no matching AlertmanagerConfig route to the unrouted channel.
 
@@ -315,7 +315,32 @@ spec:
     - { secretKey: password, remoteRef: { key: <store entry>, property: password } }
 ```
 
-The chart does not render the gateway-side htpasswd Secret; create it by hand or with External Secrets.
+### Gateway htpasswd ExternalSecret
+
+Set `htpasswdExternalSecret` on a receiver, or alongside `htpasswdSecret` on a legacy tenant without `receivers`:
+
+```yaml
+tenants:
+  - id: <tenant>
+    namespaces: [<namespace>]
+    receivers:
+      - name: <receiver>
+        port: 4320
+        namespaces: [<namespace>]
+        htpasswdSecret: { name: <secret>, key: htpasswd }
+        htpasswdExternalSecret:
+          secretStore: { name: <store>, kind: SecretStore }
+          remoteKey: <store entry>
+          property: htpasswd
+          refreshInterval: 1h
+```
+
+The gateway addon Application renders the ExternalSecret in the stack namespace (`namespace`, default `monitoring`),
+where the External Secrets operator creates the Secret. This also works with `gateway.ingress.enabled: false`.
+The operator and referenced store must already exist. `secretStore.name`, `secretStore.kind`, `remoteKey` and
+`htpasswdSecret.name` are required. `property` and `htpasswdSecret.key` default to `htpasswd`;
+`refreshInterval` defaults to `1h`. The target uses `creationPolicy: Owner` and `deletionPolicy: Retain`.
+Without this option, create the gateway-side Secret separately. Store only references in chart values.
 
 ## Dashboards
 

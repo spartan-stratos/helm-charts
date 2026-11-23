@@ -111,7 +111,19 @@ spec:
 {{- else if eq $key "networkPolicy" }}
 {{- $enabled = $.Values.networkPolicy.enabled }}
 {{- else if eq $key "gateway" }}
-{{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.alloyGateway.enabled $.Values.gateway.ingress.enabled }}
+{{- $hasExternalSecret := false }}
+{{- range $tenant := $.Values.tenants }}
+{{- $receivers := list $tenant }}
+{{- if hasKey $tenant "receivers" }}
+{{- $receivers = $tenant.receivers }}
+{{- end }}
+{{- range $receiver := $receivers }}
+{{- if hasKey $receiver "htpasswdExternalSecret" }}
+{{- $hasExternalSecret = true }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.alloyGateway.enabled (or $.Values.gateway.ingress.enabled $hasExternalSecret) }}
 {{- else if eq $key "tenantRules" }}
 {{- $enabled = and $hasTenantNamespaces $.Values.components.promLabelProxy.enabled }}
 {{- else if eq $key "tenantOrgs" }}
