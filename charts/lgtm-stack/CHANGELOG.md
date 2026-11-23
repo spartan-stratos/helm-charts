@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.9.0 (2026-11-23)
+
+### Features
+
+* Add optional backend ingress NetworkPolicies allowing the stack namespace and explicitly allowed namespaces.
+
+### Bug Fixes
+
+* Reject empty tenant receiver lists and receiver paths that do not start with `/`.
+* Drop tenant logs and traces without a resource namespace; namespace-less metrics remain accepted.
+
 ## 0.8.0 (2026-11-22)
 
 ### Features

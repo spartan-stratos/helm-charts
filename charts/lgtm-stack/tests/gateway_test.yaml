@@ -7,6 +7,28 @@ set:
   argocd.destination.name: example-cluster
   cluster.name: example-cluster
 tests:
+  - it: drops namespace-less logs and spans while preserving the metric filter
+    template: templates/applications.yaml
+    set:
+      tenantIsolation.enabled: true
+      tenants:
+        - id: example
+          namespaces: [ns-dev]
+          port: 4320
+          htpasswdSecret: { name: example-otlp, key: htpasswd }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'log_record = \["resource.attributes\[\\"k8s.namespace.name\\"\] == nil",'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'span = \["resource.attributes\[\\"k8s.namespace.name\\"\] == nil",'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: 'datapoint = \["resource.attributes\[\\"k8s.namespace.name\\"\] != nil and not IsMatch\(resource.attributes\[\\"k8s.namespace.name\\"\], \\"\^\(ns-dev\)\$\\"\)", "attributes\[\\"namespace\\"\] != nil and not IsMatch\(attributes\[\\"namespace\\"\], \\"\^\(ns-dev\)\$\\"\)"\]'
   - it: isolates two receiver credentials and allowlists under one tenant
     template: templates/applications.yaml
     set:
