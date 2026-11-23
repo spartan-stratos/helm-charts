@@ -223,6 +223,8 @@ alertmanager:
 {{- if ne $v.grafana.sso.provider "keycloak" }}{{ fail "grafana.orgMapping requires grafana.sso.provider keycloak" }}{{ end }}
 {{- $admins := $v.grafana.sso.keycloak.admin | default list }}
 {{- range $admins }}
+{{- if or (not (kindIs "string" .)) (eq . "") }}{{ fail "grafana.sso.keycloak.admin group must not contain : , whitespace or braces" }}{{ end }}
+{{- if regexMatch "[:,[:space:]{}]" . }}{{ fail "grafana.sso.keycloak.admin group must not contain : , whitespace or braces" }}{{ end }}
 {{- $orgMapping = append $orgMapping (printf "%s:*:Admin" .) }}
 {{- end }}
 {{- range $tenant := $v.tenants }}

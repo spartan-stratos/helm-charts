@@ -273,6 +273,7 @@ Set `grafana.sso.provider: keycloak`, `grafana.orgMapping.enabled: true` and eac
 Keycloak groups `lgtm-<tenant>-viewer` and `lgtm-<tenant>-editor` must exist and be assigned to the `grafana` client `groups` claim, with **Full group path off**.
 Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; tenant groups get Viewer or Editor only, never Admin.
 A tenant group name may not be empty, equal an SSO admin group, or contain `:`, `,`, whitespace or braces.
+SSO admin group names are held to the same character rules when org mapping is enabled.
 This defaults to off, with rendering unchanged when off. `role_attribute_path` and `role_attribute_strict` are not changed.
 
 ```yaml

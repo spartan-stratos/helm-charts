@@ -64,6 +64,20 @@ tests:
       - notMatchRegex:
           path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
           pattern: 'lgtm-[a-z-]+:[a-z]+:Admin'
+  - it: rejects whitespace in an SSO admin group
+    set:
+      grafana.orgMapping.enabled: true
+      grafana.sso.keycloak.admin: ["platform admins"]
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.sso.keycloak.admin group must not contain : , whitespace or braces'
+  - it: rejects a colon in an SSO admin group
+    set:
+      grafana.orgMapping.enabled: true
+      grafana.sso.keycloak.admin: ["platform:admins"]
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.sso.keycloak.admin group must not contain : , whitespace or braces'
   - it: rejects an empty tenant group
     set:
       grafana.orgMapping.enabled: true
