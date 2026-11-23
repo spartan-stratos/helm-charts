@@ -6,7 +6,7 @@ jobs:
   helm-check:
     strategy:
       matrix:
-        chart: [ spartan, datadog, lgtm-stack, spartan-alerts ]
+        chart: [ spartan, datadog, lgtm-stack, spartan-alerts, lgtm-tenant-client ]
 
     runs-on: ubuntu-latest
     steps:
@@ -27,18 +27,18 @@ jobs:
         run: helm dependency build ./charts/${{ matrix.chart }}
 
       - name: helm-check-default
-        if: matrix.chart != 'lgtm-stack' # lgtm-stack has required values, checked below
+        if: matrix.chart != 'lgtm-stack' && matrix.chart != 'lgtm-tenant-client' # required values checked below
         uses: igabaydulin/helm-check-action@0.1.4
         env:
           CHART_LOCATION: ./charts/${{ matrix.chart }}
           CHART_VALUES: ./charts/${{ matrix.chart }}/values.yaml
 
       - name: helm-check-required-values
-        if: matrix.chart == 'lgtm-stack'
+        if: matrix.chart == 'lgtm-stack' || matrix.chart == 'lgtm-tenant-client'
         uses: igabaydulin/helm-check-action@0.1.4
         env:
-          CHART_LOCATION: ./charts/lgtm-stack
-          CHART_VALUES: ./charts/lgtm-stack/ci/test-values.yaml
+          CHART_LOCATION: ./charts/${{ matrix.chart }}
+          CHART_VALUES: ./charts/${{ matrix.chart }}/ci/test-values.yaml
 
       - name: helm-check-enabled-all
         if: matrix.chart == 'spartan' # for spartan chart only

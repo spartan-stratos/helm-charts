@@ -1,0 +1,15 @@
+{{- $tenant := required "tenant is required" .Values.tenant -}}
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: {{ default $tenant .Values.instrumentationName | quote }}
+  namespace: {{ required "namespace is required" .Values.namespace | quote }}
+spec:
+  exporter:
+    endpoint: {{ required "receiverUrl is required" .Values.receiverUrl | quote }}
+  env:
+    - name: OTEL_EXPORTER_OTLP_HEADERS
+      valueFrom:
+        secretKeyRef:
+          name: otlp-basic-auth
+          key: otlp-headers

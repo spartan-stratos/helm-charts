@@ -1,0 +1,165 @@
+suite: Tenant telemetry client
+templates:
+  - templates/serviceaccount.yaml
+  - templates/secretstore.yaml
+  - templates/externalsecret.yaml
+  - templates/instrumentation.yaml
+values:
+  - ../ci/test-values.yaml
+tests:
+  - it: renders the role-bearing service account
+    template: templates/serviceaccount.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: apiVersion
+          value: v1
+      - equal:
+          path: metadata
+          value:
+            name: otlp-secrets
+            namespace: example-app
+            annotations:
+              eks.amazonaws.com/role-arn: arn:aws:iam::000000000000:role/example-otlp-secrets
+  - it: renders the AWS secret store with service account authentication
+    template: templates/secretstore.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: SecretStore
+      - equal:
+          path: apiVersion
+          value: external-secrets.io/v1
+      - equal:
+          path: metadata
+          value: { name: otlp-secrets, namespace: example-app }
+      - equal:
+          path: spec
+          value:
+            provider:
+              aws:
+                service: SecretsManager
+                region: us-east-1
+                auth:
+                  jwt:
+                    serviceAccountRef:
+                      name: otlp-secrets
+  - it: renders only remote references and unresolved ESO credential expressions
+    template: templates/externalsecret.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ExternalSecret
+      - equal:
+          path: apiVersion
+          value: external-secrets.io/v1
+      - equal:
+          path: metadata
+          value: { name: otlp-basic-auth, namespace: example-app }
+      - equal:
+          path: spec
+          value:
+            secretStoreRef: { name: otlp-secrets, kind: SecretStore }
+            target:
+              name: otlp-basic-auth
+              creationPolicy: Owner
+              template:
+                engineVersion: v2
+                data:
+                  username: '{{ .username }}'
+                  password: '{{ .password }}'
+                  otlp-headers: 'Authorization=Basic {{ printf "%s:%s" .username .password | b64enc }}'
+            data:
+              - secretKey: username
+                remoteRef: { key: example/otlp-basic-auth, property: username }
+              - secretKey: password
+                remoteRef: { key: example/otlp-basic-auth, property: password }
+      - notExists:
+          path: data
+      - notExists:
+          path: stringData
+  - it: defaults the instrumentation name to the tenant
+    template: templates/instrumentation.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Instrumentation
+      - equal:
+          path: apiVersion
+          value: opentelemetry.io/v1alpha1
+      - equal:
+          path: metadata
+          value: { name: example, namespace: example-app }
+      - equal:
+          path: spec
+          value:
+            exporter:
+              endpoint: http://example-receiver.example-namespace.svc.cluster.local:4318
+            env:
+              - name: OTEL_EXPORTER_OTLP_HEADERS
+                valueFrom:
+                  secretKeyRef: { name: otlp-basic-auth, key: otlp-headers }
+  - it: supports an instrumentation name override
+    template: templates/instrumentation.yaml
+    set:
+      instrumentationName: example-custom
+    asserts:
+      - equal:
+          path: metadata.name
+          value: example-custom
+  - it: rejects a missing namespace on the service account
+    template: templates/serviceaccount.yaml
+    set:
+      namespace: null
+    asserts:
+      - failedTemplate:
+          errorMessage: namespace is required
+  - it: rejects a missing tenant
+    template: templates/instrumentation.yaml
+    set:
+      tenant: null
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant is required
+  - it: rejects a missing tenant even with an instrumentation name override
+    template: templates/instrumentation.yaml
+    set:
+      tenant: null
+      instrumentationName: example-custom
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant is required
+  - it: rejects a missing region
+    template: templates/secretstore.yaml
+    set:
+      region: null
+    asserts:
+      - failedTemplate:
+          errorMessage: region is required
+  - it: rejects a missing role ARN
+    template: templates/serviceaccount.yaml
+    set:
+      roleArn: null
+    asserts:
+      - failedTemplate:
+          errorMessage: roleArn is required
+  - it: rejects a missing secret name
+    template: templates/externalsecret.yaml
+    set:
+      secretName: null
+    asserts:
+      - failedTemplate:
+          errorMessage: secretName is required
+  - it: rejects a missing receiver URL
+    template: templates/instrumentation.yaml
+    set:
+      receiverUrl: null
+    asserts:
+      - failedTemplate:
+          errorMessage: receiverUrl is required
