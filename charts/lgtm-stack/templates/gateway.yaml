@@ -30,3 +30,39 @@ spec:
 {{- end }}
 {{- end }}
 {{- end }}
+{{- if and (eq .Values.mode "addon") (eq .Values.addon "gateway") .Values.tenants }}
+{{- range $tenant := .Values.tenants }}
+{{- $receivers := list $tenant }}
+{{- if hasKey $tenant "receivers" }}
+{{- $receivers = $tenant.receivers }}
+{{- end }}
+{{- range $receiver := $receivers }}
+{{- if hasKey $receiver "htpasswdExternalSecret" }}
+{{- $external := $receiver.htpasswdExternalSecret | default dict }}
+{{- $store := $external.secretStore | default dict }}
+{{- $secret := $receiver.htpasswdSecret | default dict }}
+{{- $name := required "htpasswdSecret.name is required with htpasswdExternalSecret" $secret.name }}
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $name | quote }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  refreshInterval: {{ $external.refreshInterval | default "1h" | quote }}
+  secretStoreRef:
+    name: {{ required "htpasswdExternalSecret.secretStore.name is required" $store.name | quote }}
+    kind: {{ required "htpasswdExternalSecret.secretStore.kind is required" $store.kind | quote }}
+  target:
+    name: {{ $name | quote }}
+    creationPolicy: Owner
+    deletionPolicy: Retain
+  data:
+    - secretKey: {{ $secret.key | default "htpasswd" | quote }}
+      remoteRef:
+        key: {{ required "htpasswdExternalSecret.remoteKey is required" $external.remoteKey | quote }}
+        property: {{ $external.property | default "htpasswd" | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
