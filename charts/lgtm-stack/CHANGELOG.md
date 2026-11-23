@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.11.1 (2026-11-23)
+
+### Features
+
+* Add sso.keycloak.buttonName to set the Grafana login button label, default SSO (was Keycloak).
+
 ## 0.11.0 (2026-11-23)
 
 ### Features
