@@ -255,6 +255,68 @@ GitHub (`provider: github`): `organization`, `clientId`, `admin` and `member` (t
 Both presets turn the login form off; set `components.grafana.values."grafana.ini".auth.disable_login_form: false` to
 keep it as break-glass.
 
+## Onboarding a tenant
+
+A tenant is a project. Every env namespace of the project writes metrics, logs and traces under one tenant id through the gateway, and its alert rules run only in the tenant ruler.
+
+1. Namespaces: one namespace per env, unique names, each labelled `lgtm-stack/tenant=<id>` before its rules sync.
+2. Stack values: add `tenants[]` with the id and the env namespaces. Give each env its own `receivers[]` entry (port, namespaces, auth Secret) so one credential cannot write another env's namespace. Public receivers need `gateway.ingress`; receivers on the platform cluster use `ingress: false`.
+3. Credentials: one htpasswd line per receiver, stored in the Secret named by `htpasswdSecret` in `monitoring` (key `htpasswd`). The gateway pods stay Pending until that Secret exists. The matching plaintext goes to the sender as a Secret with keys `username` and `password`.
+4. Telemetry: the app namespace runs an OpenTelemetry Instrumentation or SDK that exports OTLP to the tenant receiver. Logs and spans must carry the resource attribute `k8s.namespace.name`, or the gateway drops them.
+5. Rules and alert routes: one `spartan-alerts` release per env namespace. The tenant ruler adds `namespace=<rule namespace>` to every selector, so a rule needs no namespace matcher. Alerts with no matching AlertmanagerConfig route to the unrouted channel.
+
+Sender on another cluster, using an Alloy collector that forwards all three signals to a public receiver:
+
+```alloy
+otelcol.receiver.otlp "apps" {
+  http { endpoint = "0.0.0.0:4318" }
+  grpc { endpoint = "0.0.0.0:4317" }
+  output {
+    metrics = [otelcol.processor.batch.out.input]
+    logs    = [otelcol.processor.batch.out.input]
+    traces  = [otelcol.processor.batch.out.input]
+  }
+}
+
+otelcol.processor.batch "out" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.gateway.input]
+    logs    = [otelcol.exporter.otlphttp.gateway.input]
+    traces  = [otelcol.exporter.otlphttp.gateway.input]
+  }
+}
+
+otelcol.auth.basic "gateway" {
+  username = sys.env("OTLP_USERNAME")
+  password = sys.env("OTLP_PASSWORD")
+}
+
+// The exporter appends /v1/{metrics,logs,traces} to the receiver path.
+otelcol.exporter.otlphttp "gateway" {
+  client {
+    endpoint = "https://otlp.example.com/<id>"
+    auth     = otelcol.auth.basic.gateway.handler
+  }
+}
+```
+
+Mount `OTLP_USERNAME` and `OTLP_PASSWORD` from the sender's Secret with `secretKeyRef`. To sync the credentials from a secret store instead of creating them by hand, an ExternalSecret in the sender's namespace maps the store entry to those two keys:
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: <id>-otlp-client
+spec:
+  secretStoreRef: { name: <store>, kind: SecretStore }
+  target: { name: <id>-otlp-client }
+  data:
+    - { secretKey: username, remoteRef: { key: <store entry>, property: username } }
+    - { secretKey: password, remoteRef: { key: <store entry>, property: password } }
+```
+
+The chart does not render the gateway-side htpasswd Secret; create it by hand or with External Secrets.
+
 ## Dashboards
 
 Grafana's sidecar loads every ConfigMap labelled `grafana_dashboard: "1"`, in any namespace, and files it in the
