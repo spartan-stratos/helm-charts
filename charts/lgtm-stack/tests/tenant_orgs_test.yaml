@@ -6,6 +6,89 @@ set:
   mode: addon
   addon: tenantOrgs
 tests:
+  - it: adds no settle step by default
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: alpha }]
+    documentIndex: 0
+    asserts:
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'sleep 120|missing after provisioning'
+  - it: verifies every tenant before settling enabled mapping
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: alpha }, { id: beta }]
+      grafana.orgMapping: { enabled: true, settleSeconds: 45 }
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'request GET -X GET "\$base/api/orgs/name/alpha"\nif \[ "\$code" = 404 \]; then\n  printf.*tenant org alpha missing after provisioning.*>&2\n  exit 1'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'request GET -X GET "\$base/api/orgs/name/beta"\nif \[ "\$code" = 404 \]; then\n  printf.*tenant org beta missing after provisioning.*>&2\n  exit 1\nfi\nsleep 45'
+  - it: permits a zero settle delay
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: alpha }]
+      grafana.orgMapping: { enabled: true, settleSeconds: 0 }
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'sleep 0'
+  - it: defaults an unset settle delay
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: alpha }]
+      grafana.orgMapping: { enabled: true, settleSeconds: null }
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'sleep 120'
+  - it: rejects a negative settle delay
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: alpha }]
+      grafana.orgMapping: { enabled: true, settleSeconds: -1 }
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.orgMapping.settleSeconds must be a non-negative integer
+  - it: passes enabled mapping alongside the domain to the organization addon
+    template: templates/applications.yaml
+    set:
+      mode: applications
+      argocd.project: example
+      argocd.destination.name: example-cluster
+      cluster.name: example-cluster
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
+      grafana.domain: grafana.example.com
+      grafana.orgMapping: { enabled: true, settleSeconds: 45 }
+      grafana.sso.provider: keycloak
+      grafana.sso.keycloak: { url: https://sso.example.com, realm: example, clientId: grafana }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana-tenant-orgs
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.grafana
+          value: { domain: grafana.example.com, orgMapping: { enabled: true, settleSeconds: 45 } }
+  - it: omits disabled mapping from the organization addon
+    template: templates/applications.yaml
+    set:
+      mode: applications
+      argocd.project: example
+      argocd.destination.name: example-cluster
+      cluster.name: example-cluster
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana-tenant-orgs
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject.grafana.orgMapping
   - it: provisions one organization and tenant datasources for multiple receivers
     template: templates/tenant-orgs.yaml
     set:

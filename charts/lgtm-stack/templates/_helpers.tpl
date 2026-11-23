@@ -220,6 +220,7 @@ alertmanager:
 {{- else if eq $key "grafana" }}
 {{- $orgMapping := list }}
 {{- if $v.grafana.orgMapping.enabled }}
+{{- if empty $v.tenants }}{{ fail "grafana.orgMapping requires at least one tenant" }}{{ end }}
 {{- if ne $v.grafana.sso.provider "keycloak" }}{{ fail "grafana.orgMapping requires grafana.sso.provider keycloak" }}{{ end }}
 {{- $admins := $v.grafana.sso.keycloak.admin | default list }}
 {{- range $admins }}

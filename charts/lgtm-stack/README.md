@@ -294,6 +294,10 @@ Membership of a tenant Grafana organization comes only from those groups. Groups
 A tenant group name may not be empty, equal an SSO admin group, or contain `:`, `,`, whitespace or braces.
 SSO admin group names are held to the same character rules when org mapping is enabled.
 This defaults to off, with rendering unchanged when off. `role_attribute_path` and `role_attribute_strict` are not changed.
+Org mapping is OFF by default and has been proven only on a local test harness, not on a live cluster.
+When on, the tenant-orgs job verifies every tenant organization exists, then waits `grafana.orgMapping.settleSeconds` (default 120) so Grafana's organization view catches up. A new tenant can log in about 2 minutes after the tenant-orgs job starts. No Grafana restart is needed.
+Every organization named in the mapping must exist, or all mapped users are refused and only the main organization remains for an SSO admin. Rendering fails when org mapping is on and `tenants` is empty.
+Tenant Viewer and Editor roles can read the non-secret settings (URL, basic-auth user, `jsonData`) of datasources in their own organization. Secrets are never returned, so keep anything sensitive out of a tenant datasource URL or `jsonData`.
 
 ```yaml
 grafana:

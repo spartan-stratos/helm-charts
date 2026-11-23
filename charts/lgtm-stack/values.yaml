@@ -73,7 +73,11 @@ placement:
 
 grafana:
   # Map Keycloak groups to tenant organizations when explicitly enabled.
-  orgMapping: { enabled: false }
+  orgMapping:
+    enabled: false
+    # Orgs created after Grafana starts are invisible to org_mapping for 1-2 minutes.
+    # The job waits this long; no restart needed.
+    settleSeconds: 120
   # Sets grafana.ini server.root_url and the Ingress host
   domain: ""
   ingress:
