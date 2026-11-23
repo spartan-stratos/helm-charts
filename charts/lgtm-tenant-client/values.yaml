@@ -1,0 +1,8 @@
+# Required values and the optional instrumentation name are documented in README.md.
+namespace: ""
+tenant: ""
+region: ""
+roleArn: ""
+secretName: ""
+receiverUrl: ""
+instrumentationName: ""

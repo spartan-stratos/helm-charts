@@ -1,0 +1,6 @@
+namespace: example-app
+tenant: example
+region: us-east-1
+roleArn: arn:aws:iam::000000000000:role/example-otlp-secrets
+secretName: example/otlp-basic-auth
+receiverUrl: http://example-receiver.example-namespace.svc.cluster.local:4318
