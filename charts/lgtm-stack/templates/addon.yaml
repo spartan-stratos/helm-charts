@@ -13,11 +13,11 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: {{ $backend }}
       {{- if has $backend (list "loki" "tempo") }}
+      app.kubernetes.io/name: {{ $backend }}
       app.kubernetes.io/instance: {{ $backend }}
       {{- else }}
-      {{ $backend }}: kube-prometheus-stack-{{ $backend }}
+      {{ $backend }}: kube-prometheus-stack
       {{- end }}
   policyTypes: [Ingress]
   ingress:

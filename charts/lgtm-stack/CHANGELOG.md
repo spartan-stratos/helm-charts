@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.9.1 (2026-11-23)
+
+### Bug Fixes
+
+* Match Prometheus and Alertmanager NetworkPolicies to their live pod labels.
+
 ## 0.9.0 (2026-11-23)
 
 ### Features
