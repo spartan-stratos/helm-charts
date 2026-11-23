@@ -47,6 +47,7 @@ networkPolicy:
 
 platformTenant: platform
 # See README.md Tenant gateway receivers for credential and namespace isolation configuration.
+# Tenants may set grafana: { viewers: [<group>], editors: [<group>] } for optional Keycloak org mapping.
 tenants: []
 # Keep tenant logs and traces disabled until their backends enforce tenant authentication.
 tenantIsolation:
@@ -71,6 +72,8 @@ placement:
   tolerations: []
 
 grafana:
+  # Map Keycloak groups to tenant organizations when explicitly enabled.
+  orgMapping: { enabled: false }
   # Sets grafana.ini server.root_url and the Ingress host
   domain: ""
   ingress:

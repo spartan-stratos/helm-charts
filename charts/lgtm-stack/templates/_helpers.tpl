@@ -218,10 +218,39 @@ alertmanager:
       name: slack
 {{- end }}
 {{- else if eq $key "grafana" }}
-{{- with $v.grafana.domain }}
+{{- $orgMapping := list }}
+{{- if $v.grafana.orgMapping.enabled }}
+{{- if ne $v.grafana.sso.provider "keycloak" }}{{ fail "grafana.orgMapping requires grafana.sso.provider keycloak" }}{{ end }}
+{{- $admins := $v.grafana.sso.keycloak.admin | default list }}
+{{- range $admins }}
+{{- $orgMapping = append $orgMapping (printf "%s:*:Admin" .) }}
+{{- end }}
+{{- range $tenant := $v.tenants }}
+{{- with $tenant.grafana }}
+{{- range $role := list "Viewer" "Editor" }}
+{{- $groups := list }}
+{{- if eq $role "Viewer" }}{{ $groups = $tenant.grafana.viewers | default list }}{{ else }}{{ $groups = $tenant.grafana.editors | default list }}{{ end }}
+{{- range $group := $groups }}
+{{- if or (not (kindIs "string" $group)) (eq $group "") }}{{ fail "tenant grafana group must not be empty" }}{{ end }}
+{{- if or (eq $group "sre") (has $group $admins) }}{{ fail "tenant grafana group must not be sre or an SSO admin group" }}{{ end }}
+{{- if regexMatch "[:,[:space:]{}]" $group }}{{ fail "tenant grafana group must not contain : , whitespace or braces" }}{{ end }}
+{{- $orgMapping = append $orgMapping (printf "%s:%s:%s" $group $tenant.id $role) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if or $v.grafana.domain $v.grafana.orgMapping.enabled }}
 grafana.ini:
+{{- with $v.grafana.domain }}
   server:
     root_url: https://{{ . }}
+{{- end }}
+{{- if $v.grafana.orgMapping.enabled }}
+  auth.generic_oauth:
+    org_attribute_path: groups
+    org_mapping: {{ join " " $orgMapping | quote }}
+{{- end }}
 {{- end }}
 {{- if $v.grafana.ingress.enabled }}
 ingress:

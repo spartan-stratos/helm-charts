@@ -18,7 +18,7 @@ name: lgtm-stack-<cluster>
 version: 1.0.0
 dependencies:
   - name: lgtm-stack
-    version: 0.10.0
+    version: 0.11.0
     repository: https://spartan-stratos.github.io/helm-charts
 ```
 
@@ -249,6 +249,8 @@ needs redirect URI `https://<domain>/login/generic_oauth` and a **Group Membersh
 **Full group path off**; with it on, Keycloak sends `/sre` instead of `sre` and login fails with "IdP did not return
 a role attribute". `admin` groups get Grafana Admin, `member` groups Editor, anyone else is refused.
 
+For optional tenant organization membership from Keycloak groups, see [Tenant Grafana access](#tenant-grafana-access).
+
 GitHub (`provider: github`): `organization`, `clientId`, `admin` and `member` (team slugs); callback
 `https://<domain>/login/github`.
 
@@ -264,6 +266,39 @@ A tenant is a project. Every env namespace of the project writes metrics, logs a
 3. Credentials: one htpasswd line per receiver, stored in the Secret named by `htpasswdSecret` in `monitoring` (key `htpasswd`). Optionally set `htpasswdExternalSecret` to sync it from a secret store. The gateway pods stay Pending until that Secret exists. The matching plaintext goes to the sender as a Secret with keys `username` and `password`.
 4. Telemetry: the app namespace runs an OpenTelemetry Instrumentation or SDK that exports OTLP to the tenant receiver. Logs and spans must carry the resource attribute `k8s.namespace.name`, or the gateway drops them.
 5. Rules and alert routes: one `spartan-alerts` release per env namespace. The tenant ruler adds `namespace=<rule namespace>` to every selector, so a rule needs no namespace matcher. Alerts with no matching AlertmanagerConfig route to the unrouted channel.
+
+### Tenant Grafana access
+
+Set `grafana.sso.provider: keycloak`, `grafana.orgMapping.enabled: true` and each tenant's `tenants[].grafana.viewers` / `editors` lists.
+Keycloak groups `lgtm-<tenant>-viewer` and `lgtm-<tenant>-editor` must exist and be assigned to the `grafana` client `groups` claim, with **Full group path off**.
+Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; tenant groups get Viewer or Editor only, never Admin.
+A tenant group name may not be empty, equal an SSO admin group, or contain `:`, `,`, whitespace or braces.
+This defaults to off, with rendering unchanged when off. `role_attribute_path` and `role_attribute_strict` are not changed.
+
+```yaml
+grafana:
+  sso: { provider: keycloak }
+  orgMapping: { enabled: true }
+tenants:
+  - id: tenant-a
+    grafana:
+      viewers: [lgtm-tenant-a-viewer]
+      editors: [lgtm-tenant-a-editor]
+  - id: tenant-b
+    grafana:
+      viewers: [lgtm-tenant-b-viewer]
+      editors: [lgtm-tenant-b-editor]
+```
+
+Grafana semantics (verified from the Grafana 13 documentation):
+
+- `org_mapping` entries are `<ExternalName>:<OrgIdOrName>:<Role>`, so an organization name is accepted; the tenant organization is named after the tenant id.
+- Roles from `org_mapping` and `role_attribute_path` combine, and the user gets the highest role.
+- `org_attribute_path` must return an array; `groups` is one.
+- `role_attribute_strict` denies login only when neither `role_attribute_path` nor `org_mapping` yields a role, so a user in only a tenant group is now admitted.
+- `*` matches any organization.
+
+Not yet exercised against a live Grafana: test on a non-production Grafana before enabling in production, including that platform admins still reach the main organization and that a user with no mapped group is refused.
 
 Sender on another cluster, using an Alloy collector that forwards all three signals to a public receiver:
 

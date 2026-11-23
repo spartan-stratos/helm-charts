@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.11.0 (2026-11-23)
+
+### Features
+
+* Add optional Grafana organization membership from Keycloak groups via `grafana.orgMapping.enabled` and `tenants[].grafana.viewers` / `editors`, off by default.
+
 ## 0.10.0 (2026-11-23)
 
 ### Features
