@@ -5,10 +5,19 @@ It creates four objects in the configured namespace: ServiceAccount `otlp-secret
 `otlp-secrets`, ExternalSecret `otlp-basic-auth` and an OpenTelemetry Instrumentation.
 
 Install the External Secrets Operator and OpenTelemetry Operator CRDs first. Create the application
-namespace beforehand. The IAM role must trust the `otlp-secrets` service account in that namespace
-and permit reading the configured AWS Secrets Manager entry with `username` and `password` properties.
+namespace beforehand. Use one IAM role per consumer. Trust exactly
+`system:serviceaccount:<namespace>:otlp-secrets`, with no wildcard. Allow only
+`secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret` on that one secret, plus
+`kms:Decrypt` on its customer-managed KMS key when one is used. Scope `kms:Decrypt` to that key ARN.
+Use `lgtm/tenants/<tenant>-<env>/otlp-basic-auth` with JSON keys `username`, `password` and `htpasswd`.
+The sender reads `username` and `password`; the gateway reads `htpasswd` from the same entry.
+Cross-account: the role lives in the cluster account. The secret's resource policy must allow that role.
+For a customer-managed KMS key, its key policy must also allow the role. The role's identity policy
+must grant `kms:Decrypt` scoped to that key ARN.
 The External Secrets Operator resolves credentials at runtime and produces the `otlp-headers` Secret key.
 No plaintext credentials are stored in chart values or rendered manifests.
+The default refresh is `1h`. Apply a rotated value now with
+`kubectl annotate externalsecret otlp-basic-auth -n <namespace> force-sync=<epoch> --overwrite`.
 
 ## Values
 
@@ -22,23 +31,30 @@ All defaults are empty strings. Every required value fails rendering with `<key>
 | `roleArn` | Yes | IAM role ARN used by the `otlp-secrets` service account. |
 | `secretName` | Yes | Secrets Manager entry containing `username` and `password`. |
 | `receiverUrl` | Yes | OTLP HTTP receiver base URL, including its configured receiver path. |
-| `instrumentationName` | No | Instrumentation name; defaults to `tenant`. |
+| `instrumentationName` | No | Instrumentation name; defaults to the value of `tenant`. |
+
+Dev uses in-cluster port `4320` and path `/<tenant>`. Prod uses its own port and path
+`/<tenant>/<env>`, for example `:4321/example/prod`. Public receivers use the ingress host.
 
 ## Example
 
-The account id below is a fake placeholder. Supply values matching the platform receiver:
+Replace `<account-id>` and `<region>`. Supply values matching the platform receiver:
 
 ```yaml
 namespace: example-app
 tenant: example
-region: us-east-1
-roleArn: arn:aws:iam::000000000000:role/example-otlp-secrets
-secretName: example/otlp-basic-auth
-receiverUrl: http://alloy-gateway.monitoring.svc.cluster.local:4320/example/dev
+region: <region>
+roleArn: arn:aws:iam::<account-id>:role/example-otlp-secrets
+secretName: lgtm/tenants/example-dev/otlp-basic-auth
+receiverUrl: http://alloy-gateway.monitoring.svc.cluster.local:4320/example
 ```
 
 Install this chart with those values and configure the workload's operator injection annotation to
-reference the Instrumentation. The chart does not annotate or restart application workloads.
+reference the Instrumentation:
+`instrumentation.opentelemetry.io/inject-<lang>: "<namespace>/<instrumentationName>"`.
+`instrumentationName` defaults to the value of `tenant`. For tenant `example` in namespace
+`example-app`, the annotation value is `example-app/example`.
+The chart does not annotate or restart application workloads.
 
 ## Receiver contract
 
@@ -46,8 +62,8 @@ See [Onboarding a tenant in the lgtm-stack README](../lgtm-stack/README.md#onboa
 The platform configures the tenant and receiver separately. Each receiver has its own port, credentials
 and namespace allowlist. The client credentials must match the receiver's htpasswd entry.
 
-Receiver paths default to `/<id>/<name>`; legacy tenant receivers use `/<id>`. Use the configured
-path when overridden. Direct signal endpoints have the form
+Receiver paths default to `/<id>/<name>`. A receiver may set `path`, for example `/<id>` for dev;
+legacy tenant receivers also use `/<id>`. Use the configured path when overridden. Direct signal endpoints have the form
 `http://alloy-gateway.monitoring.svc.cluster.local:<port>/<id>/<name>/v1/{metrics,logs,traces}`.
 Public receivers use the ingress host and the same signal suffixes. Set `receiverUrl` to the base
 URL including the receiver path, without the signal suffix.

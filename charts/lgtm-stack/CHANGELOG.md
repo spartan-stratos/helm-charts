@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.11.2 (2026-11-23)
+
+### Documentation
+
+- Complete tenant onboarding guidance: shared client chart, secret naming, per-consumer IRSA, cross-account, force-sync, verification and alert routing.
+
 ## 0.11.1 (2026-11-23)
 
 ### Features

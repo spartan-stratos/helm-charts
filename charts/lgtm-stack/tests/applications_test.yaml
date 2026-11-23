@@ -131,7 +131,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.11.1
+          value: 0.11.2
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info

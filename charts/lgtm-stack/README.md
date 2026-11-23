@@ -264,14 +264,31 @@ keep it as break-glass.
 A tenant is a project. Every env namespace of the project writes metrics, logs and traces under one tenant id through the gateway, and its alert rules run only in the tenant ruler.
 
 1. Namespaces: one namespace per env, unique names, each labelled `lgtm-stack/tenant=<id>` before its rules sync.
+   - For namespaces created by the `eks-cluster` Terraform module, set the label with `custom_namespace_labels` (module v1.4.0 or later). Do not also manage it with a `kubernetes_labels` resource. The two fight over the label.
 2. Stack values: add `tenants[]` with the id and the env namespaces. Give each env its own `receivers[]` entry (port, namespaces, auth Secret) so one credential cannot write another env's namespace. Public receivers need `gateway.ingress`; receivers on the platform cluster use `ingress: false`.
 3. Credentials: one htpasswd line per receiver, stored in the Secret named by `htpasswdSecret` in `monitoring` (key `htpasswd`). Optionally set `htpasswdExternalSecret` to sync it from a secret store. The gateway pods stay Pending until that Secret exists. The matching plaintext goes to the sender as a Secret with keys `username` and `password`.
+   - Use AWS secret `lgtm/tenants/<tenant>-<env>/otlp-basic-auth` with JSON keys `username`, `password` and `htpasswd`. The sender reads `username` and `password`. Gateway-side `htpasswdExternalSecret` reads `htpasswd` from the same entry. It is available since chart 0.10.0 and off by default.
+   - Use one IRSA role per consumer. Trust exactly `system:serviceaccount:<ns>:<sa>`, with no wildcard. Allow only `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret` on that one secret, plus `kms:Decrypt` on its customer-managed KMS key when one is used. Scope `kms:Decrypt` to that key ARN.
+   - Cross-account: the role lives in the cluster account. The secret's resource policy must allow that role. For a customer-managed KMS key, its key policy must also allow the role. The role's identity policy must grant `kms:Decrypt` scoped to that key ARN.
+   - ExternalSecrets refresh every `1h`. Apply a rotated value now with `kubectl annotate externalsecret <name> -n <ns> force-sync=<epoch> --overwrite`.
 4. Telemetry: the app namespace runs an OpenTelemetry Instrumentation or SDK that exports OTLP to the tenant receiver. Logs and spans must carry the resource attribute `k8s.namespace.name`, or the gateway drops them.
+   - Use the shared [lgtm-tenant-client](../lgtm-tenant-client/README.md) chart. A service must not carry its own copy of the ServiceAccount, SecretStore, ExternalSecret or Instrumentation plumbing.
+   - In-cluster Alloy and the file-tail sidecar write under the platform tenant by default. Their data does not appear in tenant datasources. Tenant-scoped data goes through the tenant receiver over OTLP. A file-tail sidecar ships logs to port `3100` at `/loki/api/v1/push`. When Loki auth is enabled, direct pushes need an `X-Scope-OrgID` header. Set it for the sidecar with the spartan chart value `observability.logs.fileSidecar.tenantId`. Set `OTEL_LOGS_EXPORTER=none` for file-tail logging. Prod sends OTLP logs through its receiver and runs no sidecar.
+   - OTLP logs through the gateway carry `k8s.namespace.name`. Loki may expose it as `k8s_namespace_name` structured metadata. File-tail sidecar logs carry `namespace` as a stream label. Use the query for the ingestion path below.
+   - Since chart 0.9.0, the gateway drops logs and spans without a namespace attribute. It does not drop metrics. A series without a namespace label cannot be isolated by the label proxy or tenant ruler.
 5. Rules and alert routes: one `spartan-alerts` release per env namespace. The tenant ruler adds `namespace=<rule namespace>` to every selector, so a rule needs no namespace matcher. Alerts with no matching AlertmanagerConfig route to the unrouted channel.
+   - Slack routes match severity `warning|critical` only. The root null route drops `info`. An alert matching no route goes to `UNROUTED`. Delivery proof is exactly one `SyntheticTest` warning alert, never re-posted.
+
+### Verify a tenant
+
+- Search Tempo with header `X-Scope-OrgID: <tenant>`.
+- For OTLP logs through the gateway, query `{service_name="<svc>"} | k8s_namespace_name="<ns>"` when Loki exposes `k8s.namespace.name` as `k8s_namespace_name` structured metadata. Confirm names with the Loki labels API at `/loki/api/v1/labels` using header `X-Scope-OrgID: <tenant>`.
+- For file-tail sidecar logs, query `{namespace="<ns>"}`. These logs carry `namespace` as a stream label. Query the tenant used for the push.
+- Query metrics through the tenant label proxy datasource.
 
 ### Tenant Grafana access
 
-Set `grafana.sso.provider: keycloak`, `grafana.orgMapping.enabled: true` and each tenant's `tenants[].grafana.viewers` / `editors` lists.
+Off by default. Set `grafana.sso.provider: keycloak`, `grafana.orgMapping.enabled: true` and each tenant's `tenants[].grafana.viewers` / `editors` lists.
 Keycloak groups `lgtm-<tenant>-viewer` and `lgtm-<tenant>-editor` must exist and be assigned to the `grafana` client `groups` claim, with **Full group path off**.
 Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; tenant groups get Viewer or Editor only, never Admin.
 A tenant group name may not be empty, equal an SSO admin group, or contain `:`, `,`, whitespace or braces.
@@ -302,6 +319,8 @@ Grafana semantics (verified from the Grafana 13 documentation):
 - `*` matches any organization.
 
 Not yet exercised against a live Grafana: test on a non-production Grafana before enabling in production, including that platform admins still reach the main organization and that a user with no mapped group is refused.
+
+### Sender on another cluster
 
 Sender on another cluster, using an Alloy collector that forwards all three signals to a public receiver:
 
@@ -346,11 +365,12 @@ kind: ExternalSecret
 metadata:
   name: <id>-otlp-client
 spec:
+  refreshInterval: 1h
   secretStoreRef: { name: <store>, kind: SecretStore }
   target: { name: <id>-otlp-client }
   data:
-    - { secretKey: username, remoteRef: { key: <store entry>, property: username } }
-    - { secretKey: password, remoteRef: { key: <store entry>, property: password } }
+    - { secretKey: username, remoteRef: { key: lgtm/tenants/<tenant>-<env>/otlp-basic-auth, property: username } }
+    - { secretKey: password, remoteRef: { key: lgtm/tenants/<tenant>-<env>/otlp-basic-auth, property: password } }
 ```
 
 ### Gateway htpasswd ExternalSecret
