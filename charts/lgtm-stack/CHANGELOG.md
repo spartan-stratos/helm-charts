@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.11.3 (2026-11-23)
+
+### Documentation
+
+- Correct the log namespace query: structured metadata filter for OTLP and Alloy-relayed sidecar logs, stream label only for direct sidecar pushes.
+
 ## 0.11.2 (2026-11-23)
 
 ### Documentation

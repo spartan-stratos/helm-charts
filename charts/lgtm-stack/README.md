@@ -274,7 +274,7 @@ A tenant is a project. Every env namespace of the project writes metrics, logs a
 4. Telemetry: the app namespace runs an OpenTelemetry Instrumentation or SDK that exports OTLP to the tenant receiver. Logs and spans must carry the resource attribute `k8s.namespace.name`, or the gateway drops them.
    - Use the shared [lgtm-tenant-client](../lgtm-tenant-client/README.md) chart. A service must not carry its own copy of the ServiceAccount, SecretStore, ExternalSecret or Instrumentation plumbing.
    - In-cluster Alloy and the file-tail sidecar write under the platform tenant by default. Their data does not appear in tenant datasources. Tenant-scoped data goes through the tenant receiver over OTLP. A file-tail sidecar ships logs to port `3100` at `/loki/api/v1/push`. When Loki auth is enabled, direct pushes need an `X-Scope-OrgID` header. Set it for the sidecar with the spartan chart value `observability.logs.fileSidecar.tenantId`. Set `OTEL_LOGS_EXPORTER=none` for file-tail logging. Prod sends OTLP logs through its receiver and runs no sidecar.
-   - OTLP logs through the gateway carry `k8s.namespace.name`. Loki may expose it as `k8s_namespace_name` structured metadata. File-tail sidecar logs carry `namespace` as a stream label. Use the query for the ingestion path below.
+   - OTLP logs through the gateway, and sidecar logs relayed through an Alloy `loki.source.api`, carry the namespace as structured metadata (`k8s_namespace_name`), not as a stream label; only `service_name` is a stream label there. A sidecar pushing straight to Loki sets `namespace` as a stream label itself via `external_labels`. Use the query for the ingestion path below.
    - Since chart 0.9.0, the gateway drops logs and spans without a namespace attribute. It does not drop metrics. A series without a namespace label cannot be isolated by the label proxy or tenant ruler.
 5. Rules and alert routes: one `spartan-alerts` release per env namespace. The tenant ruler adds `namespace=<rule namespace>` to every selector, so a rule needs no namespace matcher. Alerts with no matching AlertmanagerConfig route to the unrouted channel.
    - Slack routes match severity `warning|critical` only. The root null route drops `info`. An alert matching no route goes to `UNROUTED`. Delivery proof is exactly one `SyntheticTest` warning alert, never re-posted.
@@ -282,8 +282,8 @@ A tenant is a project. Every env namespace of the project writes metrics, logs a
 ### Verify a tenant
 
 - Search Tempo with header `X-Scope-OrgID: <tenant>`.
-- For OTLP logs through the gateway, query `{service_name="<svc>"} | k8s_namespace_name="<ns>"` when Loki exposes `k8s.namespace.name` as `k8s_namespace_name` structured metadata. Confirm names with the Loki labels API at `/loki/api/v1/labels` using header `X-Scope-OrgID: <tenant>`.
-- For file-tail sidecar logs, query `{namespace="<ns>"}`. These logs carry `namespace` as a stream label. Query the tenant used for the push.
+- For OTLP and Alloy-relayed sidecar logs in prod Loki, query `{service_name="<svc>"} | k8s_namespace_name="<ns>"` (structured metadata filter; a `{namespace="<ns>"}` or `{k8s_namespace_name="<ns>"}` stream selector returns nothing). Confirm names with the Loki labels API at `/loki/api/v1/labels` using header `X-Scope-OrgID: <tenant>`.
+- Only for a sidecar pushing directly to a Loki that has no Alloy in between: `{namespace="<ns>"}` works because the sidecar sets that stream label. Query the tenant used for the push.
 - Query metrics through the tenant label proxy datasource.
 
 ### Tenant Grafana access
