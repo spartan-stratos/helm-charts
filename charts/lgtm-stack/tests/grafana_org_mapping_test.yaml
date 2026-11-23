@@ -15,6 +15,13 @@ set:
     admin: [sre]
     member: [member]
 tests:
+  - it: requires at least one tenant when mapping is enabled
+    set:
+      grafana.orgMapping.enabled: true
+      tenants: []
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.orgMapping requires at least one tenant
   - it: ignores tenant groups by default and preserves the role rule
     set:
       tenants:

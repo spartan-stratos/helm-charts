@@ -54,6 +54,18 @@ data:
     datasource prometheus '{"name":"Prometheus","uid":"prometheus","type":"prometheus","access":"proxy","url":"http://prom-label-proxy-{{ $tenant.id }}.monitoring.svc.cluster.local:8080","isDefault":true}'
 {{- end }}
 {{- end }}
+{{- if .Values.grafana.orgMapping.enabled }}
+{{- $settleSeconds := dig "settleSeconds" 120 .Values.grafana.orgMapping }}
+{{- if not (regexMatch "^[0-9]+$" (toString $settleSeconds)) }}{{ fail "grafana.orgMapping.settleSeconds must be a non-negative integer" }}{{ end }}
+{{- range $tenant := .Values.tenants }}
+    request GET -X GET "$base/api/orgs/name/{{ $tenant.id }}"
+    if [ "$code" = 404 ]; then
+      printf '%s\n' 'tenant org {{ $tenant.id }} missing after provisioning' >&2
+      exit 1
+    fi
+{{- end }}
+    sleep {{ $settleSeconds }}
+{{- end }}
 ---
 apiVersion: batch/v1
 kind: Job

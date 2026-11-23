@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.11.4 (2026-11-23)
+
+### Features
+
+* Verify tenant organizations and wait for Grafana organization mapping to settle when explicitly enabled, without restarting Grafana.
+
 ## 0.11.3 (2026-11-23)
 
 ### Documentation
