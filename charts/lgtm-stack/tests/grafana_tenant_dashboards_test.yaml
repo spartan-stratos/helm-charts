@@ -20,6 +20,72 @@ set:
       htpasswdSecret: { name: beta-otlp, key: htpasswd }
       grafana: { viewers: [tenant-viewer], orgId: 3 }
 tests:
+  - it: rejects reserved general when any tenant has an org id
+    set:
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { viewers: [tenant-viewer], orgId: 2 } }
+        - { id: general, port: 4321, htpasswdSecret: { name: beta-otlp, key: htpasswd }, namespaces: [beta-dev] }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant dashboard id must not be general or volume
+  - it: rejects reserved volume
+    set:
+      tenants:
+        - { id: volume, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { viewers: [tenant-viewer], orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant dashboard id must not be general or volume
+  - it: rejects collisions with custom tenant provider names
+    set:
+      components.grafana.values.dashboardProviders:
+        custom.yaml: { apiVersion: 1, providers: [{ name: tenant-alpha }] }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant dashboard provider names must be unique
+  - it: rejects collisions with custom provider names
+    set:
+      components.grafana.values.dashboardProviders:
+        custom.yaml: { apiVersion: 1, providers: [{ name: home-alpha }] }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant dashboard provider names must be unique
+  - it: rejects collisions with the main sidecar provider name
+    set:
+      components.grafana.values.sidecar.dashboards.provider.name: tenant-alpha
+    asserts:
+      - failedTemplate:
+          errorMessage: tenant dashboard provider names must be unique
+  - it: keeps alpha and alpha-home provider names distinct and polling
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    set:
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { viewers: [tenant-viewer], orgId: 2 } }
+        - { id: alpha-home, port: 4321, htpasswdSecret: { name: beta-otlp, key: htpasswd }, namespaces: [beta-dev], grafana: { viewers: [tenant-viewer], orgId: 3 } }
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[0].name
+          value: tenant-alpha
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[1].name
+          value: home-alpha
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[2].name
+          value: tenant-alpha-home
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[3].name
+          value: home-alpha-home
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[0].updateIntervalSeconds
+          value: 30
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[1].updateIntervalSeconds
+          value: 30
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[2].updateIntervalSeconds
+          value: 30
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["tenant-dashboardproviders.yaml"].providers[3].updateIntervalSeconds
+          value: 30
   - it: rejects org ids without any tenant groups
     set:
       tenants: [{ id: alpha, port: 4320, grafana: { orgId: 2 } }]
@@ -283,24 +349,27 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "tenants[].namespaces must be set when tenants[].grafana.orgId is set; an empty sidecar NAMESPACE watches the Grafana namespace"
-  - it: reads the sidecar reload credentials from the configured admin secret
+  - it: never gives tenant sidecars request credentials or the configured admin secret
     documentSelector: { path: metadata.name, value: lgtm-grafana }
     set:
       components.grafana.values.admin: { existingSecret: custom-admin, userKey: u, passwordKey: p }
     asserts:
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.extraContainers
+          pattern: 'REQ_USERNAME|REQ_PASSWORD|REQ_URL|REQ_METHOD|custom-admin|grafana-admin|secretKeyRef'
+  - it: uses unique filenames on every tenant sidecar
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    asserts:
       - matchRegex:
           path: spec.source.helm.valuesObject.extraContainers
-          pattern: "name: custom-admin"
-      - matchRegex:
-          path: spec.source.helm.valuesObject.extraContainers
-          pattern: "key: p\\n"
+          pattern: '(?s)name: UNIQUE_FILENAMES\n\s+value: "true".*name: grafana-sc-dashboard-alpha.*name: UNIQUE_FILENAMES\n\s+value: "true".*name: grafana-sc-dashboard-beta'
   - it: rejects user extraContainers even when set to an empty string
     set:
       components.grafana.values.extraContainers: ""
     asserts:
       - failedTemplate:
           errorMessage: grafana.tenantDashboards cannot be combined with components.grafana.values.extraContainers
-  - it: renders per-tenant sidecars with joined namespaces and safe reload credentials
+  - it: renders per-tenant sidecars with joined namespaces and no reload credentials
     documentSelector: { path: metadata.name, value: lgtm-grafana }
     asserts:
       - matchRegex:
@@ -324,18 +393,9 @@ tests:
       - matchRegex:
           path: spec.source.helm.valuesObject.extraContainers
           pattern: 'image: quay.io/kiwigrid/k8s-sidecar:2.11.2'
-      - matchRegex:
+      - notMatchRegex:
           path: spec.source.helm.valuesObject.extraContainers
-          pattern: 'key: admin-password\n\s+name: grafana-admin'
-      - matchRegex:
-          path: spec.source.helm.valuesObject.extraContainers
-          pattern: 'key: admin-user\n\s+name: grafana-admin'
-      - matchRegex:
-          path: spec.source.helm.valuesObject.extraContainers
-          pattern: 'name: REQ_URL\n\s+value: http://localhost:3000/api/admin/provisioning/dashboards/reload'
-      - matchRegex:
-          path: spec.source.helm.valuesObject.extraContainers
-          pattern: 'name: REQ_METHOD\n\s+value: POST'
+          pattern: 'REQ_|grafana-admin|secretKeyRef'
       - matchRegex:
           path: spec.source.helm.valuesObject.extraContainers
           pattern: 'allowPrivilegeEscalation: false'
@@ -350,7 +410,7 @@ tests:
           pattern: 'drop:\n\s+- ALL'
       - matchRegex:
           path: spec.source.helm.valuesObject.extraContainers
-          pattern: 'name: sc-dashboard-alpha\n\s+readOnly: false'
+          pattern: 'name: tenant-dash-alpha\n\s+readOnly: false'
       - notMatchRegex:
           path: spec.source.helm.valuesObject.extraContainers
           pattern: 'FOLDER_ANNOTATION|/tmp/dashboards|\{\{'
@@ -363,6 +423,7 @@ tests:
             apiVersion: 1
             providers:
               - name: tenant-alpha
+                updateIntervalSeconds: 30
                 orgId: 2
                 folder: alpha
                 folderUid: alpha
@@ -370,7 +431,8 @@ tests:
                 allowUiUpdates: false
                 disableDeletion: false
                 options: { path: /var/lib/grafana-tenant-dashboards/alpha, foldersFromFilesStructure: false }
-              - name: tenant-alpha-home
+              - name: home-alpha
+                updateIntervalSeconds: 30
                 orgId: 2
                 folder: alpha
                 folderUid: alpha
@@ -379,6 +441,7 @@ tests:
                 disableDeletion: true
                 options: { path: /etc/grafana/tenant-home/alpha, foldersFromFilesStructure: false }
               - name: tenant-beta
+                updateIntervalSeconds: 30
                 orgId: 3
                 folder: beta
                 folderUid: beta
@@ -386,7 +449,8 @@ tests:
                 allowUiUpdates: false
                 disableDeletion: false
                 options: { path: /var/lib/grafana-tenant-dashboards/beta, foldersFromFilesStructure: false }
-              - name: tenant-beta-home
+              - name: home-beta
+                updateIntervalSeconds: 30
                 orgId: 3
                 folder: beta
                 folderUid: beta
@@ -396,13 +460,13 @@ tests:
                 options: { path: /etc/grafana/tenant-home/beta, foldersFromFilesStructure: false }
       - equal:
           path: spec.source.helm.valuesObject.extraVolumeMounts[0]
-          value: { name: sc-dashboard-alpha, mountPath: /var/lib/grafana-tenant-dashboards/alpha, readOnly: true }
+          value: { name: tenant-dash-alpha, mountPath: /var/lib/grafana-tenant-dashboards/alpha, readOnly: true }
       - equal:
           path: spec.source.helm.valuesObject.extraVolumeMounts[1]
           value: { name: tenant-home-alpha, mountPath: /etc/grafana/tenant-home/alpha, readOnly: true }
       - equal:
           path: spec.source.helm.valuesObject.extraVolumes[0]
-          value: { name: sc-dashboard-alpha, emptyDir: {} }
+          value: { name: tenant-dash-alpha, emptyDir: {} }
       - equal:
           path: spec.source.helm.valuesObject.extraVolumes[1]
           value: { name: tenant-home-alpha, configMap: { name: grafana-tenant-home-alpha } }

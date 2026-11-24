@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+* Remove Grafana admin credentials and reload requests from tenant sidecars; poll both tenant providers every 30 seconds.
+* Use unique sidecar filenames and distinct tenant dashboard volume and provider prefixes; reject reserved ids and name collisions.
+* Clarify that parent folder permission replacement preserves tenant-created sub-folder grants within the confined org.
 * Reject overrides of the generated tenant dashboard provider while allowing other dashboard provider keys.
 * Validate tenant org ids and namespace boundaries, reject delivery overrides, and assign distinct sidecar health ports.
 * Check org ids before datasource writes and fail when an existing admin membership lacks the Admin role.

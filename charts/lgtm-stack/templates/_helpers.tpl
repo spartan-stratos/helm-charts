@@ -268,17 +268,21 @@ alertmanager:
 {{- end }}
 {{- $namespaces := dict }}
 {{- $orgIds := dict }}
+{{- $volumeNames := dict "sc-dashboard" true "sc-dashboard-volume" true }}
+{{- $providerNames := dict (dig "sidecar" "dashboards" "provider" "name" "sidecarProvider" $v.components.grafana.values) true }}
+{{- range $providerFile := (dig "dashboardProviders" dict $v.components.grafana.values) }}
+{{- range $providerFile.providers }}
+{{- $_ := set $providerNames .name true }}
+{{- end }}
+{{- end }}
 {{- $healthPort := 8085 }}
-{{- $admin := dig "admin" dict $v.components.grafana.values }}
-{{- $adminSecret := $admin.existingSecret | default "grafana-admin" }}
-{{- $adminUser := $admin.userKey | default "admin-user" }}
-{{- $adminPassword := $admin.passwordKey | default "admin-password" }}
 {{- $volumes := list }}
 {{- $mounts := list }}
 {{- $containers := list }}
 {{- $providers := list }}
 {{- $objects := list }}
 {{- range $tenant := $v.tenants }}
+{{- if has $tenant.id (list "general" "volume") }}{{ fail "tenant dashboard id must not be general or volume" }}{{ end }}
 {{- range $tenant.namespaces }}
 {{- if eq (upper (toString .)) "ALL" }}{{ fail "tenants[].namespaces must not contain ALL" }}{{ end }}
 {{- if or (not (kindIs "string" .)) (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" (toString .))) (gt (len (toString .)) 63) }}{{ fail "tenants[].namespaces must contain DNS-1123 labels" }}{{ end }}
@@ -294,8 +298,16 @@ alertmanager:
 {{- $_ := set $orgIds (toString .orgId) true }}
 {{- if empty $tenant.namespaces }}{{ fail "tenants[].namespaces must be set when tenants[].grafana.orgId is set; an empty sidecar NAMESPACE watches the Grafana namespace" }}{{ end }}
 {{- $id := $tenant.id }}
-{{- $volume := printf "sc-dashboard-%s" $id }}
+{{- $volume := printf "tenant-dash-%s" $id }}
 {{- $home := printf "tenant-home-%s" $id }}
+{{- range $name := list $volume $home }}
+{{- if or (hasKey $volumeNames $name) (gt (len $name) 63) }}{{ fail "tenant dashboard volume names must be unique and at most 63 characters" }}{{ end }}
+{{- $_ := set $volumeNames $name true }}
+{{- end }}
+{{- range $name := list (printf "tenant-%s" $id) (printf "home-%s" $id) }}
+{{- if hasKey $providerNames $name }}{{ fail "tenant dashboard provider names must be unique" }}{{ end }}
+{{- $_ := set $providerNames $name true }}
+{{- end }}
 {{- $path := printf "/var/lib/grafana-tenant-dashboards/%s" $id }}
 {{- $homePath := printf "/etc/grafana/tenant-home/%s" $id }}
 {{- $volumes = append $volumes (dict "name" $volume "emptyDir" dict) }}
@@ -305,16 +317,13 @@ alertmanager:
 {{- $env := list }}
 {{- $env = append $env (dict "name" "HEALTH_PORT" "value" (toString $healthPort)) }}
 {{- $healthPort = add1 $healthPort }}
-{{- range $name, $value := dict "METHOD" "WATCH" "LABEL" "grafana_dashboard" "LABEL_VALUE" "1" "NAMESPACE" (join "," $tenant.namespaces) "RESOURCE" "configmap" "FOLDER" $path "REQ_URL" "http://localhost:3000/api/admin/provisioning/dashboards/reload" "REQ_METHOD" "POST" }}
+{{- range $name, $value := dict "METHOD" "WATCH" "LABEL" "grafana_dashboard" "LABEL_VALUE" "1" "NAMESPACE" (join "," $tenant.namespaces) "RESOURCE" "configmap" "FOLDER" $path "UNIQUE_FILENAMES" "true" }}
 {{- $env = append $env (dict "name" $name "value" $value) }}
-{{- end }}
-{{- range $name, $key := dict "REQ_USERNAME" $adminUser "REQ_PASSWORD" $adminPassword }}
-{{- $env = append $env (dict "name" $name "valueFrom" (dict "secretKeyRef" (dict "name" $adminSecret "key" $key))) }}
 {{- end }}
 {{- $security := dict "readOnlyRootFilesystem" true "allowPrivilegeEscalation" false "capabilities" (dict "drop" (list "ALL")) "seccompProfile" (dict "type" "RuntimeDefault") }}
 {{- $containers = append $containers (dict "name" (printf "grafana-sc-dashboard-%s" $id) "image" "quay.io/kiwigrid/k8s-sidecar:2.11.2" "env" $env "securityContext" $security "volumeMounts" (list (dict "name" $volume "mountPath" $path "readOnly" false))) }}
 {{- range $isHome := list false true }}
-{{- $providers = append $providers (dict "name" (printf "tenant-%s%s" $id (ternary "-home" "" $isHome)) "orgId" $tenant.grafana.orgId "folder" $id "folderUid" $id "type" "file" "allowUiUpdates" false "disableDeletion" $isHome "options" (dict "path" (ternary $homePath $path $isHome) "foldersFromFilesStructure" false)) }}
+{{- $providers = append $providers (dict "name" (printf "%s-%s" (ternary "home" "tenant" $isHome) $id) "orgId" $tenant.grafana.orgId "folder" $id "folderUid" $id "type" "file" "updateIntervalSeconds" 30 "allowUiUpdates" false "disableDeletion" $isHome "options" (dict "path" (ternary $homePath $path $isHome) "foldersFromFilesStructure" false)) }}
 {{- end }}
 {{- $dashboard := dict "uid" (printf "%s-home" $id) "title" (printf "%s home" $id) "schemaVersion" 39 "panels" (list (dict "id" 1 "type" "text" "title" "Your dashboards" "gridPos" (dict "h" 6 "w" 24 "x" 0 "y" 0) "options" (dict "mode" "markdown" "content" (printf "Save dashboards and sub-folders inside the %s folder. Copy Git-managed dashboards to edit them." $id)))) }}
 {{- $objects = append $objects (dict "apiVersion" "v1" "kind" "ConfigMap" "metadata" (dict "name" (printf "grafana-tenant-home-%s" $id) "namespace" $v.namespace) "data" (dict (printf "%s-home.json" $id) (toJson $dashboard))) }}

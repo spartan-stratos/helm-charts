@@ -28,7 +28,14 @@ then sync so Grafana starts without the missing-org provider.
 Each configured tenant gets a sidecar watching its `namespaces`, two providers in its org and folder
 with uid equal to the tenant id, and an unlabelled home ConfigMap delivered through Grafana's `extraObjects`.
 The protected `<tenant>-home` dashboard prevents deletion of the parent folder. Git dashboards are read-only;
-copy them into the tenant folder to edit them. Tenant ConfigMaps use this shape:
+copy them into the tenant folder to edit them.
+
+Tenant dashboards appear within about 30 seconds through provider polling. The tenant sidecar holds no Grafana credential.
+The sidecar can still fetch `.url` annotated keys; no Grafana credential is sent with those requests.
+Only the parent folder's permission list is replaced. Grants a tenant creates on its own sub-folders stay;
+this is harmless because the Grafana org is the confinement boundary and sub-folders cannot leave the parent.
+Tenant dashboard ids `general` and `volume`, and ids that cause generated volume or provider name collisions, are rejected.
+Tenant ConfigMaps use this shape:
 
 ```yaml
 apiVersion: v1
