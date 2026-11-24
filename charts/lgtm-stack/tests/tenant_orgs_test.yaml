@@ -86,6 +86,18 @@ tests:
       - matchRegex:
           path: data["provision.sh"]
           pattern: 'else\n  admin_role=.*\n  if \[ "\$admin_role" != Admin \]; then\n    printf.*admin membership must have role Admin.*>&2\n    exit 1\n  fi\nfi\ndatasource loki'
+  - it: checks the configured orgId even when tenant folders are off
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: alpha, grafana: { orgId: 2 } }]
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'orgId mismatch'
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'api/orgs/\$org_id/users'
   - it: waits for health before the first write
     template: templates/tenant-orgs.yaml
     set:

@@ -71,7 +71,6 @@ data:
       org_id=$(printf '%s\n' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
     fi
     case "$org_id" in ''|*[!0-9]*) exit 1 ;; esac
-{{- if $.Values.grafana.tenantFolders.enabled }}
 {{- $grafana := $tenant.grafana | default dict }}
 {{- if hasKey $grafana "orgId" }}
 {{- if not (regexMatch "^[1-9][0-9]*$" (toString $grafana.orgId)) }}{{ fail "tenant grafana.orgId must be a positive integer" }}{{ end }}
@@ -80,6 +79,7 @@ data:
       exit 1
     fi
 {{- end }}
+{{- if $.Values.grafana.tenantFolders.enabled }}
     request GET -X GET "$base/api/orgs/$org_id/users"
     admin_member=$(printf '%s\n' "$body" | sed 's/}[[:space:]]*,[[:space:]]*{/}\n{/g' | sed -n '/"userId"[[:space:]]*:[[:space:]]*'"$admin_id"'[[:space:]]*[,}]/p')
     if [ -z "$admin_member" ]; then
