@@ -1,4 +1,5 @@
 {{- if and (eq .Values.mode "addon") (eq .Values.addon "tenantOrgs") .Values.tenants .Values.components.grafana.enabled }}
+{{- include "lgtm-stack.validateTenantFolders" . }}
 {{- $admin := .Values.grafanaAdmin | default dict }}
 apiVersion: v1
 kind: ConfigMap
@@ -16,7 +17,7 @@ data:
       response=$(curl --silent --show-error --fail-with-body --connect-timeout 5 --max-time 30 \
         -u "$GF_USER:$GF_PASSWORD" -w '\n%{http_code}' "$@") || {
         code=$(printf '%s\n' "$response" | sed -n '$p')
-        [ "$code" = 404 ] && [ "$method" = GET ] || exit 1
+        { [ "$code" = 404 ] && [ "$method" = GET ]; } || [ "$method" = GET_PERMISSIONS ] || exit 1
       }
       code=$(printf '%s\n' "$response" | sed -n '$p')
       body=$(printf '%s\n' "$response" | sed '$d')
@@ -35,6 +36,30 @@ data:
           -H 'Content-Type: application/json' -d "$2" "$base/api/datasources"
       fi
     }
+{{- if .Values.grafana.tenantFolders.enabled }}
+    request GET -X GET "$base/api/user"
+    admin_id=$(printf '%s\n' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
+    case "$admin_id" in ''|*[!0-9]*) exit 1 ;; esac
+    admin_login=$(printf '%s\n' "$body" | sed -n 's/.*"login"[[:space:]]*:[[:space:]]*\("\([^"\\]\|\\.\)*"\).*/\1/p')
+    [ -n "$admin_login" ] || exit 1
+    verify_permissions() {
+      permission_attempt=1
+      while [ "$permission_attempt" -le 12 ]; do
+        request GET_PERMISSIONS -X GET -H "X-Grafana-Org-Id: $org_id" "$base/api/folders/$1/permissions"
+        permissions=$(printf '%s\n' "$body" | sed 's/}[[:space:]]*,[[:space:]]*{/}\n{/g')
+        viewer_permission=$(printf '%s\n' "$permissions" | sed -n '/"role"[[:space:]]*:[[:space:]]*"Viewer"/s/.*"permission"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
+        editor_entry=$(printf '%s\n' "$permissions" | sed -n '/"role"[[:space:]]*:[[:space:]]*"Editor"/p')
+        if [ "$code" = 200 ] && [ "$viewer_permission" = "$2" ] && [ -z "$editor_entry" ]; then
+          return 0
+        fi
+        [ "$permission_attempt" -lt 12 ] || break
+        sleep 10
+        permission_attempt=$((permission_attempt + 1))
+      done
+      printf 'folder %s permission verification failed after 12 attempts: %s\n' "$1" "$body" >&2
+      exit 1
+    }
+{{- end }}
 {{- range $tenant := .Values.tenants }}
 {{- if or (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $tenant.id)) (gt (len $tenant.id) 30) }}{{ fail "tenant id must be a DNS-1123 label of at most 30 characters" }}{{ end }}
     request GET -X GET "$base/api/orgs/name/{{ $tenant.id }}"
@@ -46,12 +71,51 @@ data:
       org_id=$(printf '%s\n' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
     fi
     case "$org_id" in ''|*[!0-9]*) exit 1 ;; esac
+{{- if $.Values.grafana.tenantFolders.enabled }}
+    request GET -X GET "$base/api/orgs/$org_id/users"
+    admin_member=$(printf '%s\n' "$body" | sed -n 's/.*"userId"[[:space:]]*:[[:space:]]*'"$admin_id"'[[:space:]]*[,}].*/present/p')
+    if [ -z "$admin_member" ]; then
+      request POST -X POST -H 'Content-Type: application/json' \
+        -d "{\"loginOrEmail\":$admin_login,\"role\":\"Admin\"}" "$base/api/orgs/$org_id/users"
+    fi
+{{- end }}
 {{- if $.Values.tenantIsolation.enabled }}
     datasource loki '{"name":"Loki","uid":"loki","type":"loki","access":"proxy","url":"http://loki.monitoring.svc.cluster.local:3100","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
     datasource tempo '{"name":"Tempo","uid":"tempo","type":"tempo","access":"proxy","url":"http://tempo.monitoring.svc.cluster.local:3200","jsonData":{"httpHeaderName1":"X-Scope-OrgID"},"secureJsonData":{"httpHeaderValue1":{{ $tenant.id | toJson }}}}'
 {{- end }}
 {{- if $.Values.components.promLabelProxy.enabled }}
     datasource prometheus '{"name":"Prometheus","uid":"prometheus","type":"prometheus","access":"proxy","url":"http://prom-label-proxy-{{ $tenant.id }}.monitoring.svc.cluster.local:8080","isDefault":true}'
+{{- end }}
+    printf 'tenant org %s id %s\n' '{{ $tenant.id }}' "$org_id"
+{{- if $.Values.grafana.tenantFolders.enabled }}
+{{- $grafana := $tenant.grafana | default dict }}
+{{- if hasKey $grafana "orgId" }}
+{{- if not (regexMatch "^[1-9][0-9]*$" (toString $grafana.orgId)) }}{{ fail "tenant grafana.orgId must be a positive integer" }}{{ end }}
+    if [ "$org_id" != '{{ $grafana.orgId }}' ]; then
+      printf 'tenant {{ $tenant.id }} orgId mismatch: expected %s, got %s\n' '{{ $grafana.orgId }}' "$org_id" >&2
+      exit 1
+    fi
+{{- end }}
+    request GET -X GET -H "X-Grafana-Org-Id: $org_id" "$base/api/folders/{{ $tenant.id }}"
+    if [ "$code" = 404 ]; then
+      request POST -X POST -H "X-Grafana-Org-Id: $org_id" \
+        -H 'Content-Type: application/json' -d '{"uid":"{{ $tenant.id }}","title":"{{ $tenant.id }}"}' "$base/api/folders"
+    fi
+    request POST -X POST -H "X-Grafana-Org-Id: $org_id" \
+      -H 'Content-Type: application/json' -d '{"items":[{"role":"Admin","permission":4},{"role":"Viewer","permission":2}]}' \
+      "$base/api/folders/{{ $tenant.id }}/permissions"
+    verify_permissions '{{ $tenant.id }}' 2
+    request GET -X GET -H "X-Grafana-Org-Id: $org_id" "$base/api/folders"
+    [ "$code" = 200 ] || exit 1
+    # Grafana returns root folders only when parentUid is omitted.
+    folder_uids=$(printf '%s\n' "$body" | sed 's/}[[:space:]]*,[[:space:]]*{/}\n{/g' | sed -n 's/.*"uid"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    for folder_uid in $folder_uids; do
+      [ "$folder_uid" = '{{ $tenant.id }}' ] && continue
+      request POST -X POST -H "X-Grafana-Org-Id: $org_id" \
+        -H 'Content-Type: application/json' -d '{"items":[{"role":"Admin","permission":4}]}' \
+        "$base/api/folders/$folder_uid/permissions"
+      verify_permissions "$folder_uid" ''
+    done
 {{- end }}
 {{- end }}
 {{- if .Values.grafana.orgMapping.enabled }}

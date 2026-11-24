@@ -1,3 +1,10 @@
+{{/* Folder confinement requires org-level Viewer membership, including in addon mode. */}}
+{{- define "lgtm-stack.validateTenantFolders" -}}
+{{- if and .Values.grafana.tenantFolders.enabled (not .Values.grafana.orgMapping.enabled) -}}
+{{- fail "grafana.tenantFolders requires grafana.orgMapping.enabled" -}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Deep merge (list dst src): src wins key by key, including false, "" and null, which sprig's mergeOverwrite would skip.
 A null reaches the upstream chart as null, so it still deletes that chart's default. Mutates dst.
@@ -237,7 +244,8 @@ alertmanager:
 {{- if or (not (kindIs "string" $group)) (eq $group "") }}{{ fail "tenant grafana group must not be empty" }}{{ end }}
 {{- if or (eq $group "sre") (has $group $admins) }}{{ fail "tenant grafana group must not be sre or an SSO admin group" }}{{ end }}
 {{- if regexMatch "[:,[:space:]{}]" $group }}{{ fail "tenant grafana group must not contain : , whitespace or braces" }}{{ end }}
-{{- $orgMapping = append $orgMapping (printf "%s:%s:%s" $group $tenant.id $role) }}
+{{- $mappedRole := ternary "Viewer" $role $v.grafana.tenantFolders.enabled }}
+{{- $orgMapping = append $orgMapping (printf "%s:%s:%s" $group $tenant.id $mappedRole) }}
 {{- end }}
 {{- end }}
 {{- end }}

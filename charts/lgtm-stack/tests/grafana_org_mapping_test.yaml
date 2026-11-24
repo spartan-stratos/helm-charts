@@ -15,6 +15,28 @@ set:
     admin: [sre]
     member: [member]
 tests:
+  - it: fails tenant folders rendering without org mapping
+    set:
+      grafana.tenantFolders.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantFolders requires grafana.orgMapping.enabled
+  - it: maps editors and viewers to Viewer when tenant folders are enabled
+    set:
+      grafana.orgMapping.enabled: true
+      grafana.tenantFolders.enabled: true
+      tenants:
+        - id: alpha
+          port: 4320
+          htpasswdSecret: { name: alpha-otlp, key: htpasswd }
+          grafana: { viewers: [lgtm-alpha-viewer], editors: [lgtm-alpha-editor] }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
+          value: 'sre:*:Admin lgtm-alpha-viewer:alpha:Viewer lgtm-alpha-editor:alpha:Viewer'
   - it: requires at least one tenant when mapping is enabled
     set:
       grafana.orgMapping.enabled: true

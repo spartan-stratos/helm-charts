@@ -1,4 +1,5 @@
 {{- if eq .Values.mode "applications" }}
+{{- include "lgtm-stack.validateTenantFolders" . }}
 {{- $_ := required "argocd.project is required" .Values.argocd.project }}
 {{- $_ := required "cluster.name is required" .Values.cluster.name }}
 {{- $tenantIds := dict }}
@@ -201,6 +202,11 @@ spec:
           orgMapping:
             enabled: true
             settleSeconds: {{ dig "settleSeconds" 120 $.Values.grafana.orgMapping }}
+          {{- end }}
+          {{- if and (eq $key "tenantOrgs") $.Values.grafana.tenantFolders.enabled }}
+          tenantFolders:
+            enabled: true
+            settleSeconds: {{ dig "settleSeconds" 60 $.Values.grafana.tenantFolders }}
           {{- end }}
   {{- include "lgtm-stack.syncPolicy" (list $ false) | nindent 2 }}
 {{- end }}

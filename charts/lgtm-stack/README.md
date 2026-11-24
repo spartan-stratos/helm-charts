@@ -209,6 +209,7 @@ No tenant log or trace processors or exporters are generated. With `components.p
 the tenant-org Job creates the Prometheus datasource, which queries through the tenant's label-enforcing proxy.
 With `components.promLabelProxy.enabled: false`, no tenant Prometheus datasource is created.
 The Job creates organizations and missing datasources; it does not remove existing ones.
+A dashboard provider for a missing `orgId` makes Grafana exit 1, so set `orgId` only after the org exists; every org named in `org_mapping` must exist or all mapped users are refused.
 Its admin Secret name and keys follow the effective Grafana `admin.existingSecret`, `admin.userKey` and `admin.passwordKey` values.
 
 Metrics scraped inside the platform cluster carry no tenant label, so tenant rules cannot see them; tenant telemetry must arrive through the gateway.
@@ -298,6 +299,23 @@ Org mapping is OFF by default and has been proven only on a local test harness, 
 When on, the tenant-orgs job verifies every tenant organization exists, then waits `grafana.orgMapping.settleSeconds` (default 120) so Grafana's organization view catches up. A new tenant can log in about 2 minutes after the tenant-orgs job starts. No Grafana restart is needed.
 Every organization named in the mapping must exist, or all mapped users are refused and only the main organization remains for an SSO admin. Rendering fails when org mapping is on and `tenants` is empty.
 Tenant Viewer and Editor roles can read the non-secret settings (URL, basic-auth user, `jsonData`) of datasources in their own organization. Secrets are never returned, so keep anything sensitive out of a tenant datasource URL or `jsonData`.
+
+#### Confined tenant parent folders
+
+Set `grafana.tenantFolders.enabled: true` together with `grafana.orgMapping.enabled: true` to enable strict folder confinement (default off).
+Both tenant `viewers` and `editors` groups then map to organization **Viewer**. Both can edit dashboards and create sub-folders inside the parent whose uid and title equal the tenant id; neither can create root folders. There is no read-only tenant tier in this mode.
+SSO admin groups retain Admin in every organization. Keep tenant users out of SSO admin/member groups that independently grant a higher role.
+
+The tenant-orgs job waits for Grafana health, adds the admin to each tenant org before org-header requests, provisions datasources, logs each tenant org id, then creates missing parent folders.
+If `tenants[].grafana.orgId` is configured, it must match the resolved id or the job fails before folder writes.
+The job replaces the parent's complete permission list with Admin 4 and Viewer 2, and replaces every other root folder's list with Admin 4 only.
+This strips existing user, team, Editor and Viewer grants from those root folders; sub-folders inherit their parent's permissions.
+After each write it reads back permissions up to 12 times, 10 seconds apart, requiring Viewer Edit (2) and no Editor entry on the tenant parent, or neither role on other roots; exhaustion fails with the last response.
+After all tenants, the job waits once for `grafana.orgMapping.settleSeconds` (default 120) for login visibility only; the folder settle value is unused.
+
+Folder permission changes persist. Rollback: disable `tenantFolders`, sync Grafana and the tenant-orgs addon, and explicitly restore any stripped folder grants as an administrator.
+Disabling restores tenant editors' organization Editor mapping but does not undo permission writes.
+This option does not deliver dashboards or protect an empty parent against deletion; a tenant with Edit can delete an empty parent, so rerun the job to recreate it and restore grants.
 
 ```yaml
 grafana:

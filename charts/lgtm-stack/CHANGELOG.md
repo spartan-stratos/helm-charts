@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.12.0 (2026-11-24)
+
+### Features
+
+* Add default-off tenant parent folders with org-level Viewer membership for both tenant groups, Edit on the parent and Admin-only permissions on other root folders.
+* Verify configured tenant organization ids; add the admin before org-header requests and retry folder permission read-back up to 12 times at 10s, keeping the fixed settle for org mapping only.
+* Log tenant organization ids for subsequent configuration, including when tenant folders are disabled.
+
 ## 0.11.4 (2026-11-23)
 
 ### Features
