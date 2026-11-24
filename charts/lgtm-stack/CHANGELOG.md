@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 0.13.0 (2026-11-24)
 
+### Bug Fixes
+
+* Validate tenant org ids and namespace boundaries, reject delivery overrides, and assign distinct sidecar health ports.
+* Check org ids before datasource writes and fail when an existing admin membership lacks the Admin role.
+
 ### Features
 
 * Add default-off tenant dashboard sidecars with namespace isolation and per-organization file providers.

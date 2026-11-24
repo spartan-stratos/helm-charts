@@ -18,6 +18,189 @@ set:
       htpasswdSecret: { name: beta-otlp, key: htpasswd }
       grafana: { orgId: 3 }
 tests:
+  - it: rejects a string org id
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { orgId: "2" } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].grafana.orgId must be a positive integer
+  - it: rejects a zero org id
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { orgId: 0 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].grafana.orgId must be a positive integer
+  - it: rejects the main org id
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { orgId: 1 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].grafana.orgId must not be 1
+  - it: rejects duplicate org ids
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { orgId: 2 } }
+        - { id: beta, port: 4321, htpasswdSecret: { name: beta-otlp, key: htpasswd }, namespaces: [beta-dev], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].grafana.orgId must be unique across tenants
+  - it: rejects extraVolumes
+    set:
+      grafana.tenantDashboards.enabled: true
+      components.grafana.values.extraVolumes: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards cannot be combined with components.grafana.values.extraVolumes
+  - it: rejects extraVolumeMounts
+    set:
+      grafana.tenantDashboards.enabled: true
+      components.grafana.values.extraVolumeMounts: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards cannot be combined with components.grafana.values.extraVolumeMounts
+  - it: rejects extraObjects
+    set:
+      grafana.tenantDashboards.enabled: true
+      components.grafana.values.extraObjects: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards cannot be combined with components.grafana.values.extraObjects
+  - it: rejects sidecar.dashboards.searchNamespace
+    set:
+      grafana.tenantDashboards.enabled: true
+      components.grafana.values.sidecar.dashboards.searchNamespace: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards cannot be combined with components.grafana.values.sidecar.dashboards.searchNamespace
+  - it: rejects tenant namespace ALL
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [ALL], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must not contain ALL
+  - it: rejects platform namespace ALL
+    set:
+      grafana.tenantDashboards.enabled: true
+      grafana.tenantDashboards.platformNamespaces: [ALL]
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards.platformNamespaces must not contain ALL
+  - it: rejects tenant namespace aLl
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [aLl], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must not contain ALL
+  - it: rejects platform namespace aLl
+    set:
+      grafana.tenantDashboards.enabled: true
+      grafana.tenantDashboards.platformNamespaces: [aLl]
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards.platformNamespaces must not contain ALL
+  - it: rejects tenant namespace bad_name
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [bad_name], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must contain DNS-1123 labels
+  - it: rejects platform namespace bad_name
+    set:
+      grafana.tenantDashboards.enabled: true
+      grafana.tenantDashboards.platformNamespaces: [bad_name]
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels
+  - it: rejects tenant namespace Bad
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [Bad], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must contain DNS-1123 labels
+  - it: rejects platform namespace Bad
+    set:
+      grafana.tenantDashboards.enabled: true
+      grafana.tenantDashboards.platformNamespaces: [Bad]
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels
+  - it: rejects tenant namespace -bad
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [-bad], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must contain DNS-1123 labels
+  - it: rejects platform namespace -bad
+    set:
+      grafana.tenantDashboards.enabled: true
+      grafana.tenantDashboards.platformNamespaces: [-bad]
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels
+  - it: rejects tenant namespace bad-
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [bad-], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must contain DNS-1123 labels
+  - it: rejects platform namespace bad-
+    set:
+      grafana.tenantDashboards.enabled: true
+      grafana.tenantDashboards.platformNamespaces: [bad-]
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels
+  - it: rejects tenant namespace aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa], grafana: { orgId: 2 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must contain DNS-1123 labels
+  - it: rejects platform namespace aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    set:
+      grafana.tenantDashboards.enabled: true
+      grafana.tenantDashboards.platformNamespaces: [aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels
+  - it: rejects shared tenant namespaces
+    set:
+      grafana.tenantDashboards.enabled: true
+      tenants:
+        - { id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { orgId: 2 } }
+        - { id: beta, port: 4321, htpasswdSecret: { name: beta-otlp, key: htpasswd }, namespaces: [alpha-dev], grafana: { orgId: 3 } }
+    asserts:
+      - failedTemplate:
+          errorMessage: tenants[].namespaces must be unique across tenants
+  - it: assigns distinct health ports outside upstream ports for two tenants
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    set:
+      grafana.tenantDashboards.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.valuesObject.extraContainers
+          pattern: '(?s)name: HEALTH_PORT\n\s+value: "8085".*name: grafana-sc-dashboard-alpha.*name: HEALTH_PORT\n\s+value: "8086".*name: grafana-sc-dashboard-beta'
   - it: preserves the main sidecar and omits tenant delivery by default
     documentSelector: { path: metadata.name, value: lgtm-grafana }
     asserts:

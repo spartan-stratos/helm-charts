@@ -72,11 +72,25 @@ data:
     fi
     case "$org_id" in ''|*[!0-9]*) exit 1 ;; esac
 {{- if $.Values.grafana.tenantFolders.enabled }}
+{{- $grafana := $tenant.grafana | default dict }}
+{{- if hasKey $grafana "orgId" }}
+{{- if not (regexMatch "^[1-9][0-9]*$" (toString $grafana.orgId)) }}{{ fail "tenant grafana.orgId must be a positive integer" }}{{ end }}
+    if [ "$org_id" != '{{ $grafana.orgId }}' ]; then
+      printf 'tenant {{ $tenant.id }} orgId mismatch: expected %s, got %s\n' '{{ $grafana.orgId }}' "$org_id" >&2
+      exit 1
+    fi
+{{- end }}
     request GET -X GET "$base/api/orgs/$org_id/users"
-    admin_member=$(printf '%s\n' "$body" | sed -n 's/.*"userId"[[:space:]]*:[[:space:]]*'"$admin_id"'[[:space:]]*[,}].*/present/p')
+    admin_member=$(printf '%s\n' "$body" | sed 's/}[[:space:]]*,[[:space:]]*{/}\n{/g' | sed -n '/"userId"[[:space:]]*:[[:space:]]*'"$admin_id"'[[:space:]]*[,}]/p')
     if [ -z "$admin_member" ]; then
       request POST -X POST -H 'Content-Type: application/json' \
         -d "{\"loginOrEmail\":$admin_login,\"role\":\"Admin\"}" "$base/api/orgs/$org_id/users"
+    else
+      admin_role=$(printf '%s\n' "$admin_member" | sed -n 's/.*"role"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+      if [ "$admin_role" != Admin ]; then
+        printf 'tenant {{ $tenant.id }} admin membership must have role Admin, got %s\n' "$admin_role" >&2
+        exit 1
+      fi
     fi
 {{- end }}
 {{- if $.Values.tenantIsolation.enabled }}
@@ -88,14 +102,6 @@ data:
 {{- end }}
     printf 'tenant org %s id %s\n' '{{ $tenant.id }}' "$org_id"
 {{- if $.Values.grafana.tenantFolders.enabled }}
-{{- $grafana := $tenant.grafana | default dict }}
-{{- if hasKey $grafana "orgId" }}
-{{- if not (regexMatch "^[1-9][0-9]*$" (toString $grafana.orgId)) }}{{ fail "tenant grafana.orgId must be a positive integer" }}{{ end }}
-    if [ "$org_id" != '{{ $grafana.orgId }}' ]; then
-      printf 'tenant {{ $tenant.id }} orgId mismatch: expected %s, got %s\n' '{{ $grafana.orgId }}' "$org_id" >&2
-      exit 1
-    fi
-{{- end }}
     request GET -X GET -H "X-Grafana-Org-Id: $org_id" "$base/api/folders/{{ $tenant.id }}"
     if [ "$code" = 404 ]; then
       request POST -X POST -H "X-Grafana-Org-Id: $org_id" \

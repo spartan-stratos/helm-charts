@@ -13,6 +13,7 @@ A project installs it as one Application and keeps one values file. Updating the
 must not contain any tenant namespace. Custom `components.grafana.values.extraContainers` is rejected.
 
 Set `tenants[].grafana.orgId` only after the org exists, using the numeric id logged by the tenant-orgs job.
+Grafana org ids autoincrement and are not reused; after a Grafana DB reset or org deletion, unset the stale `orgId` or re-read it from the job log before the next sync.
 A provider for a missing org makes Grafana exit 1. First sync without `orgId` creates the org; a second
 change sets its id. A tenant without an id gets no dashboard sidecar, providers or sentinel.
 Never delete the org or reset the Grafana database while its id is set. For recovery, unset `orgId`

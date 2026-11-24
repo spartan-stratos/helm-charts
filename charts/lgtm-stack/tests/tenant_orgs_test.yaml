@@ -32,7 +32,7 @@ tests:
     asserts:
       - matchRegex:
           path: data["provision.sh"]
-          pattern: '(?s)api/orgs/name/alpha.*?case "\$org_id".*?request GET -X GET "\$base/api/orgs/\$org_id/users".*?"role\\":\\"Admin\\".*?api/orgs/\$org_id/users"\nfi\ndatasource loki.*?api/orgs/name/beta.*?request GET -X GET "\$base/api/orgs/\$org_id/users".*?api/orgs/\$org_id/users"\nfi\ndatasource loki'
+          pattern: '(?s)api/orgs/name/alpha.*?case "\$org_id".*?request GET -X GET "\$base/api/orgs/\$org_id/users".*?"role\\":\\"Admin\\".*?api/orgs/\$org_id/users".*?\nfi\ndatasource loki.*?api/orgs/name/beta.*?request GET -X GET "\$base/api/orgs/\$org_id/users".*?api/orgs/\$org_id/users".*?\nfi\ndatasource loki'
       - matchRegex:
           path: data["provision.sh"]
           pattern: 'if \[ -z "\$admin_member" \]; then\n  request POST'
@@ -70,17 +70,22 @@ tests:
       - matchRegex:
           path: data["provision.sh"]
           pattern: 'for folder_uid in \$folder_uids; do\n  \[ "\$folder_uid" = .alpha. \] && continue\n  request POST[^\n]*\n    .*\{"items":\[\{"role":"Admin","permission":4\}\]\}.*\n    "\$base/api/folders/\$folder_uid/permissions"'
-  - it: fails on an orgId mismatch before writing folders
+  - it: fails on an orgId mismatch before datasource writes and folders
     template: templates/tenant-orgs.yaml
     set:
       tenants: [{ id: alpha, grafana: { orgId: 2 } }]
       grafana.orgMapping.enabled: true
       grafana.tenantFolders.enabled: true
+      tenantIsolation.enabled: true
+      components.promLabelProxy.enabled: true
     documentIndex: 0
     asserts:
       - matchRegex:
           path: data["provision.sh"]
-          pattern: 'if \[ "\$org_id" != .2. \]; then\n  printf.*orgId mismatch.*\n  exit 1\nfi\nrequest GET.*api/folders/alpha'
+          pattern: '(?s)if \[ "\$org_id" != .2. \]; then\n  printf.*?orgId mismatch.*?\n  exit 1\nfi\nrequest GET.*?api/orgs/\$org_id/users.*?datasource loki.*?datasource tempo.*?datasource prometheus.*?api/folders/alpha'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'else\n  admin_role=.*\n  if \[ "\$admin_role" != Admin \]; then\n    printf.*admin membership must have role Admin.*>&2\n    exit 1\n  fi\nfi\ndatasource loki'
   - it: waits for health before the first write
     template: templates/tenant-orgs.yaml
     set:

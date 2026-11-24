@@ -228,7 +228,17 @@ alertmanager:
 {{- if $v.grafana.tenantDashboards.enabled }}
 {{- $platform := $v.grafana.tenantDashboards.platformNamespaces }}
 {{- if empty $platform }}{{ fail "grafana.tenantDashboards.platformNamespaces must not be empty" }}{{ end }}
-{{- if hasKey $v.components.grafana.values "extraContainers" }}{{ fail "grafana.tenantDashboards cannot be combined with components.grafana.values.extraContainers" }}{{ end }}
+{{- range $key := list "extraContainers" "extraVolumes" "extraVolumeMounts" "extraObjects" }}
+{{- if hasKey $v.components.grafana.values $key }}{{ fail (printf "grafana.tenantDashboards cannot be combined with components.grafana.values.%s" $key) }}{{ end }}
+{{- end }}
+{{- if hasKey (dig "sidecar" "dashboards" dict $v.components.grafana.values) "searchNamespace" }}{{ fail "grafana.tenantDashboards cannot be combined with components.grafana.values.sidecar.dashboards.searchNamespace" }}{{ end }}
+{{- range $platform }}
+{{- if eq (upper (toString .)) "ALL" }}{{ fail "grafana.tenantDashboards.platformNamespaces must not contain ALL" }}{{ end }}
+{{- if or (not (kindIs "string" .)) (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" (toString .))) (gt (len (toString .)) 63) }}{{ fail "grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels" }}{{ end }}
+{{- end }}
+{{- $namespaces := dict }}
+{{- $orgIds := dict }}
+{{- $healthPort := 8085 }}
 {{- $admin := dig "admin" dict $v.components.grafana.values }}
 {{- $adminSecret := $admin.existingSecret | default "grafana-admin" }}
 {{- $adminUser := $admin.userKey | default "admin-user" }}
@@ -240,10 +250,18 @@ alertmanager:
 {{- $objects := list }}
 {{- range $tenant := $v.tenants }}
 {{- range $tenant.namespaces }}
+{{- if eq (upper (toString .)) "ALL" }}{{ fail "tenants[].namespaces must not contain ALL" }}{{ end }}
+{{- if or (not (kindIs "string" .)) (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" (toString .))) (gt (len (toString .)) 63) }}{{ fail "tenants[].namespaces must contain DNS-1123 labels" }}{{ end }}
+{{- if and (hasKey $namespaces .) (ne (index $namespaces .) $tenant.id) }}{{ fail "tenants[].namespaces must be unique across tenants" }}{{ end }}
+{{- $_ := set $namespaces . $tenant.id }}
 {{- if has . $platform }}{{ fail "tenant namespace must not be in grafana.tenantDashboards.platformNamespaces" }}{{ end }}
 {{- end }}
 {{- with $tenant.grafana }}
-{{- if .orgId }}
+{{- if hasKey . "orgId" }}
+{{- if or (kindIs "string" .orgId) (not (regexMatch "^[1-9][0-9]*$" (toString .orgId))) }}{{ fail "tenants[].grafana.orgId must be a positive integer" }}{{ end }}
+{{- if eq (toString .orgId) "1" }}{{ fail "tenants[].grafana.orgId must not be 1" }}{{ end }}
+{{- if hasKey $orgIds (toString .orgId) }}{{ fail "tenants[].grafana.orgId must be unique across tenants" }}{{ end }}
+{{- $_ := set $orgIds (toString .orgId) true }}
 {{- if empty $tenant.namespaces }}{{ fail "tenants[].namespaces must be set when tenants[].grafana.orgId is set; an empty sidecar NAMESPACE watches the Grafana namespace" }}{{ end }}
 {{- $id := $tenant.id }}
 {{- $volume := printf "sc-dashboard-%s" $id }}
@@ -255,6 +273,8 @@ alertmanager:
 {{- $mounts = append $mounts (dict "name" $volume "mountPath" $path "readOnly" true) }}
 {{- $mounts = append $mounts (dict "name" $home "mountPath" $homePath "readOnly" true) }}
 {{- $env := list }}
+{{- $env = append $env (dict "name" "HEALTH_PORT" "value" (toString $healthPort)) }}
+{{- $healthPort = add1 $healthPort }}
 {{- range $name, $value := dict "METHOD" "WATCH" "LABEL" "grafana_dashboard" "LABEL_VALUE" "1" "NAMESPACE" (join "," $tenant.namespaces) "RESOURCE" "configmap" "FOLDER" $path "REQ_URL" "http://localhost:3000/api/admin/provisioning/dashboards/reload" "REQ_METHOD" "POST" }}
 {{- $env = append $env (dict "name" $name "value" $value) }}
 {{- end }}
