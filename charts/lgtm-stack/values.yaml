@@ -48,6 +48,7 @@ networkPolicy:
 platformTenant: platform
 # See README.md Tenant gateway receivers for credential and namespace isolation configuration.
 # Tenants may set grafana: { viewers: [<group>], editors: [<group>] } for optional Keycloak org mapping.
+# Set grafana.orgId only after the org exists; a provider for a missing org makes Grafana exit 1.
 tenants: []
 # Keep tenant logs and traces disabled until their backends enforce tenant authentication.
 tenantIsolation:
@@ -72,6 +73,10 @@ placement:
   tolerations: []
 
 grafana:
+  tenantDashboards:
+    enabled: false
+    # Main sidecar namespaces; tenant namespaces here fail rendering.
+    platformNamespaces: [monitoring]
   tenantFolders:
     enabled: false
     # Seconds the job waits after the last permission write; Grafana applies grants within about a minute.

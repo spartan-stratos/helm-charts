@@ -6,6 +6,42 @@ apps), not the workloads themselves, so each component keeps its own sync wave, 
 
 A project installs it as one Application and keeps one values file. Updating the stack is a chart version bump.
 
+## Tenant dashboard delivery
+
+`grafana.tenantDashboards.enabled` defaults to `false`. When enabled, the main sidecar watches only
+`grafana.tenantDashboards.platformNamespaces` (default `[monitoring]`). This list must be nonempty and
+must not contain any tenant namespace. Custom `components.grafana.values.extraContainers` is rejected.
+
+Set `tenants[].grafana.orgId` only after the org exists, using the numeric id logged by the tenant-orgs job.
+A provider for a missing org makes Grafana exit 1. First sync without `orgId` creates the org; a second
+change sets its id. A tenant without an id gets no dashboard sidecar, providers or sentinel.
+Never delete the org or reset the Grafana database while its id is set. For recovery, unset `orgId`
+or disable `tenantDashboards`, then sync so Grafana starts without the missing-org provider.
+
+Each configured tenant gets a sidecar watching its `namespaces`, two providers in its org and folder
+with uid equal to the tenant id, and an unlabelled home ConfigMap delivered through Grafana's `extraObjects`.
+The protected `<tenant>-home` dashboard prevents deletion of the parent folder. Git dashboards are read-only;
+copy them into the tenant folder to edit them. Tenant ConfigMaps use this shape:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alpha-dashboard-overview
+  namespace: alpha-dev
+  labels:
+    grafana_dashboard: "1"
+data:
+  overview.json: |
+    {"uid":"alpha-overview","title":"Overview","panels":[]}
+```
+
+Use tenant-prefixed uids, never `<tenant>-home`; omit top-level `id` and `__inputs`. Use datasource
+uids `prometheus`, `loki`, `tempo`, with tenant namespace filters. Files land flat in the tenant folder;
+`grafana_folder` annotations are ignored. ConfigMaps must be on Grafana's cluster: a production Grafana
+cannot watch ConfigMaps on a separate development cluster. Both dashboard mounts are outside `/tmp/dashboards`
+so the main-org provider cannot load tenant files.
+
 ## Install
 
 The project's ArgoCD repo wraps the chart, so Dependabot's `helm` ecosystem opens a PR for every new version. The

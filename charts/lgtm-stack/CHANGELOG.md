@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.13.0 (2026-11-24)
+
+### Features
+
+* Add default-off tenant dashboard sidecars with namespace isolation and per-organization file providers.
+* Protect tenant parent folders with a provisioned home dashboard, delivered only after an existing organization id is configured.
+* Reject platform namespace overlap, empty platform namespace lists and conflicting custom sidecars.
+
 ## 0.12.0 (2026-11-24)
 
 ### Features
