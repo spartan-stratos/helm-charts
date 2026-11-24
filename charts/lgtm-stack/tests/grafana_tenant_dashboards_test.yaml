@@ -79,6 +79,24 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: grafana.tenantDashboards cannot be combined with components.grafana.values.sidecar.dashboards.searchNamespace
+  - it: rejects the generated tenant dashboard provider override
+    set:
+      grafana.tenantDashboards.enabled: true
+      components.grafana.values.dashboardProviders:
+        tenant-dashboardproviders.yaml: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: grafana.tenantDashboards cannot be combined with components.grafana.values.dashboardProviders.tenant-dashboardproviders.yaml
+  - it: preserves a different dashboard provider key
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    set:
+      grafana.tenantDashboards.enabled: true
+      components.grafana.values.dashboardProviders:
+        custom.yaml: { apiVersion: 1, providers: [] }
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.dashboardProviders["custom.yaml"]
+          value: { apiVersion: 1, providers: [] }
   - it: rejects tenant namespace ALL
     set:
       grafana.tenantDashboards.enabled: true

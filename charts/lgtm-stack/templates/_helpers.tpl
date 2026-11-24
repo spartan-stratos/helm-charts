@@ -232,6 +232,7 @@ alertmanager:
 {{- if hasKey $v.components.grafana.values $key }}{{ fail (printf "grafana.tenantDashboards cannot be combined with components.grafana.values.%s" $key) }}{{ end }}
 {{- end }}
 {{- if hasKey (dig "sidecar" "dashboards" dict $v.components.grafana.values) "searchNamespace" }}{{ fail "grafana.tenantDashboards cannot be combined with components.grafana.values.sidecar.dashboards.searchNamespace" }}{{ end }}
+{{- if hasKey (dig "dashboardProviders" dict $v.components.grafana.values) "tenant-dashboardproviders.yaml" }}{{ fail "grafana.tenantDashboards cannot be combined with components.grafana.values.dashboardProviders.tenant-dashboardproviders.yaml" }}{{ end }}
 {{- range $platform }}
 {{- if eq (upper (toString .)) "ALL" }}{{ fail "grafana.tenantDashboards.platformNamespaces must not contain ALL" }}{{ end }}
 {{- if or (not (kindIs "string" .)) (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" (toString .))) (gt (len (toString .)) 63) }}{{ fail "grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels" }}{{ end }}

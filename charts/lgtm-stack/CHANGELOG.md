@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+* Reject overrides of the generated tenant dashboard provider while allowing other dashboard provider keys.
 * Validate tenant org ids and namespace boundaries, reject delivery overrides, and assign distinct sidecar health ports.
 * Check org ids before datasource writes and fail when an existing admin membership lacks the Admin role.
 
