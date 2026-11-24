@@ -347,7 +347,7 @@ If `tenants[].grafana.orgId` is configured, it must match the resolved id or the
 The job replaces the parent's complete permission list with Admin 4 and Viewer 2, and replaces every other root folder's list with Admin 4 only.
 This strips existing user, team, Editor and Viewer grants from those root folders; sub-folders inherit their parent's permissions.
 After each write it reads back permissions up to 12 times, 10 seconds apart, requiring Viewer Edit (2) and no Editor entry on the tenant parent, or neither role on other roots; exhaustion fails with the last response.
-After all tenants, the job waits once for `grafana.orgMapping.settleSeconds` (default 120) for login visibility only; the folder settle value is unused.
+After all tenants, the job waits once for `grafana.orgMapping.settleSeconds` (default 120) for login visibility only.
 
 Folder permission changes persist. Rollback: disable `tenantFolders`, sync Grafana and the tenant-orgs addon, and explicitly restore any stripped folder grants as an administrator.
 Disabling restores tenant editors' organization Editor mapping but does not undo permission writes.

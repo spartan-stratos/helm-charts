@@ -79,8 +79,6 @@ grafana:
     platformNamespaces: [monitoring]
   tenantFolders:
     enabled: false
-    # Seconds the job waits after the last permission write; Grafana applies grants within about a minute.
-    settleSeconds: 60
   # Map Keycloak groups to tenant organizations when explicitly enabled.
   orgMapping:
     enabled: false
