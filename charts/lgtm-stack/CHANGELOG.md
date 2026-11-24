@@ -12,17 +12,13 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-* Add default-off tenant dashboard sidecars with namespace isolation and per-organization file providers.
+* Derive tenant mapping and parent folders from non-empty tenant Grafana viewers or editors groups, with no enable flag. Both tenant group tiers receive org-level Viewer membership, Edit on the parent and no access to other root folders.
+* Enable namespace-isolated dashboard sidecars and per-organization file providers per tenant through `tenants[].grafana.orgId`, only with org mapping enabled.
 * Protect tenant parent folders with a provisioned home dashboard, delivered only after an existing organization id is configured.
 * Reject platform namespace overlap, empty platform namespace lists and conflicting custom sidecars.
 
-## 0.12.0 (2026-11-24)
-
-### Features
-
-* Add default-off tenant parent folders with org-level Viewer membership for both tenant groups, Edit on the parent and Admin-only permissions on other root folders.
 * Verify configured tenant organization ids; add the admin before org-header requests and retry folder permission read-back up to 12 times at 10s, keeping the fixed settle for org mapping only.
-* Log tenant organization ids for subsequent configuration, including when tenant folders are disabled.
+* Log tenant organization ids for the second onboarding step. Without org ids, org mapping still provisions folders but no dashboard delivery resources. With org mapping off and no org ids, rendering is unchanged.
 
 ## 0.11.4 (2026-11-23)
 
@@ -52,7 +48,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-* Add optional Grafana organization membership from Keycloak groups via `grafana.orgMapping.enabled` and `tenants[].grafana.viewers` / `editors`, off by default.
+* Add optional Grafana organization membership from Keycloak groups via `tenants[].grafana.viewers` / `editors`, absent by default.
 
 ## 0.10.0 (2026-11-23)
 

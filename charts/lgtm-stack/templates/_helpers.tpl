@@ -1,7 +1,26 @@
-{{/* Folder confinement requires org-level Viewer membership, including in addon mode. */}}
-{{- define "lgtm-stack.validateTenantFolders" -}}
-{{- if and .Values.grafana.tenantFolders.enabled (not .Values.grafana.orgMapping.enabled) -}}
-{{- fail "grafana.tenantFolders requires grafana.orgMapping.enabled" -}}
+{{/* Mapping applies to all tenants when any tenant declares Grafana groups. */}}
+{{- define "lgtm-stack.orgMapping" -}}
+{{- $active := false -}}
+{{- range .Values.tenants -}}
+{{- $grafana := .grafana | default dict -}}
+{{- if or $grafana.viewers $grafana.editors -}}{{- $active = true -}}{{- end -}}
+{{- end -}}
+{{- if $active -}}true{{- end -}}
+{{- end -}}
+
+{{/* Dashboard providers require the org and folder provisioned by org mapping. */}}
+{{- define "lgtm-stack.validateTenantDashboards" -}}
+{{- $mapping := include "lgtm-stack.orgMapping" . -}}
+{{- range .Values.tenants -}}
+{{- if and (hasKey (.grafana | default dict) "orgId") (not $mapping) -}}
+{{- fail "tenants[].grafana.orgId requires tenant Grafana viewers or editors groups; dashboards need the organization and folder from the tenant-orgs job" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "lgtm-stack.hasTenantDashboards" -}}
+{{- range .Values.tenants -}}
+{{- if hasKey (.grafana | default dict) "orgId" -}}true{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -206,6 +225,7 @@ instrumentation:
 {{- $ := index . 0 -}}
 {{- $key := index . 1 -}}
 {{- $v := $.Values -}}
+{{- $mapping := include "lgtm-stack.orgMapping" $ -}}
 {{- if eq $key "kubePrometheusStack" }}
 {{- with $v.placement.tolerations }}
 prometheus-node-exporter:
@@ -225,7 +245,7 @@ alertmanager:
       name: slack
 {{- end }}
 {{- else if eq $key "grafana" }}
-{{- if $v.grafana.tenantDashboards.enabled }}
+{{- if include "lgtm-stack.hasTenantDashboards" $ }}
 {{- $platform := $v.grafana.tenantDashboards.platformNamespaces }}
 {{- if empty $platform }}{{ fail "grafana.tenantDashboards.platformNamespaces must not be empty" }}{{ end }}
 {{- range $key := list "extraContainers" "extraVolumes" "extraVolumeMounts" "extraObjects" }}
@@ -307,8 +327,7 @@ extraObjects: {{ toYaml $objects | nindent 2 }}
 {{- end }}
 {{- end }}
 {{- $orgMapping := list }}
-{{- if $v.grafana.orgMapping.enabled }}
-{{- if empty $v.tenants }}{{ fail "grafana.orgMapping requires at least one tenant" }}{{ end }}
+{{- if $mapping }}
 {{- if ne $v.grafana.sso.provider "keycloak" }}{{ fail "grafana.orgMapping requires grafana.sso.provider keycloak" }}{{ end }}
 {{- $admins := $v.grafana.sso.keycloak.admin | default list }}
 {{- range $admins }}
@@ -325,20 +344,19 @@ extraObjects: {{ toYaml $objects | nindent 2 }}
 {{- if or (not (kindIs "string" $group)) (eq $group "") }}{{ fail "tenant grafana group must not be empty" }}{{ end }}
 {{- if or (eq $group "sre") (has $group $admins) }}{{ fail "tenant grafana group must not be sre or an SSO admin group" }}{{ end }}
 {{- if regexMatch "[:,[:space:]{}]" $group }}{{ fail "tenant grafana group must not contain : , whitespace or braces" }}{{ end }}
-{{- $mappedRole := ternary "Viewer" $role $v.grafana.tenantFolders.enabled }}
-{{- $orgMapping = append $orgMapping (printf "%s:%s:%s" $group $tenant.id $mappedRole) }}
+{{- $orgMapping = append $orgMapping (printf "%s:%s:Viewer" $group $tenant.id) }}
 {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
-{{- if or $v.grafana.domain $v.grafana.orgMapping.enabled }}
+{{- if or $v.grafana.domain $mapping }}
 grafana.ini:
 {{- with $v.grafana.domain }}
   server:
     root_url: https://{{ . }}
 {{- end }}
-{{- if $v.grafana.orgMapping.enabled }}
+{{- if $mapping }}
   auth.generic_oauth:
     org_attribute_path: groups
     org_mapping: {{ join " " $orgMapping | quote }}

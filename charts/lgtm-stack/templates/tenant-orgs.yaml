@@ -1,5 +1,6 @@
 {{- if and (eq .Values.mode "addon") (eq .Values.addon "tenantOrgs") .Values.tenants .Values.components.grafana.enabled }}
-{{- include "lgtm-stack.validateTenantFolders" . }}
+{{- include "lgtm-stack.validateTenantDashboards" . }}
+{{- $mapping := include "lgtm-stack.orgMapping" . }}
 {{- $admin := .Values.grafanaAdmin | default dict }}
 apiVersion: v1
 kind: ConfigMap
@@ -17,7 +18,11 @@ data:
       response=$(curl --silent --show-error --fail-with-body --connect-timeout 5 --max-time 30 \
         -u "$GF_USER:$GF_PASSWORD" -w '\n%{http_code}' "$@") || {
         code=$(printf '%s\n' "$response" | sed -n '$p')
+{{- if $mapping }}
         { [ "$code" = 404 ] && [ "$method" = GET ]; } || [ "$method" = GET_PERMISSIONS ] || exit 1
+{{- else }}
+        [ "$code" = 404 ] && [ "$method" = GET ] || exit 1
+{{- end }}
       }
       code=$(printf '%s\n' "$response" | sed -n '$p')
       body=$(printf '%s\n' "$response" | sed '$d')
@@ -36,7 +41,7 @@ data:
           -H 'Content-Type: application/json' -d "$2" "$base/api/datasources"
       fi
     }
-{{- if .Values.grafana.tenantFolders.enabled }}
+{{- if $mapping }}
     request GET -X GET "$base/api/user"
     admin_id=$(printf '%s\n' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
     case "$admin_id" in ''|*[!0-9]*) exit 1 ;; esac
@@ -79,7 +84,7 @@ data:
       exit 1
     fi
 {{- end }}
-{{- if $.Values.grafana.tenantFolders.enabled }}
+{{- if $mapping }}
     request GET -X GET "$base/api/orgs/$org_id/users"
     admin_member=$(printf '%s\n' "$body" | sed 's/}[[:space:]]*,[[:space:]]*{/}\n{/g' | sed -n '/"userId"[[:space:]]*:[[:space:]]*'"$admin_id"'[[:space:]]*[,}]/p')
     if [ -z "$admin_member" ]; then
@@ -100,8 +105,8 @@ data:
 {{- if $.Values.components.promLabelProxy.enabled }}
     datasource prometheus '{"name":"Prometheus","uid":"prometheus","type":"prometheus","access":"proxy","url":"http://prom-label-proxy-{{ $tenant.id }}.monitoring.svc.cluster.local:8080","isDefault":true}'
 {{- end }}
+{{- if $mapping }}
     printf 'tenant org %s id %s\n' '{{ $tenant.id }}' "$org_id"
-{{- if $.Values.grafana.tenantFolders.enabled }}
     request GET -X GET -H "X-Grafana-Org-Id: $org_id" "$base/api/folders/{{ $tenant.id }}"
     if [ "$code" = 404 ]; then
       request POST -X POST -H "X-Grafana-Org-Id: $org_id" \
@@ -124,7 +129,7 @@ data:
     done
 {{- end }}
 {{- end }}
-{{- if .Values.grafana.orgMapping.enabled }}
+{{- if $mapping }}
 {{- $settleSeconds := dig "settleSeconds" 120 .Values.grafana.orgMapping }}
 {{- if not (regexMatch "^[0-9]+$" (toString $settleSeconds)) }}{{ fail "grafana.orgMapping.settleSeconds must be a non-negative integer" }}{{ end }}
 {{- range $tenant := .Values.tenants }}

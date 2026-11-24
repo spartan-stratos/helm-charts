@@ -6,6 +6,21 @@ set:
   mode: addon
   addon: tenantOrgs
 tests:
+  - it: renders folders and permission checks with org mapping on and no org ids
+    template: templates/tenant-orgs.yaml
+    set:
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'api/folders/alpha'
+      - matchRegex:
+          path: data["provision.sh"]
+          pattern: 'verify_permissions .alpha. 2'
+      - notMatchRegex:
+          path: data["provision.sh"]
+          pattern: 'orgId mismatch'
   - it: provisions no folders by default
     template: templates/tenant-orgs.yaml
     set:
@@ -15,7 +30,7 @@ tests:
       - notMatchRegex:
           path: data["provision.sh"]
           pattern: /api/folders
-      - matchRegex:
+      - notMatchRegex:
           path: data["provision.sh"]
           pattern: "printf 'tenant org %s id %s"
       - notMatchRegex:
@@ -24,10 +39,8 @@ tests:
   - it: adds the admin to each org before invoking org-header datasource requests
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }, { id: beta }]
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }, { id: beta }]
       tenantIsolation.enabled: true
-      grafana.orgMapping.enabled: true
-      grafana.tenantFolders.enabled: true
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -39,9 +52,7 @@ tests:
   - it: creates each tenant parent with the full two-entry permissions list
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }, { id: beta }]
-      grafana.orgMapping.enabled: true
-      grafana.tenantFolders.enabled: true
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }, { id: beta }]
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -59,9 +70,7 @@ tests:
   - it: strips other root folders and keeps the tenant parent
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping.enabled: true
-      grafana.tenantFolders.enabled: true
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -73,9 +82,7 @@ tests:
   - it: fails on an orgId mismatch before datasource writes and folders
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha, grafana: { orgId: 2 } }]
-      grafana.orgMapping.enabled: true
-      grafana.tenantFolders.enabled: true
+      tenants: [{ id: alpha, grafana: { orgId: 2, viewers: [alpha-viewer] } }]
       tenantIsolation.enabled: true
       components.promLabelProxy.enabled: true
     documentIndex: 0
@@ -86,35 +93,27 @@ tests:
       - matchRegex:
           path: data["provision.sh"]
           pattern: 'else\n  admin_role=.*\n  if \[ "\$admin_role" != Admin \]; then\n    printf.*admin membership must have role Admin.*>&2\n    exit 1\n  fi\nfi\ndatasource loki'
-  - it: checks the configured orgId even when tenant folders are off
+  - it: rejects an orgId when org mapping is off
     template: templates/tenant-orgs.yaml
     set:
       tenants: [{ id: alpha, grafana: { orgId: 2 } }]
-    documentIndex: 0
     asserts:
-      - matchRegex:
-          path: data["provision.sh"]
-          pattern: 'orgId mismatch'
-      - notMatchRegex:
-          path: data["provision.sh"]
-          pattern: 'api/orgs/\$org_id/users'
+      - failedTemplate:
+          errorMessage: 'tenants[].grafana.orgId requires tenant Grafana viewers or editors groups; dashboards need the organization and folder from the tenant-orgs job'
   - it: waits for health before the first write
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping.enabled: true
-      grafana.tenantFolders.enabled: true
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
     documentIndex: 0
     asserts:
       - matchRegex:
           path: data["provision.sh"]
           pattern: '(?s)until curl[^;]*api/health"; do.*\[ "\$attempts" -lt 60 \] \|\| exit 1.*done.*request POST'
-  - it: uses only the mapping delay even when the folder delay is larger
+  - it: uses the configured mapping delay
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping: { enabled: true, settleSeconds: 45 }
-      grafana.tenantFolders: { enabled: true, settleSeconds: 75 }
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping: { settleSeconds: 45 }
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -123,12 +122,11 @@ tests:
       - notMatchRegex:
           path: data["provision.sh"]
           pattern: 'sleep 75|sleep 60|(?s)sleep 45.*sleep 45'
-  - it: settles once with the larger mapping delay
+  - it: settles once with the mapping delay
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping: { enabled: true, settleSeconds: 90 }
-      grafana.tenantFolders: { enabled: true, settleSeconds: 30 }
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping: { settleSeconds: 90 }
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -137,20 +135,10 @@ tests:
       - notMatchRegex:
           path: data["provision.sh"]
           pattern: 'sleep 30|(?s)sleep 90.*sleep 90'
-  - it: fails addon rendering without org mapping
-    template: templates/tenant-orgs.yaml
-    set:
-      tenants: [{ id: alpha }]
-      grafana.tenantFolders.enabled: true
-    asserts:
-      - failedTemplate:
-          errorMessage: grafana.tenantFolders requires grafana.orgMapping.enabled
   - it: retries permission reads twelve times ten seconds apart and fails with the last response
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping.enabled: true
-      grafana.tenantFolders.enabled: true
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -174,16 +162,14 @@ tests:
       - matchRegex:
           path: data["provision.sh"]
           pattern: '"\$base/api/folders/\$folder_uid/permissions"\n  verify_permissions "\$folder_uid" ..'
-  - it: passes enabled tenant folders to the organization addon
+  - it: passes org mapping settings to the organization addon
     template: templates/applications.yaml
     set:
       mode: applications
       argocd.project: example
       argocd.destination.name: example-cluster
       cluster.name: example-cluster
-      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
-      grafana.orgMapping.enabled: true
-      grafana.tenantFolders: { enabled: true, settleSeconds: 75 }
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] }, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
       grafana.sso.provider: keycloak
       grafana.sso.keycloak: { url: https://sso.example.com, realm: example, clientId: grafana }
     documentSelector:
@@ -191,9 +177,9 @@ tests:
       value: lgtm-grafana-tenant-orgs
     asserts:
       - equal:
-          path: spec.source.helm.valuesObject.grafana.tenantFolders
-          value: { enabled: true, settleSeconds: 75 }
-  - it: omits disabled tenant folders from the organization addon
+          path: spec.source.helm.valuesObject.grafana.orgMapping
+          value: { settleSeconds: 120 }
+  - it: omits org mapping when disabled
     template: templates/applications.yaml
     set:
       mode: applications
@@ -206,7 +192,7 @@ tests:
       value: lgtm-grafana-tenant-orgs
     asserts:
       - notExists:
-          path: spec.source.helm.valuesObject.grafana.tenantFolders
+          path: spec.source.helm.valuesObject.grafana.orgMapping
   - it: adds no settle step by default
     template: templates/tenant-orgs.yaml
     set:
@@ -219,8 +205,8 @@ tests:
   - it: verifies every tenant before settling enabled mapping
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }, { id: beta }]
-      grafana.orgMapping: { enabled: true, settleSeconds: 45 }
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }, { id: beta }]
+      grafana.orgMapping: { settleSeconds: 45 }
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -232,8 +218,8 @@ tests:
   - it: permits a zero settle delay
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping: { enabled: true, settleSeconds: 0 }
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping: { settleSeconds: 0 }
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -242,8 +228,8 @@ tests:
   - it: defaults an unset settle delay
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping: { enabled: true, settleSeconds: null }
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping: { settleSeconds: null }
     documentIndex: 0
     asserts:
       - matchRegex:
@@ -252,8 +238,8 @@ tests:
   - it: rejects a negative settle delay
     template: templates/tenant-orgs.yaml
     set:
-      tenants: [{ id: alpha }]
-      grafana.orgMapping: { enabled: true, settleSeconds: -1 }
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping: { settleSeconds: -1 }
     asserts:
       - failedTemplate:
           errorMessage: grafana.orgMapping.settleSeconds must be a non-negative integer
@@ -264,9 +250,9 @@ tests:
       argocd.project: example
       argocd.destination.name: example-cluster
       cluster.name: example-cluster
-      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
+      tenants: [{ id: alpha, grafana: { viewers: [alpha-viewer] }, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
       grafana.domain: grafana.example.com
-      grafana.orgMapping: { enabled: true, settleSeconds: 45 }
+      grafana.orgMapping: { settleSeconds: 45 }
       grafana.sso.provider: keycloak
       grafana.sso.keycloak: { url: https://sso.example.com, realm: example, clientId: grafana }
     documentSelector:
@@ -275,7 +261,7 @@ tests:
     asserts:
       - equal:
           path: spec.source.helm.valuesObject.grafana
-          value: { domain: grafana.example.com, orgMapping: { enabled: true, settleSeconds: 45 } }
+          value: { domain: grafana.example.com, orgMapping: { settleSeconds: 45 } }
   - it: omits disabled mapping from the organization addon
     template: templates/applications.yaml
     set:

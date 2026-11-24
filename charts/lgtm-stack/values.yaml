@@ -48,7 +48,8 @@ networkPolicy:
 platformTenant: platform
 # See README.md Tenant gateway receivers for credential and namespace isolation configuration.
 # Tenants may set grafana: { viewers: [<group>], editors: [<group>] } for optional Keycloak org mapping.
-# Set grafana.orgId only after the org exists; a provider for a missing org makes Grafana exit 1.
+# Adding viewers or editors groups enables mapping and folders; set orgId after the job creates them.
+# An orgId enables that tenant's dashboards; a provider for a missing org makes Grafana exit 1.
 tenants: []
 # Keep tenant logs and traces disabled until their backends enforce tenant authentication.
 tenantIsolation:
@@ -74,16 +75,11 @@ placement:
 
 grafana:
   tenantDashboards:
-    enabled: false
-    # Main sidecar namespaces; tenant namespaces here fail rendering.
+    # Main sidecar namespaces when any tenant has orgId; tenant namespaces here fail rendering.
     platformNamespaces: [monitoring]
-  tenantFolders:
-    enabled: false
-    # Passed to the job but not read by it today: the job waits only on orgMapping.settleSeconds.
-    settleSeconds: 60
-  # Map Keycloak groups to tenant organizations when explicitly enabled.
+  # Mapping and confined parent folders are enabled by tenant viewers or editors groups.
+  # Both tenant group tiers map to Viewer, with Edit permission inside their parent folder.
   orgMapping:
-    enabled: false
     # Orgs created after Grafana starts are invisible to org_mapping for 1-2 minutes.
     # The job waits this long; no restart needed.
     settleSeconds: 120

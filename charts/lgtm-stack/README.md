@@ -8,16 +8,22 @@ A project installs it as one Application and keeps one values file. Updating the
 
 ## Tenant dashboard delivery
 
-`grafana.tenantDashboards.enabled` defaults to `false`. When enabled, the main sidecar watches only
+Tenant organization mapping and confined parent folders are enabled exactly when at least one tenant has
+non-empty `tenants[].grafana.viewers` or `editors` groups. The rule applies to the whole tenant list.
+Dashboard delivery starts per tenant when `tenants[].grafana.orgId` is set and requires org mapping to be enabled.
+When at least one tenant has an org id, the main sidecar watches only
 `grafana.tenantDashboards.platformNamespaces` (default `[monitoring]`). This list must be nonempty and
-must not contain any tenant namespace. Custom `components.grafana.values.extraContainers` is rejected.
+must not contain any tenant namespace. Delivery overrides through `extraContainers`, `extraVolumes`,
+`extraVolumeMounts`, `extraObjects`, `sidecar.dashboards.searchNamespace` or the generated
+`dashboardProviders.tenant-dashboardproviders.yaml` key in `components.grafana.values` are rejected.
+Without any org ids, dashboard delivery settings and validations do not apply; the main sidecar is unchanged.
 
 Set `tenants[].grafana.orgId` only after the org exists, using the numeric id logged by the tenant-orgs job.
 Grafana org ids autoincrement and are not reused; after a Grafana DB reset or org deletion, unset the stale `orgId` or re-read it from the job log before the next sync.
-A provider for a missing org makes Grafana exit 1. First sync without `orgId` creates the org; a second
+A provider for a missing org makes Grafana exit 1. First add tenant Grafana groups and sync without `orgId` to create the org and folder; a second
 change sets its id. A tenant without an id gets no dashboard sidecar, providers or sentinel.
 Never delete the org or reset the Grafana database while its id is set. For recovery, unset `orgId`
-or disable `tenantDashboards`, then sync so Grafana starts without the missing-org provider.
+then sync so Grafana starts without the missing-org provider.
 
 Each configured tenant gets a sidecar watching its `namespaces`, two providers in its org and folder
 with uid equal to the tenant id, and an unlabelled home ConfigMap delivered through Grafana's `extraObjects`.
@@ -326,38 +332,38 @@ A tenant is a project. Every env namespace of the project writes metrics, logs a
 
 ### Tenant Grafana access
 
-Off by default. Set `grafana.sso.provider: keycloak`, `grafana.orgMapping.enabled: true` and each tenant's `tenants[].grafana.viewers` / `editors` lists.
+Set `grafana.sso.provider: keycloak` and tenant `tenants[].grafana.viewers` / `editors` lists.
+Production enablement is adding those tenant Grafana groups to the production values. Without any groups, mapping and folder confinement render nothing.
 Keycloak groups `lgtm-<tenant>-viewer` and `lgtm-<tenant>-editor` must exist and be assigned to the `grafana` client `groups` claim, with **Full group path off**.
-Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; tenant groups get Viewer or Editor only, never Admin.
+Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; both tenant group tiers get Viewer with Edit permission in their parent folder.
 A tenant group name may not be empty, equal an SSO admin group, or contain `:`, `,`, whitespace or braces.
 SSO admin group names are held to the same character rules when org mapping is enabled.
 This defaults to off, with rendering unchanged when off. `role_attribute_path` and `role_attribute_strict` are not changed.
 Org mapping is OFF by default and has been proven only on a local test harness, not on a live cluster.
 When on, the tenant-orgs job verifies every tenant organization exists, then waits `grafana.orgMapping.settleSeconds` (default 120) so Grafana's organization view catches up. A new tenant can log in about 2 minutes after the tenant-orgs job starts. No Grafana restart is needed.
-Every organization named in the mapping must exist, or all mapped users are refused and only the main organization remains for an SSO admin. Rendering fails when org mapping is on and `tenants` is empty.
+Every organization named in the mapping must exist, or all mapped users are refused and only the main organization remains for an SSO admin. An empty tenant list means no mapping. An org id without any tenant groups fails rendering.
 Tenant Viewer and Editor roles can read the non-secret settings (URL, basic-auth user, `jsonData`) of datasources in their own organization. Secrets are never returned, so keep anything sensitive out of a tenant datasource URL or `jsonData`.
 
 #### Confined tenant parent folders
 
-Set `grafana.tenantFolders.enabled: true` together with `grafana.orgMapping.enabled: true` to enable strict folder confinement (default off).
-Both tenant `viewers` and `editors` groups then map to organization **Viewer**. Both can edit dashboards and create sub-folders inside the parent whose uid and title equal the tenant id; neither can create root folders. There is no read-only tenant tier in this mode.
+Strict folder confinement is active whenever any tenant has viewers or editors groups, even before any tenant has an org id configured.
+Both tenant `viewers` and `editors` groups map to organization **Viewer**. Both can edit dashboards and create sub-folders inside the parent whose uid and title equal the tenant id; neither can create root folders. There is no read-only tenant tier.
 SSO admin groups retain Admin in every organization. Keep tenant users out of SSO admin/member groups that independently grant a higher role.
 
 The tenant-orgs job waits for Grafana health, adds the admin to each tenant org before org-header requests, provisions datasources, logs each tenant org id, then creates missing parent folders.
-If `tenants[].grafana.orgId` is configured, it must match the resolved id or the job fails before folder writes.
+If `tenants[].grafana.orgId` is configured, it must match the resolved id or the job fails before datasource or folder writes.
 The job replaces the parent's complete permission list with Admin 4 and Viewer 2, and replaces every other root folder's list with Admin 4 only.
 This strips existing user, team, Editor and Viewer grants from those root folders; sub-folders inherit their parent's permissions.
 After each write it reads back permissions up to 12 times, 10 seconds apart, requiring Viewer Edit (2) and no Editor entry on the tenant parent, or neither role on other roots; exhaustion fails with the last response.
-After all tenants, the job waits once for `grafana.orgMapping.settleSeconds` (default 120) for login visibility only; `grafana.tenantFolders.settleSeconds` is passed to the job but not read.
+After all tenants, the job waits once for `grafana.orgMapping.settleSeconds` (default 120) for login visibility only.
 
-Folder permission changes persist. Rollback: disable `tenantFolders`, sync Grafana and the tenant-orgs addon, and explicitly restore any stripped folder grants as an administrator.
-Disabling restores tenant editors' organization Editor mapping but does not undo permission writes.
-This option does not deliver dashboards or protect an empty parent against deletion; a tenant with Edit can delete an empty parent, so rerun the job to recreate it and restore grants.
+Folder permission changes persist. Rollback: unset tenant org ids, remove all tenant Grafana groups, sync Grafana and the tenant-orgs addon, and explicitly restore any stripped folder grants as an administrator.
+Disabling removes tenant organization mapping but does not undo permission writes.
+Until a tenant's org id enables its protected home dashboard, a tenant with Edit can delete an empty parent; rerun the job to recreate it and restore grants.
 
 ```yaml
 grafana:
   sso: { provider: keycloak }
-  orgMapping: { enabled: true }
 tenants:
   - id: tenant-a
     grafana:
