@@ -229,6 +229,10 @@ alertmanager:
 {{- $platform := $v.grafana.tenantDashboards.platformNamespaces }}
 {{- if empty $platform }}{{ fail "grafana.tenantDashboards.platformNamespaces must not be empty" }}{{ end }}
 {{- if hasKey $v.components.grafana.values "extraContainers" }}{{ fail "grafana.tenantDashboards cannot be combined with components.grafana.values.extraContainers" }}{{ end }}
+{{- $admin := dig "admin" dict $v.components.grafana.values }}
+{{- $adminSecret := $admin.existingSecret | default "grafana-admin" }}
+{{- $adminUser := $admin.userKey | default "admin-user" }}
+{{- $adminPassword := $admin.passwordKey | default "admin-password" }}
 {{- $volumes := list }}
 {{- $mounts := list }}
 {{- $containers := list }}
@@ -254,8 +258,8 @@ alertmanager:
 {{- range $name, $value := dict "METHOD" "WATCH" "LABEL" "grafana_dashboard" "LABEL_VALUE" "1" "NAMESPACE" (join "," $tenant.namespaces) "RESOURCE" "configmap" "FOLDER" $path "REQ_URL" "http://localhost:3000/api/admin/provisioning/dashboards/reload" "REQ_METHOD" "POST" }}
 {{- $env = append $env (dict "name" $name "value" $value) }}
 {{- end }}
-{{- range $name, $key := dict "REQ_USERNAME" "admin-user" "REQ_PASSWORD" "admin-password" }}
-{{- $env = append $env (dict "name" $name "valueFrom" (dict "secretKeyRef" (dict "name" "grafana-admin" "key" $key))) }}
+{{- range $name, $key := dict "REQ_USERNAME" $adminUser "REQ_PASSWORD" $adminPassword }}
+{{- $env = append $env (dict "name" $name "valueFrom" (dict "secretKeyRef" (dict "name" $adminSecret "key" $key))) }}
 {{- end }}
 {{- $security := dict "readOnlyRootFilesystem" true "allowPrivilegeEscalation" false "capabilities" (dict "drop" (list "ALL")) "seccompProfile" (dict "type" "RuntimeDefault") }}
 {{- $containers = append $containers (dict "name" (printf "grafana-sc-dashboard-%s" $id) "image" "quay.io/kiwigrid/k8s-sidecar:2.11.2" "env" $env "securityContext" $security "volumeMounts" (list (dict "name" $volume "mountPath" $path "readOnly" false))) }}

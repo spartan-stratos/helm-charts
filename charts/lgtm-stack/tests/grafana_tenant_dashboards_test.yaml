@@ -66,6 +66,18 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "tenants[].namespaces must be set when tenants[].grafana.orgId is set; an empty sidecar NAMESPACE watches the Grafana namespace"
+  - it: reads the sidecar reload credentials from the configured admin secret
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    set:
+      grafana.tenantDashboards.enabled: true
+      components.grafana.values.admin: { existingSecret: custom-admin, userKey: u, passwordKey: p }
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.valuesObject.extraContainers
+          pattern: "name: custom-admin"
+      - matchRegex:
+          path: spec.source.helm.valuesObject.extraContainers
+          pattern: "key: p\\n"
   - it: rejects user extraContainers even when set to an empty string
     set:
       grafana.tenantDashboards.enabled: true
