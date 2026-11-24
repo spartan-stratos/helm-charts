@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.13.0 (2026-11-24)
+
+### BREAKING
+
+* Remove `grafana.orgMapping.enabled`, `grafana.tenantFolders.enabled` and `grafana.tenantDashboards.enabled`. Delete these keys and set `tenants[].grafana.viewers` / `editors` groups instead. With no tenant groups, rendering is unchanged.
+
+### Bug Fixes
+
+* Remove Grafana admin credentials and reload requests from tenant sidecars; poll both tenant providers every 30 seconds.
+* Use unique sidecar filenames and distinct tenant dashboard volume and provider prefixes; reject reserved ids and name collisions.
+* Clarify that parent folder permission replacement preserves tenant-created sub-folder grants within the confined org.
+* Reject overrides of the generated tenant dashboard provider while allowing other dashboard provider keys.
+* Validate tenant org ids and namespace boundaries, reject delivery overrides, and assign distinct sidecar health ports.
+* Check org ids before datasource writes and fail when an existing admin membership lacks the Admin role.
+
+### Features
+
+* Derive tenant mapping and parent folders from non-empty tenant Grafana viewers or editors groups, with no enable flag. Both tenant group tiers receive org-level Viewer membership, Edit on the parent and no access to other root folders.
+* Enable namespace-isolated dashboard sidecars and per-organization file providers per tenant through `tenants[].grafana.orgId`, only with org mapping enabled.
+* Protect tenant parent folders with a provisioned home dashboard, delivered only after an existing organization id is configured.
+* Reject platform namespace overlap, empty platform namespace lists and conflicting custom sidecars.
+* Verify configured tenant organization ids; add the admin before org-header requests and retry folder permission read-back up to 12 times at 10s, keeping the fixed settle for org mapping only.
+* Log tenant organization ids for the second onboarding step. Without org ids, org mapping still provisions folders but no dashboard delivery resources. With no tenant groups, rendering is unchanged.
+
 ## 0.11.4 (2026-11-23)
 
 ### Features

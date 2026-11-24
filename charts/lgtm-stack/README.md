@@ -6,6 +6,56 @@ apps), not the workloads themselves, so each component keeps its own sync wave, 
 
 A project installs it as one Application and keeps one values file. Updating the stack is a chart version bump.
 
+## Tenant dashboard delivery
+
+Tenant organization mapping and confined parent folders are enabled exactly when at least one tenant has
+non-empty `tenants[].grafana.viewers` or `editors` groups. The rule applies to the whole tenant list.
+Dashboard delivery starts per tenant when `tenants[].grafana.orgId` is set and requires org mapping to be enabled.
+When at least one tenant has an org id, the main sidecar watches only
+`grafana.tenantDashboards.platformNamespaces` (default `[monitoring]`). This list must be nonempty and
+must not contain any tenant namespace. Delivery overrides through `extraContainers`, `extraVolumes`,
+`extraVolumeMounts`, `extraObjects`, `sidecar.dashboards.searchNamespace` or the generated
+`dashboardProviders.tenant-dashboardproviders.yaml` key in `components.grafana.values` are rejected.
+Without any org ids, dashboard delivery settings and validations do not apply; the main sidecar is unchanged.
+
+Set `tenants[].grafana.orgId` only after the org exists, using the numeric id logged by the tenant-orgs job.
+Grafana org ids autoincrement and are not reused; after a Grafana DB reset or org deletion, unset the stale `orgId` or re-read it from the job log before the next sync.
+A provider for a missing org makes Grafana exit 1. First add tenant Grafana groups and sync without `orgId` to create the org and folder; a second
+change sets its id. A tenant without an id gets no dashboard sidecar, providers or sentinel.
+Never delete the org or reset the Grafana database while its id is set. For recovery, unset `orgId`
+then sync so Grafana starts without the missing-org provider.
+
+Each configured tenant gets a sidecar watching its `namespaces`, two providers in its org and folder
+with uid equal to the tenant id, and an unlabelled home ConfigMap delivered through Grafana's `extraObjects`.
+The protected `<tenant>-home` dashboard prevents deletion of the parent folder. Git dashboards are read-only;
+copy them into the tenant folder to edit them.
+
+Tenant dashboards appear within about 30 seconds through provider polling. The tenant sidecar holds no Grafana credential.
+The sidecar can still fetch `.url` annotated keys; no Grafana credential is sent with those requests.
+Only the parent folder's permission list is replaced. Grants a tenant creates on its own sub-folders stay;
+this is harmless because the Grafana org is the confinement boundary and sub-folders cannot leave the parent.
+Tenant dashboard ids `general` and `volume`, and ids that cause generated volume or provider name collisions, are rejected.
+Tenant ConfigMaps use this shape:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alpha-dashboard-overview
+  namespace: alpha-dev
+  labels:
+    grafana_dashboard: "1"
+data:
+  overview.json: |
+    {"uid":"alpha-overview","title":"Overview","panels":[]}
+```
+
+Use tenant-prefixed uids, never `<tenant>-home`; omit top-level `id` and `__inputs`. Use datasource
+uids `prometheus`, `loki`, `tempo`, with tenant namespace filters. Files land flat in the tenant folder;
+`grafana_folder` annotations are ignored. ConfigMaps must be on Grafana's cluster: a production Grafana
+cannot watch ConfigMaps on a separate development cluster. Both dashboard mounts are outside `/tmp/dashboards`
+so the main-org provider cannot load tenant files.
+
 ## Install
 
 The project's ArgoCD repo wraps the chart, so Dependabot's `helm` ecosystem opens a PR for every new version. The
@@ -209,6 +259,7 @@ No tenant log or trace processors or exporters are generated. With `components.p
 the tenant-org Job creates the Prometheus datasource, which queries through the tenant's label-enforcing proxy.
 With `components.promLabelProxy.enabled: false`, no tenant Prometheus datasource is created.
 The Job creates organizations and missing datasources; it does not remove existing ones.
+A dashboard provider for a missing `orgId` makes Grafana exit 1, so set `orgId` only after the org exists; every org named in `org_mapping` must exist or all mapped users are refused.
 Its admin Secret name and keys follow the effective Grafana `admin.existingSecret`, `admin.userKey` and `admin.passwordKey` values.
 
 Metrics scraped inside the platform cluster carry no tenant label, so tenant rules cannot see them; tenant telemetry must arrive through the gateway.
@@ -263,6 +314,8 @@ keep it as break-glass.
 
 A tenant is a project. Every env namespace of the project writes metrics, logs and traces under one tenant id through the gateway, and its alert rules run only in the tenant ruler.
 
+Adding the first tenant group turns org mapping on for the whole Grafana; expect logins to fail until the tenant-orgs job finishes plus about 2 minutes. A missing mapped org refuses everyone, so apply tenant groups only after the orgs exist (the job creates them).
+
 1. Namespaces: one namespace per env, unique names, each labelled `lgtm-stack/tenant=<id>` before its rules sync.
    - For namespaces created by the `eks-cluster` Terraform module, set the label with `custom_namespace_labels` (module v1.4.0 or later). Do not also manage it with a `kubernetes_labels` resource. The two fight over the label.
 2. Stack values: add `tenants[]` with the id and the env namespaces. Give each env its own `receivers[]` entry (port, namespaces, auth Secret) so one credential cannot write another env's namespace. Public receivers need `gateway.ingress`; receivers on the platform cluster use `ingress: false`.
@@ -288,21 +341,38 @@ A tenant is a project. Every env namespace of the project writes metrics, logs a
 
 ### Tenant Grafana access
 
-Off by default. Set `grafana.sso.provider: keycloak`, `grafana.orgMapping.enabled: true` and each tenant's `tenants[].grafana.viewers` / `editors` lists.
+Set `grafana.sso.provider: keycloak` and tenant `tenants[].grafana.viewers` / `editors` lists.
+Production enablement is adding those tenant Grafana groups to the production values. Without any groups, mapping and folder confinement render nothing.
 Keycloak groups `lgtm-<tenant>-viewer` and `lgtm-<tenant>-editor` must exist and be assigned to the `grafana` client `groups` claim, with **Full group path off**.
-Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; tenant groups get Viewer or Editor only, never Admin.
+Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; both tenant group tiers get Viewer with Edit permission in their parent folder.
 A tenant group name may not be empty, equal an SSO admin group, or contain `:`, `,`, whitespace or braces.
 SSO admin group names are held to the same character rules when org mapping is enabled.
-This defaults to off, with rendering unchanged when off. `role_attribute_path` and `role_attribute_strict` are not changed.
-Org mapping is OFF by default and has been proven only on a local test harness, not on a live cluster.
-When on, the tenant-orgs job verifies every tenant organization exists, then waits `grafana.orgMapping.settleSeconds` (default 120) so Grafana's organization view catches up. A new tenant can log in about 2 minutes after the tenant-orgs job starts. No Grafana restart is needed.
-Every organization named in the mapping must exist, or all mapped users are refused and only the main organization remains for an SSO admin. Rendering fails when org mapping is on and `tenants` is empty.
+With no tenant groups, rendering is unchanged. `role_attribute_path` and `role_attribute_strict` are not changed.
+Org mapping renders nothing with no tenant groups and has been proven only on a local test harness, not on a live cluster.
+With tenant groups, the tenant-orgs job verifies every tenant organization exists, then waits `grafana.orgMapping.settleSeconds` (default 120) so Grafana's organization view catches up. Expect logins to fail until the job finishes plus about 2 minutes. No Grafana restart is needed.
+Every organization named in the mapping must exist, or all mapped users are refused and only the main organization remains for an SSO admin. An empty tenant list means no mapping. An org id without any tenant groups fails rendering.
 Tenant Viewer and Editor roles can read the non-secret settings (URL, basic-auth user, `jsonData`) of datasources in their own organization. Secrets are never returned, so keep anything sensitive out of a tenant datasource URL or `jsonData`.
+
+#### Confined tenant parent folders
+
+Strict folder confinement is active whenever any tenant has viewers or editors groups, even before any tenant has an org id configured.
+Both tenant `viewers` and `editors` groups map to organization **Viewer**. Both can edit dashboards and create sub-folders inside the parent whose uid and title equal the tenant id; neither can create root folders. There is no read-only tenant tier.
+SSO admin groups retain Admin in every organization. Keep tenant users out of SSO admin/member groups that independently grant a higher role.
+
+The tenant-orgs job waits for Grafana health, adds the admin to each tenant org before org-header requests, provisions datasources, logs each tenant org id, then creates missing parent folders.
+If `tenants[].grafana.orgId` is configured, it must match the resolved id or the job fails before datasource or folder writes.
+The job replaces the parent's complete permission list with Admin 4 and Viewer 2, and replaces every other root folder's list with Admin 4 only.
+This strips existing user, team, Editor and Viewer grants from those root folders; sub-folders inherit their parent's permissions.
+After each write it reads back permissions up to 12 times, 10 seconds apart, requiring Viewer Edit (2) and no Editor entry on the tenant parent, or neither role on other roots; exhaustion fails with the last response.
+After all tenants, the job waits once for `grafana.orgMapping.settleSeconds` (default 120) for login visibility only.
+
+Folder permission changes persist. Rollback: unset tenant org ids, remove all tenant Grafana groups, sync Grafana and the tenant-orgs addon, and explicitly restore any stripped folder grants as an administrator.
+Removing the groups removes tenant organization mapping but does not undo permission writes.
+Until a tenant's org id enables its protected home dashboard, a tenant with Edit can delete an empty parent; rerun the job to recreate it and restore grants.
 
 ```yaml
 grafana:
   sso: { provider: keycloak }
-  orgMapping: { enabled: true }
 tenants:
   - id: tenant-a
     grafana:

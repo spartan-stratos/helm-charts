@@ -15,20 +15,66 @@ set:
     admin: [sre]
     member: [member]
 tests:
-  - it: requires at least one tenant when mapping is enabled
+  - it: rejects removed grafana.orgMapping.enabled
     set:
-      grafana.orgMapping.enabled: true
-      tenants: []
+      grafana.orgMapping.enabled: false
     asserts:
       - failedTemplate:
-          errorMessage: grafana.orgMapping requires at least one tenant
-  - it: ignores tenant groups by default and preserves the role rule
+          errorMessage: 'grafana.orgMapping.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key'
+  - it: rejects removed grafana.tenantFolders.enabled
+    set:
+      grafana.tenantFolders.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.tenantFolders.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key'
+  - it: rejects removed grafana.tenantDashboards.enabled
+    set:
+      grafana.tenantDashboards.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.tenantDashboards.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key'
+  - it: accepts settleSeconds and platformNamespaces without removed switches
+    set:
+      grafana.orgMapping.settleSeconds: 15
+      grafana.tenantDashboards.platformNamespaces: [monitoring]
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
+  - it: rejects an org id without org mapping
+    set:
+      tenants: [{ id: alpha, port: 4320, grafana: { orgId: 2 } }]
+    asserts:
+      - failedTemplate:
+          errorMessage: 'tenants[].grafana.orgId requires tenant Grafana viewers or editors groups; dashboards need the organization and folder from the tenant-orgs job'
+  - it: maps editors and viewers to Viewer whenever org mapping is enabled
     set:
       tenants:
         - id: alpha
           port: 4320
           htpasswdSecret: { name: alpha-otlp, key: htpasswd }
-          grafana: { viewers: [sre, "bad:group"], editors: [""] }
+          grafana: { viewers: [lgtm-alpha-viewer], editors: [lgtm-alpha-editor] }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-grafana
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
+          value: 'sre:*:Admin lgtm-alpha-viewer:alpha:Viewer lgtm-alpha-editor:alpha:Viewer'
+  - it: renders no mapping without tenants
+    set:
+      tenants: []
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
+  - it: preserves the role rule without tenant groups
+    set:
+      tenants:
+        - id: alpha
+          port: 4320
+          htpasswdSecret: { name: alpha-otlp, key: htpasswd }
+          grafana: { viewers: [], editors: [] }
     documentSelector:
       path: metadata.name
       value: lgtm-grafana
@@ -48,7 +94,6 @@ tests:
             ''
   - it: maps admin and tenant groups in tenant and role order
     set:
-      grafana.orgMapping.enabled: true
       tenants:
         - id: alpha
           port: 4320
@@ -67,41 +112,38 @@ tests:
           value: groups
       - equal:
           path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
-          value: 'sre:*:Admin lgtm-alpha-viewer:alpha:Viewer lgtm-alpha-editor:alpha:Editor lgtm-beta-viewer:beta:Viewer'
+          value: 'sre:*:Admin lgtm-alpha-viewer:alpha:Viewer lgtm-alpha-editor:alpha:Viewer lgtm-beta-viewer:beta:Viewer'
       - notMatchRegex:
           path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
           pattern: 'lgtm-[a-z-]+:[a-z]+:Admin'
   - it: rejects whitespace in an SSO admin group
     set:
-      grafana.orgMapping.enabled: true
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [viewer] } }]
       grafana.sso.keycloak.admin: ["platform admins"]
     asserts:
       - failedTemplate:
           errorMessage: 'grafana.sso.keycloak.admin group must not contain : , whitespace or braces'
   - it: rejects a colon in an SSO admin group
     set:
-      grafana.orgMapping.enabled: true
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [viewer] } }]
       grafana.sso.keycloak.admin: ["platform:admins"]
     asserts:
       - failedTemplate:
           errorMessage: 'grafana.sso.keycloak.admin group must not contain : , whitespace or braces'
   - it: rejects an empty tenant group
     set:
-      grafana.orgMapping.enabled: true
       tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [""] } }]
     asserts:
       - failedTemplate:
           errorMessage: tenant grafana group must not be empty
   - it: rejects the sre tenant group
     set:
-      grafana.orgMapping.enabled: true
       tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [sre] } }]
     asserts:
       - failedTemplate:
           errorMessage: tenant grafana group must not be sre or an SSO admin group
   - it: rejects an SSO admin tenant group
     set:
-      grafana.orgMapping.enabled: true
       grafana.sso.keycloak.admin: [platform-admin]
       tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { editors: [platform-admin] } }]
     asserts:
@@ -109,33 +151,30 @@ tests:
           errorMessage: tenant grafana group must not be sre or an SSO admin group
   - it: rejects a colon in a tenant group
     set:
-      grafana.orgMapping.enabled: true
       tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: ["bad:group"] } }]
     asserts:
       - failedTemplate:
           errorMessage: 'tenant grafana group must not contain : , whitespace or braces'
   - it: rejects a comma in a tenant group
     set:
-      grafana.orgMapping.enabled: true
       tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: ["bad,group"] } }]
     asserts:
       - failedTemplate:
           errorMessage: 'tenant grafana group must not contain : , whitespace or braces'
   - it: requires the Keycloak provider
     set:
-      grafana.orgMapping.enabled: true
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { editors: [editor] } }]
       grafana.sso.provider: none
     asserts:
       - failedTemplate:
           errorMessage: grafana.orgMapping requires grafana.sso.provider keycloak
-  - it: maps only admin groups when tenants have no grafana settings
+  - it: groups on one tenant enable mapping for the whole tenant list
     set:
-      grafana.orgMapping.enabled: true
-      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }]
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd } }, { id: beta, port: 4321, htpasswdSecret: { name: beta-otlp, key: htpasswd }, grafana: { editors: [beta-editor] } }]
     documentSelector:
       path: metadata.name
       value: lgtm-grafana
     asserts:
       - equal:
           path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
-          value: 'sre:*:Admin'
+          value: 'sre:*:Admin beta-editor:beta:Viewer'

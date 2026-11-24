@@ -1,3 +1,38 @@
+{{/* Reject removed switches even when explicitly set to false. */}}
+{{- define "lgtm-stack.validateRemovedGrafanaKeys" -}}
+{{- range $key := list "orgMapping" "tenantFolders" "tenantDashboards" -}}
+{{- if hasKey (index $.Values.grafana $key | default dict) "enabled" -}}
+{{- fail (printf "grafana.%s.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key" $key) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Mapping applies to all tenants when any tenant declares Grafana groups. */}}
+{{- define "lgtm-stack.orgMapping" -}}
+{{- $active := false -}}
+{{- range .Values.tenants -}}
+{{- $grafana := .grafana | default dict -}}
+{{- if or $grafana.viewers $grafana.editors -}}{{- $active = true -}}{{- end -}}
+{{- end -}}
+{{- if $active -}}true{{- end -}}
+{{- end -}}
+
+{{/* Dashboard providers require the org and folder provisioned by org mapping. */}}
+{{- define "lgtm-stack.validateTenantDashboards" -}}
+{{- $mapping := include "lgtm-stack.orgMapping" . -}}
+{{- range .Values.tenants -}}
+{{- if and (hasKey (.grafana | default dict) "orgId") (not $mapping) -}}
+{{- fail "tenants[].grafana.orgId requires tenant Grafana viewers or editors groups; dashboards need the organization and folder from the tenant-orgs job" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "lgtm-stack.hasTenantDashboards" -}}
+{{- range .Values.tenants -}}
+{{- if hasKey (.grafana | default dict) "orgId" -}}true{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Deep merge (list dst src): src wins key by key, including false, "" and null, which sprig's mergeOverwrite would skip.
 A null reaches the upstream chart as null, so it still deletes that chart's default. Mutates dst.
@@ -199,6 +234,7 @@ instrumentation:
 {{- $ := index . 0 -}}
 {{- $key := index . 1 -}}
 {{- $v := $.Values -}}
+{{- $mapping := include "lgtm-stack.orgMapping" $ -}}
 {{- if eq $key "kubePrometheusStack" }}
 {{- with $v.placement.tolerations }}
 prometheus-node-exporter:
@@ -218,9 +254,98 @@ alertmanager:
       name: slack
 {{- end }}
 {{- else if eq $key "grafana" }}
+{{- if include "lgtm-stack.hasTenantDashboards" $ }}
+{{- $platform := $v.grafana.tenantDashboards.platformNamespaces }}
+{{- if empty $platform }}{{ fail "grafana.tenantDashboards.platformNamespaces must not be empty" }}{{ end }}
+{{- range $key := list "extraContainers" "extraVolumes" "extraVolumeMounts" "extraObjects" }}
+{{- if hasKey $v.components.grafana.values $key }}{{ fail (printf "grafana.tenantDashboards cannot be combined with components.grafana.values.%s" $key) }}{{ end }}
+{{- end }}
+{{- if hasKey (dig "sidecar" "dashboards" dict $v.components.grafana.values) "searchNamespace" }}{{ fail "grafana.tenantDashboards cannot be combined with components.grafana.values.sidecar.dashboards.searchNamespace" }}{{ end }}
+{{- if hasKey (dig "dashboardProviders" dict $v.components.grafana.values) "tenant-dashboardproviders.yaml" }}{{ fail "grafana.tenantDashboards cannot be combined with components.grafana.values.dashboardProviders.tenant-dashboardproviders.yaml" }}{{ end }}
+{{- range $platform }}
+{{- if eq (upper (toString .)) "ALL" }}{{ fail "grafana.tenantDashboards.platformNamespaces must not contain ALL" }}{{ end }}
+{{- if or (not (kindIs "string" .)) (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" (toString .))) (gt (len (toString .)) 63) }}{{ fail "grafana.tenantDashboards.platformNamespaces must contain DNS-1123 labels" }}{{ end }}
+{{- end }}
+{{- $namespaces := dict }}
+{{- $orgIds := dict }}
+{{- $volumeNames := dict "sc-dashboard" true "sc-dashboard-volume" true }}
+{{- $providerNames := dict (dig "sidecar" "dashboards" "provider" "name" "sidecarProvider" $v.components.grafana.values) true }}
+{{- range $providerFile := (dig "dashboardProviders" dict $v.components.grafana.values) }}
+{{- range $providerFile.providers }}
+{{- $_ := set $providerNames .name true }}
+{{- end }}
+{{- end }}
+{{- $healthPort := 8085 }}
+{{- $volumes := list }}
+{{- $mounts := list }}
+{{- $containers := list }}
+{{- $providers := list }}
+{{- $objects := list }}
+{{- range $tenant := $v.tenants }}
+{{- if has $tenant.id (list "general" "volume") }}{{ fail "tenant dashboard id must not be general or volume" }}{{ end }}
+{{- range $tenant.namespaces }}
+{{- if eq (upper (toString .)) "ALL" }}{{ fail "tenants[].namespaces must not contain ALL" }}{{ end }}
+{{- if or (not (kindIs "string" .)) (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" (toString .))) (gt (len (toString .)) 63) }}{{ fail "tenants[].namespaces must contain DNS-1123 labels" }}{{ end }}
+{{- if and (hasKey $namespaces .) (ne (index $namespaces .) $tenant.id) }}{{ fail "tenants[].namespaces must be unique across tenants" }}{{ end }}
+{{- $_ := set $namespaces . $tenant.id }}
+{{- if has . $platform }}{{ fail "tenant namespace must not be in grafana.tenantDashboards.platformNamespaces" }}{{ end }}
+{{- end }}
+{{- with $tenant.grafana }}
+{{- if hasKey . "orgId" }}
+{{- if or (kindIs "string" .orgId) (not (regexMatch "^[1-9][0-9]*$" (toString .orgId))) }}{{ fail "tenants[].grafana.orgId must be a positive integer" }}{{ end }}
+{{- if eq (toString .orgId) "1" }}{{ fail "tenants[].grafana.orgId must not be 1" }}{{ end }}
+{{- if hasKey $orgIds (toString .orgId) }}{{ fail "tenants[].grafana.orgId must be unique across tenants" }}{{ end }}
+{{- $_ := set $orgIds (toString .orgId) true }}
+{{- if empty $tenant.namespaces }}{{ fail "tenants[].namespaces must be set when tenants[].grafana.orgId is set; an empty sidecar NAMESPACE watches the Grafana namespace" }}{{ end }}
+{{- $id := $tenant.id }}
+{{- $volume := printf "tenant-dash-%s" $id }}
+{{- $home := printf "tenant-home-%s" $id }}
+{{- range $name := list $volume $home }}
+{{- if or (hasKey $volumeNames $name) (gt (len $name) 63) }}{{ fail "tenant dashboard volume names must be unique and at most 63 characters" }}{{ end }}
+{{- $_ := set $volumeNames $name true }}
+{{- end }}
+{{- range $name := list (printf "tenant-%s" $id) (printf "home-%s" $id) }}
+{{- if hasKey $providerNames $name }}{{ fail "tenant dashboard provider names must be unique" }}{{ end }}
+{{- $_ := set $providerNames $name true }}
+{{- end }}
+{{- $path := printf "/var/lib/grafana-tenant-dashboards/%s" $id }}
+{{- $homePath := printf "/etc/grafana/tenant-home/%s" $id }}
+{{- $volumes = append $volumes (dict "name" $volume "emptyDir" dict) }}
+{{- $volumes = append $volumes (dict "name" $home "configMap" (dict "name" (printf "grafana-tenant-home-%s" $id))) }}
+{{- $mounts = append $mounts (dict "name" $volume "mountPath" $path "readOnly" true) }}
+{{- $mounts = append $mounts (dict "name" $home "mountPath" $homePath "readOnly" true) }}
+{{- $env := list }}
+{{- $env = append $env (dict "name" "HEALTH_PORT" "value" (toString $healthPort)) }}
+{{- $healthPort = add1 $healthPort }}
+{{- range $name, $value := dict "METHOD" "WATCH" "LABEL" "grafana_dashboard" "LABEL_VALUE" "1" "NAMESPACE" (join "," $tenant.namespaces) "RESOURCE" "configmap" "FOLDER" $path "UNIQUE_FILENAMES" "true" }}
+{{- $env = append $env (dict "name" $name "value" $value) }}
+{{- end }}
+{{- $security := dict "readOnlyRootFilesystem" true "allowPrivilegeEscalation" false "capabilities" (dict "drop" (list "ALL")) "seccompProfile" (dict "type" "RuntimeDefault") }}
+{{- $containers = append $containers (dict "name" (printf "grafana-sc-dashboard-%s" $id) "image" "quay.io/kiwigrid/k8s-sidecar:2.11.2" "env" $env "securityContext" $security "volumeMounts" (list (dict "name" $volume "mountPath" $path "readOnly" false))) }}
+{{- range $isHome := list false true }}
+{{- $providers = append $providers (dict "name" (printf "%s-%s" (ternary "home" "tenant" $isHome) $id) "orgId" $tenant.grafana.orgId "folder" $id "folderUid" $id "type" "file" "updateIntervalSeconds" 30 "allowUiUpdates" false "disableDeletion" $isHome "options" (dict "path" (ternary $homePath $path $isHome) "foldersFromFilesStructure" false)) }}
+{{- end }}
+{{- $dashboard := dict "uid" (printf "%s-home" $id) "title" (printf "%s home" $id) "schemaVersion" 39 "panels" (list (dict "id" 1 "type" "text" "title" "Your dashboards" "gridPos" (dict "h" 6 "w" 24 "x" 0 "y" 0) "options" (dict "mode" "markdown" "content" (printf "Save dashboards and sub-folders inside the %s folder. Copy Git-managed dashboards to edit them." $id)))) }}
+{{- $objects = append $objects (dict "apiVersion" "v1" "kind" "ConfigMap" "metadata" (dict "name" (printf "grafana-tenant-home-%s" $id) "namespace" $v.namespace) "data" (dict (printf "%s-home.json" $id) (toJson $dashboard))) }}
+{{- end }}
+{{- end }}
+{{- end }}
+sidecar:
+  dashboards:
+    searchNamespace: {{ toYaml $platform | nindent 6 }}
+{{- if $containers }}
+extraVolumes: {{ toYaml $volumes | nindent 2 }}
+extraVolumeMounts: {{ toYaml $mounts | nindent 2 }}
+extraContainers: {{ toYaml $containers | quote }}
+dashboardProviders:
+  tenant-dashboardproviders.yaml:
+    apiVersion: 1
+    providers: {{ toYaml $providers | nindent 6 }}
+extraObjects: {{ toYaml $objects | nindent 2 }}
+{{- end }}
+{{- end }}
 {{- $orgMapping := list }}
-{{- if $v.grafana.orgMapping.enabled }}
-{{- if empty $v.tenants }}{{ fail "grafana.orgMapping requires at least one tenant" }}{{ end }}
+{{- if $mapping }}
 {{- if ne $v.grafana.sso.provider "keycloak" }}{{ fail "grafana.orgMapping requires grafana.sso.provider keycloak" }}{{ end }}
 {{- $admins := $v.grafana.sso.keycloak.admin | default list }}
 {{- range $admins }}
@@ -237,19 +362,19 @@ alertmanager:
 {{- if or (not (kindIs "string" $group)) (eq $group "") }}{{ fail "tenant grafana group must not be empty" }}{{ end }}
 {{- if or (eq $group "sre") (has $group $admins) }}{{ fail "tenant grafana group must not be sre or an SSO admin group" }}{{ end }}
 {{- if regexMatch "[:,[:space:]{}]" $group }}{{ fail "tenant grafana group must not contain : , whitespace or braces" }}{{ end }}
-{{- $orgMapping = append $orgMapping (printf "%s:%s:%s" $group $tenant.id $role) }}
+{{- $orgMapping = append $orgMapping (printf "%s:%s:Viewer" $group $tenant.id) }}
 {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
-{{- if or $v.grafana.domain $v.grafana.orgMapping.enabled }}
+{{- if or $v.grafana.domain $mapping }}
 grafana.ini:
 {{- with $v.grafana.domain }}
   server:
     root_url: https://{{ . }}
 {{- end }}
-{{- if $v.grafana.orgMapping.enabled }}
+{{- if $mapping }}
   auth.generic_oauth:
     org_attribute_path: groups
     org_mapping: {{ join " " $orgMapping | quote }}
