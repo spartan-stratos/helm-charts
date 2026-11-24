@@ -1,3 +1,12 @@
+{{/* Reject removed switches even when explicitly set to false. */}}
+{{- define "lgtm-stack.validateRemovedGrafanaKeys" -}}
+{{- range $key := list "orgMapping" "tenantFolders" "tenantDashboards" -}}
+{{- if hasKey (index $.Values.grafana $key | default dict) "enabled" -}}
+{{- fail (printf "grafana.%s.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key" $key) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{/* Mapping applies to all tenants when any tenant declares Grafana groups. */}}
 {{- define "lgtm-stack.orgMapping" -}}
 {{- $active := false -}}

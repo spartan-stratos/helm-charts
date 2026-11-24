@@ -6,6 +6,36 @@ set:
   mode: addon
   addon: tenantOrgs
 tests:
+  - it: rejects removed grafana.orgMapping.enabled
+    template: templates/tenant-orgs.yaml
+    set:
+      grafana.orgMapping.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.orgMapping.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key'
+  - it: rejects removed grafana.tenantFolders.enabled
+    template: templates/tenant-orgs.yaml
+    set:
+      grafana.tenantFolders.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.tenantFolders.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key'
+  - it: rejects removed grafana.tenantDashboards.enabled
+    template: templates/tenant-orgs.yaml
+    set:
+      grafana.tenantDashboards.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.tenantDashboards.enabled was removed in 0.13.0: org mapping is now on when a tenant has grafana.viewers or grafana.editors groups; delete the key'
+  - it: accepts settleSeconds and platformNamespaces without removed switches
+    template: templates/tenant-orgs.yaml
+    set:
+      grafana.orgMapping.settleSeconds: 15
+      grafana.tenantDashboards.platformNamespaces: [monitoring]
+      tenants: [{ id: alpha }]
+    asserts:
+      - hasDocuments:
+          count: 2
   - it: renders folders and permission checks with org mapping on and no org ids
     template: templates/tenant-orgs.yaml
     set:

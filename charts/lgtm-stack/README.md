@@ -307,6 +307,8 @@ keep it as break-glass.
 
 A tenant is a project. Every env namespace of the project writes metrics, logs and traces under one tenant id through the gateway, and its alert rules run only in the tenant ruler.
 
+Adding the first tenant group turns org mapping on for the whole Grafana; expect logins to fail until the tenant-orgs job finishes plus about 2 minutes. A missing mapped org refuses everyone, so apply tenant groups only after the orgs exist (the job creates them).
+
 1. Namespaces: one namespace per env, unique names, each labelled `lgtm-stack/tenant=<id>` before its rules sync.
    - For namespaces created by the `eks-cluster` Terraform module, set the label with `custom_namespace_labels` (module v1.4.0 or later). Do not also manage it with a `kubernetes_labels` resource. The two fight over the label.
 2. Stack values: add `tenants[]` with the id and the env namespaces. Give each env its own `receivers[]` entry (port, namespaces, auth Secret) so one credential cannot write another env's namespace. Public receivers need `gateway.ingress`; receivers on the platform cluster use `ingress: false`.
@@ -338,9 +340,9 @@ Keycloak groups `lgtm-<tenant>-viewer` and `lgtm-<tenant>-editor` must exist and
 Membership of a tenant Grafana organization comes only from those groups. Groups in `grafana.sso.keycloak.admin` keep Admin in every organization via `<group>:*:Admin`; both tenant group tiers get Viewer with Edit permission in their parent folder.
 A tenant group name may not be empty, equal an SSO admin group, or contain `:`, `,`, whitespace or braces.
 SSO admin group names are held to the same character rules when org mapping is enabled.
-This defaults to off, with rendering unchanged when off. `role_attribute_path` and `role_attribute_strict` are not changed.
-Org mapping is OFF by default and has been proven only on a local test harness, not on a live cluster.
-When on, the tenant-orgs job verifies every tenant organization exists, then waits `grafana.orgMapping.settleSeconds` (default 120) so Grafana's organization view catches up. A new tenant can log in about 2 minutes after the tenant-orgs job starts. No Grafana restart is needed.
+With no tenant groups, rendering is unchanged. `role_attribute_path` and `role_attribute_strict` are not changed.
+Org mapping renders nothing with no tenant groups and has been proven only on a local test harness, not on a live cluster.
+With tenant groups, the tenant-orgs job verifies every tenant organization exists, then waits `grafana.orgMapping.settleSeconds` (default 120) so Grafana's organization view catches up. Expect logins to fail until the job finishes plus about 2 minutes. No Grafana restart is needed.
 Every organization named in the mapping must exist, or all mapped users are refused and only the main organization remains for an SSO admin. An empty tenant list means no mapping. An org id without any tenant groups fails rendering.
 Tenant Viewer and Editor roles can read the non-secret settings (URL, basic-auth user, `jsonData`) of datasources in their own organization. Secrets are never returned, so keep anything sensitive out of a tenant datasource URL or `jsonData`.
 
@@ -358,7 +360,7 @@ After each write it reads back permissions up to 12 times, 10 seconds apart, req
 After all tenants, the job waits once for `grafana.orgMapping.settleSeconds` (default 120) for login visibility only.
 
 Folder permission changes persist. Rollback: unset tenant org ids, remove all tenant Grafana groups, sync Grafana and the tenant-orgs addon, and explicitly restore any stripped folder grants as an administrator.
-Disabling removes tenant organization mapping but does not undo permission writes.
+Removing the groups removes tenant organization mapping but does not undo permission writes.
 Until a tenant's org id enables its protected home dashboard, a tenant with Edit can delete an empty parent; rerun the job to recreate it and restore grants.
 
 ```yaml

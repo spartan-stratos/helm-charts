@@ -1,4 +1,5 @@
 {{- if eq .Values.mode "applications" }}
+{{- include "lgtm-stack.validateRemovedGrafanaKeys" . }}
 {{- include "lgtm-stack.validateTenantDashboards" . }}
 {{- $mapping := include "lgtm-stack.orgMapping" . }}
 {{- $_ := required "argocd.project is required" .Values.argocd.project }}
