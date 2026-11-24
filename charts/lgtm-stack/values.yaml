@@ -79,6 +79,8 @@ grafana:
     platformNamespaces: [monitoring]
   tenantFolders:
     enabled: false
+    # Passed to the job but not read by it today: the job waits only on orgMapping.settleSeconds.
+    settleSeconds: 60
   # Map Keycloak groups to tenant organizations when explicitly enabled.
   orgMapping:
     enabled: false
