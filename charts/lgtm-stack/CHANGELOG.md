@@ -21,7 +21,7 @@ All notable changes to this project will be documented in this file.
 * Protect tenant parent folders with a provisioned home dashboard, delivered only after an existing organization id is configured.
 * Reject platform namespace overlap, empty platform namespace lists and conflicting custom sidecars.
 * Verify configured tenant organization ids; add the admin before org-header requests and retry folder permission read-back up to 12 times at 10s, keeping the fixed settle for org mapping only.
-* Log tenant organization ids for the second onboarding step. Without org ids, org mapping still provisions folders but no dashboard delivery resources. With org mapping off and no org ids, rendering is unchanged.
+* Log tenant organization ids for the second onboarding step. Without org ids, org mapping still provisions folders but no dashboard delivery resources. With no tenant groups, rendering is unchanged.
 
 ## 0.11.4 (2026-11-23)
 
