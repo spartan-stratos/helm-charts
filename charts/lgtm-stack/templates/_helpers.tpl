@@ -191,6 +191,10 @@ tenantRules:
   app: tenant-rules
   wave: 32
   files: []
+logRules:
+  app: log-rules
+  wave: 49
+  files: []
 tenantOrgs:
   app: grafana-tenant-orgs
   wave: 61
@@ -245,7 +249,58 @@ instrumentation:
 {{- $key := index . 1 -}}
 {{- $v := $.Values -}}
 {{- $mapping := include "lgtm-stack.orgMapping" $ -}}
-{{- if eq $key "kubePrometheusStack" }}
+{{- if and (eq $key "loki") $v.logRules.enabled }}
+{{- $containers := list }}
+{{- $volumes := list (dict "name" "rules-platform" "configMap" (dict "name" "loki-rules-platform")) }}
+{{- $mounts := list (dict "name" "rules-platform" "mountPath" "/rules/platform" "readOnly" true) }}
+{{- $overrides := dict }}
+{{- $alertmanager := "http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093" }}
+{{- $index := 0 }}
+{{- /* Sidecars share the pod network, so the default health port 8080 collides for a second tenant. */}}
+{{- range $tenant := $v.tenants }}
+{{- if $tenant.namespaces }}
+{{- $healthPort := add 8080 $index }}
+{{- $volume := printf "rules-%d" $index }}
+{{- $path := printf "/rules/%s" $tenant.id }}
+{{- $ruleNamespaces := $tenant.namespaces }}
+{{- if hasKey $tenant "ruleNamespaces" }}{{ $ruleNamespaces = $tenant.ruleNamespaces }}{{ end }}
+{{- $volumes = append $volumes (dict "name" $volume "emptyDir" dict) }}
+{{- $mounts = append $mounts (dict "name" $volume "mountPath" $path "readOnly" true) }}
+{{- $env := list }}
+{{- range $name, $value := dict "LABEL" "loki_rule" "FOLDER" $path "NAMESPACE" (join "," $ruleNamespaces) "RESOURCE" "configmap" "METHOD" "WATCH" "UNIQUE_FILENAMES" "true" "HEALTH_PORT" (toString $healthPort) "WATCH_SERVER_TIMEOUT" "60" "WATCH_CLIENT_TIMEOUT" "60" }}
+{{- $env = append $env (dict "name" $name "value" $value) }}
+{{- end }}
+{{- $security := dict "readOnlyRootFilesystem" true "allowPrivilegeEscalation" false "capabilities" (dict "drop" (list "ALL")) "seccompProfile" (dict "type" "RuntimeDefault") }}
+{{- /* Isolate writable volumes because k8s-sidecar-target-directory can override FOLDER. */}}
+{{- $containers = append $containers (dict "name" (printf "rules-%s" $tenant.id) "image" $v.logRules.sidecar.image "env" $env "ports" (list (dict "name" (printf "http-rules-%d" $index) "containerPort" $healthPort)) "resources" $v.logRules.sidecar.resources "securityContext" $security "volumeMounts" (list (dict "name" $volume "mountPath" $path))) }}
+{{- $index = int (add1 $index) }}
+{{- /* Loki has no enforcedNamespaceLabel, so keep tenant namespaces to prevent routing forged alerts to the shared channel. */}}
+{{- $relabels := list (dict "action" "keep" "source_labels" (list "namespace") "regex" (printf "^(%s)$" (join "|" $tenant.namespaces))) (dict "action" "replace" "target_label" "tenant" "replacement" $tenant.id) }}
+{{- $_ := set $overrides $tenant.id (dict "ruler_max_rule_groups_per_tenant" $v.logRules.limits.maxRuleGroupsPerTenant "ruler_max_rules_per_rule_group" $v.logRules.limits.maxRulesPerRuleGroup "ruler_alertmanager_config" (dict "alertmanager_url" $alertmanager "enable_alertmanager_v2" true "alert_relabel_configs" $relabels)) }}
+{{- end }}
+{{- end }}
+loki:
+  rulerConfig:
+    wal:
+      dir: /var/loki/ruler-wal
+    storage:
+      type: local
+      local:
+        directory: /rules
+    rule_path: /var/loki/rules-tmp
+    alertmanager_url: {{ $alertmanager }}
+    enable_alertmanager_v2: true
+    enable_api: true
+    ring:
+      kvstore:
+        store: inmemory
+  runtimeConfig:
+    overrides: {{ toYaml $overrides | nindent 6 }}
+singleBinary:
+  extraVolumes: {{ toYaml $volumes | nindent 4 }}
+  extraVolumeMounts: {{ toYaml $mounts | nindent 4 }}
+  extraContainers: {{ toYaml $containers | nindent 4 }}
+{{- else if eq $key "kubePrometheusStack" }}
 {{- with $v.placement.tolerations }}
 prometheus-node-exporter:
   tolerations: {{- toYaml . | nindent 4 }}

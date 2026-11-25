@@ -1,0 +1,100 @@
+{{- if and (eq .Values.mode "addon") (eq .Values.addon "logRules") .Values.logRules.enabled }}
+{{- $active := list }}
+{{- range .Values.tenants }}
+{{- if .namespaces }}{{ $active = append $active . }}{{ end }}
+{{- end }}
+{{- range $tenant := $active }}
+{{- $ruleNamespaces := $tenant.namespaces }}
+{{- if hasKey $tenant "ruleNamespaces" }}{{ $ruleNamespaces = $tenant.ruleNamespaces }}{{ end }}
+{{- /* Rule namespaces must exist locally because missing namespaces fail addon sync. */}}
+{{- range $ruleNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: loki-rules-{{ $tenant.id }}
+  namespace: {{ . }}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: loki-rules-{{ $tenant.id }}
+  namespace: {{ . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: loki-rules-{{ $tenant.id }}
+subjects:
+  - kind: ServiceAccount
+    name: loki
+    namespace: {{ $.Values.namespace }}
+{{- end }}
+{{- end }}
+{{- if $active }}
+{{- $o := "{{" }}{{ $c := "}}" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-rules-platform
+  namespace: {{ .Values.namespace }}
+data:
+  canary.yaml: |
+    groups:
+      - name: lgtm-log-rules-canary
+        rules:
+          - record: lgtm:log_rules_canary
+            expr: vector(1)
+          - alert: LokiRuleListFailing
+            expr: 'sum(count_over_time({namespace="{{ .Values.namespace }}", container="loki"} |= "unable to list rules" [5m])) > 0'
+            for: 5m
+            labels:
+              severity: critical
+              namespace: {{ .Values.namespace }}
+            annotations:
+              summary: '{{ $o }} $value {{ $c }} rule list failures in 5m; expected 0.'
+              description: 'A malformed tenant log rule ConfigMap stops rule sync for every tenant and none load after a restart. Check the Loki log line for the tenant and file named in it first.'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lgtm-log-rules
+  namespace: {{ .Values.namespace }}
+spec:
+  groups:
+    - name: lgtm-log-rules
+      rules:
+{{- $o := "{{" }}{{ $c := "}}" }}
+        - alert: LokiRulerEvaluationFailures
+          expr: increase(loki_prometheus_rule_evaluation_failures_total[10m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+            namespace: {{ .Values.namespace }}
+          annotations:
+            summary: '{{ $o }} $value {{ $c }} log rule evaluation failures in 10m; expected 0.'
+            description: 'Tenant log alert rules may be silenced. Check the Loki pod and tenant rule ConfigMaps first.'
+        - alert: LokiRulerAlertSendFailures
+          expr: increase(loki_prometheus_notifications_errors_total[10m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+            namespace: {{ .Values.namespace }}
+          annotations:
+            summary: '{{ $o }} $value {{ $c }} log alert send failures in 10m; expected 0.'
+            description: 'Tenant log alerts may be silenced. Check the Loki pod and Alertmanager connectivity first.'
+        - alert: LokiLogRulesNotLoaded
+          expr: absent(loki_prometheus_rule_group_rules{user="platform", rule_group=~".*;lgtm-log-rules-canary"})
+          for: 10m
+          labels:
+            severity: critical
+            namespace: {{ .Values.namespace }}
+          annotations:
+            summary: '0 log rule groups loaded for 10m; expected the platform canary.'
+            description: 'No tenant log alert rule is evaluating; check the Loki log for "unable to list rules" first.'
+{{- end }}
+{{- end }}

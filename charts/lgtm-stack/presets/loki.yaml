@@ -86,7 +86,7 @@ test:
   enabled: false
 minio:
   enabled: false
-# No ruler in Lite; the sidecar was OOM-killed in the spike
+# Keep the upstream sidecar off because logRules adds per-tenant sidecars.
 sidecar:
   rules:
     enabled: false

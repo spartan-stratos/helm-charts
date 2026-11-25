@@ -127,6 +127,7 @@ Before the first sync, the target cluster needs the `gp3-enc-retain` StorageClas
 | `lgtm-grafana` | 40 | `grafana` + `presets/grafana.yaml` (+ `grafana-sso-<provider>.yaml`) |
 | `lgtm-dashboards` | 41 | Dashboard ConfigMaps from `files/dashboards/` |
 | `lgtm-project` | 42 | The project folder: its dashboards and rules (only with `project.enabled`) |
+| `lgtm-log-rules` | 49 | Tenant rule ConfigMap read permissions, platform canary and ruler health alerts (only with `logRules.enabled` and tenant namespaces) |
 | `lgtm-loki` | 50 | `loki` + `presets/loki.yaml` |
 | `lgtm-grafana-datasources` | 51 | Loki and Tempo datasource ConfigMaps |
 | `lgtm-alloy` | 52 | `alloy` + `presets/alloy.yaml` |
@@ -161,6 +162,11 @@ default. Lists are replaced, not appended.
 | `argocd.syncPolicy` | automated, retry 10 | Shared syncPolicy. `RespectIgnoreDifferences=true` is added where diffs are ignored |
 | `cluster.name` | `""` | `cluster` label on metrics, logs and Slack messages. Required |
 | `tenantIsolation.enabled` | `false` | Enable tenant logs and traces only when backend tenant authentication is enabled |
+| `logRules.enabled` | `false` | Enable tenant Loki rules; requires Loki, tenant isolation and explicit Loki authentication |
+| `logRules.sidecar.image` | `docker.io/kiwigrid/k8s-sidecar:2.11.2` | Rule ConfigMap watcher image |
+| `logRules.sidecar.resources` | requests: 10m CPU, 64Mi; memory limit: 128Mi | Resources per tenant sidecar |
+| `logRules.limits.maxRuleGroupsPerTenant` / `.maxRulesPerRuleGroup` | `10` / `10` | Maximum groups per tenant and rules per group |
+| `tenants[].ruleNamespaces` | tenant's `namespaces` | Subset containing rule ConfigMaps on the Loki cluster |
 | `placement.nodeSelector` / `.tolerations` | `{}` / `[]` | Pin every pod, e.g. to a dedicated node. Alloy and node-exporter (DaemonSets that read their own node) take only the tolerations, so they run on every node the tolerations admit; with a nodeSelector Alloy's Service uses `internalTrafficPolicy: Cluster`. To cover node pools with other taints, override both DaemonSets' tolerations under `components` |
 | `grafana.domain` | `""` | `root_url` and Ingress host |
 | `grafana.ingress.enabled` / `.className` / `.annotations` | `false` / `alb` / `{}` | Grafana Ingress |
@@ -476,6 +482,33 @@ The operator and referenced store must already exist. `secretStore.name`, `secre
 `htpasswdSecret.name` are required. `property` and `htpasswdSecret.key` default to `htpasswd`;
 `refreshInterval` defaults to `1h`. The target uses `creationPolicy: Owner` and `deletionPolicy: Retain`.
 Without this option, create the gateway-side Secret separately. Store only references in chart values.
+
+## Tenant log alert rules
+
+Set `logRules.enabled: true` with `tenantIsolation.enabled: true`,
+`components.loki.enabled: true` and `components.loki.values.loki.auth_enabled: true`.
+Each tenant puts ConfigMaps labelled `loki_rule` in its `ruleNamespaces`;
+their data contains Loki ruler `groups` files. `ruleNamespaces` defaults to the
+tenant's `namespaces` and must be a subset. Those namespaces must exist on the Loki
+cluster, and the ArgoCD project must allow them as destinations. This allows a
+tenant's development namespace to exist only on a remote cluster.
+
+Rules see the tenant's OTLP logs sent through the gateway. A tenant is the isolation
+boundary: its namespaces can read each other's logs. Node stdout logs belong to the
+platform tenant. Every alert rule needs a STATIC `namespace` label set to one of the
+tenant's namespaces. Alerts without it, or with another namespace, are dropped.
+
+Each sidecar can write only its own tenant's rule volume. Sidecars share the Loki
+pod, so adding or removing a tenant restarts Loki. A malformed tenant rule stops
+sync for every tenant; after a restart no groups load. `LokiRuleListFailing` detects
+the error log and `LokiLogRulesNotLoaded` detects a missing platform canary. Check
+the Loki log for "unable to list rules" and the tenant and file named there first.
+
+Limits apply per tenant: `logRules.limits.maxRuleGroupsPerTenant` defaults to 10
+groups, and `maxRulesPerRuleGroup` defaults to 10 rules per group. When enabled,
+logRules owns `singleBinary.extraContainers`, `singleBinary.extraVolumes`,
+`singleBinary.extraVolumeMounts`, `loki.rulerConfig` and `loki.runtimeConfig`;
+setting those keys under `components.loki.values` fails rendering.
 
 ## Dashboards
 
