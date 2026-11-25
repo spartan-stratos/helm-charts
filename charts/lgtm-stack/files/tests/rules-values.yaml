@@ -1,6 +1,9 @@
 # Values test-rules.sh renders the rule bundles with: one override that tightens, one that turns a service off
 cluster:
   name: test
+tenants:
+  - id: shop
+    namespaces: [shop-prod]
 retention:
   loki: 2592000
   tempo: 1296000
