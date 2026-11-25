@@ -508,7 +508,7 @@ The canary ConfigMap mounts at `/rules/<platformTenant>` (default `/rules/platfo
 The mount is optional so a missing ConfigMap does not keep the only Loki pod in
 ContainerCreating; `LokiLogRulesNotLoaded` checks the configured `platformTenant`.
 The canary group contains only `LokiRuleListFailing`, with no recording rule because
-no remote write is configured. Its query excludes lines containing `count_over_time`
+no remote write is configured. Its query matches the parsed `msg` field
 because Loki logs each ruler query's text, which would otherwise match itself.
 
 Limits apply per tenant: `logRules.limits.maxRuleGroupsPerTenant` defaults to 10

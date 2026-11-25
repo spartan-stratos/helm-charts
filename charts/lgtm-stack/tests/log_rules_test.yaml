@@ -279,8 +279,8 @@ tests:
               - name: lgtm-log-rules-canary
                 rules:
                   - alert: LokiRuleListFailing
-                    # Loki logs each ruler query's text, so without the exclusion the alert matches its own query log.
-                    expr: 'sum(count_over_time({namespace="monitoring", container="loki"} |= "unable to list rules" != "count_over_time" [5m])) > 0'
+                    # Loki logs each ruler query's text, so match the parsed msg field rather than the raw phrase.
+                    expr: 'sum(count_over_time({namespace="monitoring", container="loki"} |= "unable to list rules" | logfmt | msg = "unable to list rules" [5m])) > 0'
                     for: 5m
                     labels:
                       severity: critical
@@ -359,6 +359,13 @@ tests:
       tenants: [{ id: a, namespaces: [shared], port: 4320 }, { id: b, namespaces: [shared], port: 4321 }]
     asserts:
       - failedTemplate: { errorMessage: 'tenant b namespace shared appears in another tenant' }
+  - it: rejects empty rule namespaces
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [a-dev], ruleNamespaces: [], port: 4320 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant a ruleNamespaces must not be empty; omit it to use namespaces' }
   - it: rejects rule namespaces outside the tenant
     template: templates/applications.yaml
     set:

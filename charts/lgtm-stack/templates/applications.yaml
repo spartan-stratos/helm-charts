@@ -13,6 +13,8 @@
 {{- end }}
 {{- $namespaces := dict }}
 {{- range $tenant := .Values.tenants }}
+{{- /* k8s-sidecar with an empty NAMESPACE watches its own namespace. */}}
+{{- if and (hasKey $tenant "ruleNamespaces") (empty $tenant.ruleNamespaces) }}{{ fail (printf "tenant %s ruleNamespaces must not be empty; omit it to use namespaces" $tenant.id) }}{{ end }}
 {{- range $namespace := concat ($tenant.namespaces | default list) ($tenant.ruleNamespaces | default list) }}
 {{- if or (not (kindIs "string" $namespace)) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" (toString $namespace))) }}{{ fail (printf "tenant %s namespace %v must be a DNS-1123 label" $tenant.id $namespace) }}{{ end }}
 {{- if eq $namespace $.Values.namespace }}{{ fail (printf "tenant %s namespace %s must not equal the monitoring namespace" $tenant.id $namespace) }}{{ end }}

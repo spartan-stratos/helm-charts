@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.18.0 (2026-11-25)
+
+### Features
+
+* Add opt-in `logRules` with a per-tenant Loki ruler, one sidecar and volume per tenant, and render guards. Per-tenant alert relabeling keeps the tenant namespaces and stamps `tenant`.
+* Add canary alerts `LokiRuleListFailing` and `LokiLogRulesNotLoaded`.
+* Enabling `logRules` or adding or removing a tenant restarts Loki. A malformed tenant rule stops rule sync for every tenant.
+
 ## 0.17.0 (2026-11-25)
 
 ### Features

@@ -48,8 +48,8 @@ data:
       - name: lgtm-log-rules-canary
         rules:
           - alert: LokiRuleListFailing
-            # Loki logs each ruler query's text, so without the exclusion the alert matches its own query log.
-            expr: 'sum(count_over_time({namespace="{{ .Values.namespace }}", container="loki"} |= "unable to list rules" != "count_over_time" [5m])) > 0'
+            # Loki logs each ruler query's text, so match the parsed msg field rather than the raw phrase.
+            expr: 'sum(count_over_time({namespace="{{ .Values.namespace }}", container="loki"} |= "unable to list rules" | logfmt | msg = "unable to list rules" [5m])) > 0'
             for: 5m
             labels:
               severity: critical
