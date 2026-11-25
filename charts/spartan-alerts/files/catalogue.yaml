@@ -1,6 +1,7 @@
 rules:
 - alert: ContainerRestarting
   prefixable: true
+  perWorkload: true
   catalogueId: container-restarting
   sources:
   - kubeState
@@ -14,6 +15,7 @@ rules:
   description: "The app container restarted in the last 10 minutes (crash or out-of-memory kill). Read the previous container's logs with kubectl -n ${NAMESPACE} logs {{ $labels.pod }} --previous."
 - alert: PodStuckWaiting
   prefixable: true
+  perWorkload: true
   catalogueId: pod-stuck-waiting
   sources:
   - kubeState
@@ -27,6 +29,7 @@ rules:
   description: "A container has been in CrashLoopBackOff or an image pull error for 5 minutes, so the pod will not become ready. Run kubectl -n ${NAMESPACE} describe pod {{ $labels.pod }} for the event and image or crash cause."
 - alert: PodFailed
   prefixable: true
+  perWorkload: true
   catalogueId: pod-failed
   sources:
   - kubeState
@@ -41,6 +44,7 @@ rules:
   description: "The pod has been Failed for 5 minutes. Describe the pod and check its container logs."
 - alert: NoReadyPods
   prefixable: true
+  perWorkload: true
   catalogueId: no-ready-pods
   sources:
   - kubeState
@@ -54,6 +58,7 @@ rules:
   description: "No pod has been Running for 5 minutes. Check kubectl -n ${NAMESPACE} get pods and describe the newest pod for the scheduling or image error."
 - alert: MemoryNearLimit
   prefixable: true
+  perWorkload: true
   catalogueId: memory-near-limit
   sources:
   - cadvisor
@@ -68,6 +73,7 @@ rules:
   description: "Working-set memory stayed above ${THRESHOLD} of the container limit for 5 minutes (configured threshold), so an out-of-memory kill is near. Check for growth in heap or off-heap use before raising the limit."
 - alert: CpuHigh
   prefixable: true
+  perWorkload: true
   catalogueId: cpu-high
   sources:
   - cadvisor
@@ -83,6 +89,7 @@ rules:
   description: "CPU use stayed above ${THRESHOLD} of the container limit for 5 minutes (configured threshold). Check for a load spike or a busy loop before raising the limit."
 - alert: CpuThrottled
   prefixable: true
+  perWorkload: true
   catalogueId: cpu-throttled
   sources:
   - cadvisor
@@ -97,6 +104,7 @@ rules:
   description: "The kernel throttled the container above ${THRESHOLD} of scheduling periods for 15 minutes, so requests slow down even when CPU use looks low. Raise the CPU limit or reduce load."
 - alert: OomKilled
   prefixable: true
+  perWorkload: true
   catalogueId: oom-killed
   sources:
   - cadvisor

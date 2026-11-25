@@ -175,3 +175,36 @@ tests:
             name: namespace
             matchType: "!="
             value: alerts-test
+  - it: "should add workload to inhibition, grouping and Slack text when workloads are set"
+    set:
+      catalogue.enabled: true
+      catalogue.workloads[0].name: alpha
+      catalogue.workloads[0].container: api
+      catalogue.workloads[0].podRegex: api-.+
+    asserts:
+      - equal:
+          path: spec.inhibitRules[0].equal
+          value: [namespace, catalogue_id, workload, pod, dimension_DBInstanceIdentifier, dimension_CacheClusterId]
+        documentIndex: 0
+      - equal:
+          path: spec.route.groupBy
+          value: [alertname, namespace, service, workload]
+        documentIndex: 0
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: 'workload=\{\{ \.Labels\.workload \}\}'
+        documentIndex: 0
+  - it: "should keep grouping and Slack text unchanged without workloads"
+    set:
+      catalogue.enabled: true
+      catalogue.container: app
+      catalogue.podRegex: app-.*
+    asserts:
+      - equal:
+          path: spec.route.groupBy
+          value: [alertname, namespace, service]
+        documentIndex: 0
+      - notMatchRegex:
+          path: spec.receivers[0].slackConfigs[0].text
+          pattern: workload
+        documentIndex: 0

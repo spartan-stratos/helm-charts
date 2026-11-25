@@ -1,7 +1,11 @@
 {{- if .Values.catalogue.enabled -}}
 {{- $cfg := .Values.catalogue -}}
 {{- if eq .Values.nameSuffix "catalogue" -}}{{- fail "nameSuffix must not be catalogue" -}}{{- end -}}
-{{- if or $cfg.sources.kubeState $cfg.sources.cadvisor -}}
+{{- $workloads := default (list) $cfg.workloads -}}
+{{- if $workloads -}}
+{{/* WHY: workloads own container and podRegex; a scalar beside them would be silently ignored. */}}
+{{- if or $cfg.container $cfg.podRegex -}}{{- fail "catalogue.container and catalogue.podRegex must be empty when catalogue.workloads is set" -}}{{- end -}}
+{{- else if or $cfg.sources.kubeState $cfg.sources.cadvisor -}}
 {{- $_ := required "catalogue.container is required" $cfg.container -}}
 {{- $_ := required "catalogue.podRegex is required" $cfg.podRegex -}}
 {{- end -}}
@@ -14,43 +18,74 @@
 {{- if not (has $field (list "threshold" "for" "severity" "enabled")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
 {{- end -}}
 {{- end -}}
+{{- $names := dict -}}
+{{- $prefixes := dict -}}
+{{- range $index, $workload := $workloads -}}
+{{- range $field, $value := $workload -}}
+{{- if not (has $field (list "name" "container" "podRegex" "alertPrefix" "overrides")) -}}{{- fail (printf "unknown workload field: %s" $field) -}}{{- end -}}
+{{- end -}}
+{{- $_ := required (printf "catalogue.workloads[%d].name is required" $index) $workload.name -}}
+{{- $_ := required (printf "catalogue.workloads[%d].container is required" $index) $workload.container -}}
+{{- $_ := required (printf "catalogue.workloads[%d].podRegex is required" $index) $workload.podRegex -}}
+{{- if hasKey $names $workload.name -}}{{- fail (printf "duplicate workload name: %s" $workload.name) -}}{{- end -}}
+{{- $_ := set $names $workload.name true -}}
+{{- if $workload.alertPrefix -}}
+{{- if hasKey $prefixes $workload.alertPrefix -}}{{- fail (printf "duplicate workload alertPrefix: %s" $workload.alertPrefix) -}}{{- end -}}
+{{- $_ := set $prefixes $workload.alertPrefix true -}}
+{{- end -}}
+{{- range $name, $override := (default (dict) $workload.overrides) -}}
+{{- if not (hasKey $known $name) -}}{{- fail (printf "unknown override key: %s" $name) -}}{{- end -}}
+{{- range $field, $value := $override -}}
+{{- if not (has $field (list "threshold" "for" "severity" "enabled")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- $rules := list -}}
 {{- $pairs := dict -}}
 {{- range $catalogue -}}
 {{- $entry := . -}}
-{{- $override := default (dict) (index $cfg.overrides .alert) -}}
-{{- $severity := .severity -}}
+{{/* WHY: with no workloads the scalar values act as one unnamed workload, so output matches 0.3.0. */}}
+{{- $targets := list (dict "name" "" "container" $cfg.container "podRegex" $cfg.podRegex "alertPrefix" $cfg.alertPrefix "overrides" (dict)) -}}
+{{- if and $entry.perWorkload $workloads -}}{{- $targets = $workloads -}}{{- end -}}
+{{- range $target := $targets -}}
+{{- $override := dict -}}
+{{- range $field, $value := (default (dict) (index $cfg.overrides $entry.alert)) -}}{{- $_ := set $override $field $value -}}{{- end -}}
+{{- range $field, $value := (default (dict) (index (default (dict) (index $target "overrides")) $entry.alert)) -}}{{- $_ := set $override $field $value -}}{{- end -}}
+{{- $severity := $entry.severity -}}
 {{- if hasKey $override "severity" -}}{{- $severity = $override.severity -}}{{- end -}}
-{{- if not (has $severity (list "warning" "critical")) -}}{{- fail (printf "bad severity for %s" .alert) -}}{{- end -}}
-{{- $threshold := .threshold -}}
-{{- if eq .alert "RdsStorageLow" -}}{{- $threshold = $cfg.rds.storageWarningBytes -}}{{- end -}}
-{{- if eq .alert "RdsStorageCritical" -}}{{- $threshold = $cfg.rds.storageCriticalBytes -}}{{- end -}}
+{{- if not (has $severity (list "warning" "critical")) -}}{{- fail (printf "bad severity for %s" $entry.alert) -}}{{- end -}}
+{{- $threshold := $entry.threshold -}}
+{{- if eq $entry.alert "RdsStorageLow" -}}{{- $threshold = $cfg.rds.storageWarningBytes -}}{{- end -}}
+{{- if eq $entry.alert "RdsStorageCritical" -}}{{- $threshold = $cfg.rds.storageCriticalBytes -}}{{- end -}}
 {{- if hasKey $override "threshold" -}}{{- $threshold = $override.threshold -}}{{- end -}}
 {{- $number := float64 $threshold -}}
-{{- if and (eq .unit "ratio") (or (le $number 0.0) (gt $number 1.0)) -}}{{- fail (printf "ratio threshold outside (0,1] for %s" .alert) -}}{{- end -}}
-{{- if and (eq .unit "percent") (or (le $number 0.0) (gt $number 100.0)) -}}{{- fail (printf "percent threshold outside (0,100] for %s" .alert) -}}{{- end -}}
+{{- if and (eq $entry.unit "ratio") (or (le $number 0.0) (gt $number 1.0)) -}}{{- fail (printf "ratio threshold outside (0,1] for %s" $entry.alert) -}}{{- end -}}
+{{- if and (eq $entry.unit "percent") (or (le $number 0.0) (gt $number 100.0)) -}}{{- fail (printf "percent threshold outside (0,100] for %s" $entry.alert) -}}{{- end -}}
 {{- $enabled := true -}}
-{{- range .sources -}}{{- if not (index $cfg.sources .) -}}{{- $enabled = false -}}{{- end -}}{{- end -}}
+{{- range $entry.sources -}}{{- if not (index $cfg.sources .) -}}{{- $enabled = false -}}{{- end -}}{{- end -}}
 {{- if and (hasKey $override "enabled") (not $override.enabled) -}}{{- $enabled = false -}}{{- end -}}
-{{- if and (eq .unit "bytes") (eq $number 0.0) -}}{{- $enabled = false -}}{{- end -}}
+{{- if and (eq $entry.unit "bytes") (eq $number 0.0) -}}{{- $enabled = false -}}{{- end -}}
 {{- if $enabled -}}
-{{- $pair := printf "%s/%s" .catalogueId $severity -}}
-{{- if hasKey $pairs $pair -}}{{- fail (printf "same-severity pair for %s" .catalogueId) -}}{{- end -}}
+{{- $pair := printf "%s/%s/%s" $target.name $entry.catalogueId $severity -}}
+{{- if hasKey $pairs $pair -}}{{- fail (printf "same-severity pair for %s" $entry.catalogueId) -}}{{- end -}}
 {{- $_ := set $pairs $pair true -}}
 {{- $formatted := printf "%.10f" $number | trimSuffix "0000000000" | trimSuffix "." -}}
 {{- if contains "." $formatted -}}{{- $formatted = regexReplaceAll "0+$" $formatted "" -}}{{- end -}}
-{{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $cfg.container "${POD_SELECTOR}" (printf "pod=~%s" ($cfg.podRegex | quote)) "${HTTP_SELECTOR}" (default (printf "service_name=%s" ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" $.Values.service.short -}}
-{{- $texts := dict "expr" .expr "summary" .summary "description" .description -}}
+{{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $target.container "${POD_SELECTOR}" (printf "pod=~%s" ($target.podRegex | quote)) "${WORKLOAD}" $target.name "${HTTP_SELECTOR}" (default (printf "service_name=%s" ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" $.Values.service.short -}}
+{{- $texts := dict "expr" $entry.expr "summary" $entry.summary "description" $entry.description -}}
 {{- range $field, $text := $texts -}}
 {{- range $token, $value := $tokens -}}{{- $text = replace $token $value $text -}}{{- end -}}
 {{- $_ := set $texts $field $text -}}
 {{- end -}}
 {{- $annotations := dict "summary" $texts.summary "description" $texts.description -}}
 {{- if $cfg.runbookUrl -}}{{- $_ := set $annotations "runbook_url" $cfg.runbookUrl -}}{{- end -}}
-{{- $name := .alert -}}
-{{- if .prefixable -}}{{- $name = printf "%s%s" $cfg.alertPrefix .alert -}}{{- end -}}
-{{- $duration := .for -}}{{- if hasKey $override "for" -}}{{- $duration = $override.for -}}{{- end -}}
-{{- $rules = append $rules (dict "alert" $name "expr" $texts.expr "for" $duration "labels" (dict "namespace" $.Release.Namespace "severity" $severity "tier" (ternary "P2" "P3" (eq $severity "critical")) "catalogue_id" .catalogueId) "annotations" $annotations) -}}
+{{- $name := $entry.alert -}}
+{{- if $entry.prefixable -}}{{- $name = printf "%s%s" (default $cfg.alertPrefix (index $target "alertPrefix")) $entry.alert -}}{{- end -}}
+{{- $duration := $entry.for -}}{{- if hasKey $override "for" -}}{{- $duration = $override.for -}}{{- end -}}
+{{- $labels := dict "namespace" $.Release.Namespace "severity" $severity "tier" (ternary "P2" "P3" (eq $severity "critical")) "catalogue_id" $entry.catalogueId -}}
+{{- if $target.name -}}{{- $_ := set $labels "workload" $target.name -}}{{- end -}}
+{{- $rules = append $rules (dict "alert" $name "expr" $texts.expr "for" $duration "labels" $labels "annotations" $annotations) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 apiVersion: monitoring.coreos.com/v1

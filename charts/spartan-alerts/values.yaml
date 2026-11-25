@@ -21,6 +21,7 @@ catalogue:
   alertPrefix: ""
   container: ""
   podRegex: ""
+  workloads: []
   httpSelector: ""
   tagProject: ""
   runbookUrl: ""
