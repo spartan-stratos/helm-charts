@@ -16,3 +16,15 @@ externalSecrets:
   serviceAccount: alert-secrets
   roleArn: ""
 groups: []
+catalogue:
+  enabled: false
+  alertPrefix: ""
+  container: ""
+  podRegex: ""
+  httpSelector: ""
+  tagProject: ""
+  runbookUrl: ""
+  sources: {kubeState: true, cadvisor: true, http: true, probe: true, rds: false, elasticache: false}
+  rds: {storageWarningBytes: 0, storageCriticalBytes: 0}
+  inhibit: true
+  overrides: {}

@@ -1,0 +1,267 @@
+rules:
+- alert: ContainerRestarting
+  prefixable: true
+  catalogueId: container-restarting
+  sources:
+  - kubeState
+  severity: critical
+  unit: count
+  threshold: 0
+  for: 1m
+  expr: |-
+    max by (pod) (increase(kube_pod_container_status_restarts_total{namespace="${NAMESPACE}",container="${CONTAINER}",${POD_SELECTOR}}[10m])) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} pod {{ $labels.pod }} restarted"
+  description: "The app container restarted in the last 10 minutes (crash or out-of-memory kill). Read the previous container's logs with kubectl -n ${NAMESPACE} logs {{ $labels.pod }} --previous."
+- alert: PodStuckWaiting
+  prefixable: true
+  catalogueId: pod-stuck-waiting
+  sources:
+  - kubeState
+  severity: critical
+  unit: count
+  threshold: 1
+  for: 5m
+  expr: |-
+    max by (pod) (max_over_time(kube_pod_container_status_waiting_reason{namespace="${NAMESPACE}",${POD_SELECTOR},container="${CONTAINER}",reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull"}[3m])) == ${THRESHOLD}
+  summary: "${SERVICE_SHORT} pod {{ $labels.pod }} is crash-looping or cannot pull its image"
+  description: "A container has been in CrashLoopBackOff or an image pull error for 5 minutes, so the pod will not become ready. Run kubectl -n ${NAMESPACE} describe pod {{ $labels.pod }} for the event and image or crash cause."
+- alert: PodFailed
+  prefixable: true
+  catalogueId: pod-failed
+  sources:
+  - kubeState
+  severity: critical
+  unit: count
+  threshold: 0
+  for: 5m
+  expr: |-
+    max by (pod) (kube_pod_status_phase{namespace="${NAMESPACE}",${POD_SELECTOR},phase="Failed"}) > ${THRESHOLD}
+    unless on(pod) kube_pod_status_reason{namespace="${NAMESPACE}",${POD_SELECTOR},reason="Evicted"} == 1
+  summary: "${SERVICE_SHORT} pod {{ $labels.pod }} failed"
+  description: "The pod has been Failed for 5 minutes. Describe the pod and check its container logs."
+- alert: NoReadyPods
+  prefixable: true
+  catalogueId: no-ready-pods
+  sources:
+  - kubeState
+  severity: critical
+  unit: count
+  threshold: 0
+  for: 5m
+  expr: |-
+    sum(kube_pod_status_phase{namespace="${NAMESPACE}",${POD_SELECTOR},phase="Running"}) == ${THRESHOLD}
+  summary: "${SERVICE_SHORT} has no running pods"
+  description: "No pod has been Running for 5 minutes. Check kubectl -n ${NAMESPACE} get pods and describe the newest pod for the scheduling or image error."
+- alert: MemoryNearLimit
+  prefixable: true
+  catalogueId: memory-near-limit
+  sources:
+  - cadvisor
+  severity: warning
+  unit: ratio
+  threshold: 0.8
+  for: 5m
+  expr: |-
+    max by (pod, container) (container_memory_working_set_bytes{namespace="${NAMESPACE}",container="${CONTAINER}",${POD_SELECTOR}})
+    / on(pod, container) max by (pod, container) (container_spec_memory_limit_bytes{namespace="${NAMESPACE}",container="${CONTAINER}",${POD_SELECTOR}} > 0) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} pod {{ $labels.pod }} memory above ${THRESHOLD} of its limit"
+  description: "Working-set memory stayed above ${THRESHOLD} of the container limit for 5 minutes (configured threshold), so an out-of-memory kill is near. Check for growth in heap or off-heap use before raising the limit."
+- alert: CpuHigh
+  prefixable: true
+  catalogueId: cpu-high
+  sources:
+  - cadvisor
+  - kubeState
+  severity: warning
+  unit: ratio
+  threshold: 0.8
+  for: 5m
+  expr: |-
+    sum by (pod, container) (rate(container_cpu_usage_seconds_total{namespace="${NAMESPACE}",container="${CONTAINER}",${POD_SELECTOR}}[5m]))
+    / on(pod, container) max by (pod, container) (kube_pod_container_resource_limits{namespace="${NAMESPACE}",resource="cpu",container="${CONTAINER}",${POD_SELECTOR}} > 0) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} pod {{ $labels.pod }} CPU above ${THRESHOLD} of its limit"
+  description: "CPU use stayed above ${THRESHOLD} of the container limit for 5 minutes (configured threshold). Check for a load spike or a busy loop before raising the limit."
+- alert: CpuThrottled
+  prefixable: true
+  catalogueId: cpu-throttled
+  sources:
+  - cadvisor
+  severity: warning
+  unit: ratio
+  threshold: 0.25
+  for: 15m
+  expr: |-
+    sum by (pod, container) (increase(container_cpu_cfs_throttled_periods_total{namespace="${NAMESPACE}",container="${CONTAINER}",${POD_SELECTOR}}[15m]))
+    / sum by (pod, container) (increase(container_cpu_cfs_periods_total{namespace="${NAMESPACE}",container="${CONTAINER}",${POD_SELECTOR}}[15m])) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} pod {{ $labels.pod }} CPU throttled above ${THRESHOLD} of periods"
+  description: "The kernel throttled the container above ${THRESHOLD} of scheduling periods for 15 minutes, so requests slow down even when CPU use looks low. Raise the CPU limit or reduce load."
+- alert: OomKilled
+  prefixable: true
+  catalogueId: oom-killed
+  sources:
+  - cadvisor
+  severity: warning
+  unit: count
+  threshold: 0
+  for: 0m
+  expr: |-
+    max by (pod, container) (increase(container_oom_events_total{namespace="${NAMESPACE}",container="${CONTAINER}",${POD_SELECTOR}}[10m])) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} pod {{ $labels.pod }} was out-of-memory killed"
+  description: "The kernel killed a process in the app container for exceeding its memory limit in the last 10 minutes. Check heap and off-heap growth, then the memory limit."
+- alert: HttpP95Slow
+  prefixable: true
+  catalogueId: http-p95-slow
+  sources:
+  - http
+  severity: warning
+  unit: seconds
+  threshold: 1
+  for: 5m
+  expr: |-
+    histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{${HTTP_SELECTOR}}[5m]))) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} HTTP p95 above ${THRESHOLD} seconds"
+  description: "Service-wide HTTP p95 stayed above ${THRESHOLD} seconds for 5 minutes. Check slow requests and downstream dependency latency."
+- alert: Http5xx
+  prefixable: true
+  catalogueId: http5xx
+  sources:
+  - http
+  severity: warning
+  unit: ratio
+  threshold: 0.05
+  for: 5m
+  expr: |-
+    sum(increase(http_server_request_duration_seconds_count{${HTTP_SELECTOR},http_response_status_code=~"5.."}[5m])) >= 2
+    and sum(increase(http_server_request_duration_seconds_count{${HTTP_SELECTOR},http_response_status_code=~"5.."}[5m])) / sum(increase(http_server_request_duration_seconds_count{${HTTP_SELECTOR}}[5m])) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} HTTP 5xx above ${THRESHOLD} with more than 1 error"
+  description: "HTTP 5xx exceeded 1 error per 5 minutes and a ${THRESHOLD} ratio of requests for 5 minutes. The ratio guard suppresses quiet-cluster noise. Check server errors and dependencies."
+- alert: UptimeProbeFailed
+  prefixable: true
+  catalogueId: uptime-probe-failed
+  sources:
+  - probe
+  severity: critical
+  unit: count
+  threshold: 0
+  for: 2m
+  expr: |-
+    min by (instance) (probe_success{namespace="${NAMESPACE}"}) == ${THRESHOLD}
+  summary: "${SERVICE_SHORT} health probe failing for {{ $labels.instance }}"
+  description: "The public health URL returned a non-2xx or no answer for 2 minutes. This proves the app and load balancer path only, not the database, cache or other dependencies. Check the pods and the ALB target health."
+- alert: RdsCpuHigh
+  prefixable: false
+  catalogueId: rds-cpu
+  sources:
+  - rds
+  severity: warning
+  unit: percent
+  threshold: 70
+  for: 5m
+  expr: |-
+    max by (dimension_DBInstanceIdentifier) (aws_rds_cpuutilization_average{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} database {{ $labels.dimension_DBInstanceIdentifier }} CPU above ${THRESHOLD}"
+  description: "Database CPU stayed above ${THRESHOLD} for 5 minutes (configured threshold). Look for a slow query or a load spike before resizing the instance."
+- alert: RdsCpuCritical
+  prefixable: false
+  catalogueId: rds-cpu
+  sources:
+  - rds
+  severity: critical
+  unit: percent
+  threshold: 80
+  for: 5m
+  expr: |-
+    max by (dimension_DBInstanceIdentifier) (aws_rds_cpuutilization_average{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} database {{ $labels.dimension_DBInstanceIdentifier }} CPU above ${THRESHOLD}"
+  description: "Database CPU stayed above ${THRESHOLD} for 5 minutes (configured threshold). Look for a slow query or a load spike before resizing the instance."
+- alert: RdsStorageLow
+  prefixable: false
+  catalogueId: rds-storage
+  sources:
+  - rds
+  severity: warning
+  unit: bytes
+  threshold: 0
+  for: 15m
+  expr: |-
+    min by (dimension_DBInstanceIdentifier) (aws_rds_free_storage_space_minimum{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) < ${THRESHOLD}
+  summary: "${SERVICE_SHORT} database {{ $labels.dimension_DBInstanceIdentifier }} free storage below ${THRESHOLD}"
+  description: "Database free storage stayed below ${THRESHOLD} for 15 minutes. Check storage growth and autoscaling."
+- alert: RdsStorageCritical
+  prefixable: false
+  catalogueId: rds-storage
+  sources:
+  - rds
+  severity: critical
+  unit: bytes
+  threshold: 0
+  for: 15m
+  expr: |-
+    min by (dimension_DBInstanceIdentifier) (aws_rds_free_storage_space_minimum{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) < ${THRESHOLD}
+  summary: "${SERVICE_SHORT} database {{ $labels.dimension_DBInstanceIdentifier }} free storage below ${THRESHOLD}"
+  description: "Database free storage stayed below ${THRESHOLD} for 15 minutes. Check storage growth and autoscaling."
+- alert: ElasticacheCpuHigh
+  prefixable: false
+  catalogueId: elasticache-cpu
+  sources:
+  - elasticache
+  severity: warning
+  unit: percent
+  threshold: 70
+  for: 5m
+  expr: |-
+    max by (dimension_CacheClusterId) (aws_elasticache_engine_cpuutilization_average{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} cache {{ $labels.dimension_CacheClusterId }} engine CPU above ${THRESHOLD}"
+  description: "The cache engine thread stayed above ${THRESHOLD} CPU for 5 minutes (configured threshold). Check for hot keys or a burst of commands before resizing the node."
+- alert: ElasticacheCpuCritical
+  prefixable: false
+  catalogueId: elasticache-cpu
+  sources:
+  - elasticache
+  severity: critical
+  unit: percent
+  threshold: 80
+  for: 5m
+  expr: |-
+    max by (dimension_CacheClusterId) (aws_elasticache_engine_cpuutilization_average{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} cache {{ $labels.dimension_CacheClusterId }} engine CPU above ${THRESHOLD}"
+  description: "The cache engine thread stayed above ${THRESHOLD} CPU for 5 minutes (configured threshold). Check for hot keys or a burst of commands before resizing the node."
+- alert: ElasticacheMemoryHigh
+  prefixable: false
+  catalogueId: elasticache-memory
+  sources:
+  - elasticache
+  severity: warning
+  unit: percent
+  threshold: 70
+  for: 5m
+  expr: |-
+    max by (dimension_CacheClusterId) (aws_elasticache_database_memory_usage_percentage_maximum{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} cache {{ $labels.dimension_CacheClusterId }} memory above ${THRESHOLD}"
+  description: "Cache memory stayed above ${THRESHOLD} for 5 minutes (configured threshold). Keys will start to be evicted near 100%; check key growth and TTLs."
+- alert: ElasticacheMemoryCritical
+  prefixable: false
+  catalogueId: elasticache-memory
+  sources:
+  - elasticache
+  severity: critical
+  unit: percent
+  threshold: 80
+  for: 5m
+  expr: |-
+    max by (dimension_CacheClusterId) (aws_elasticache_database_memory_usage_percentage_maximum{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} cache {{ $labels.dimension_CacheClusterId }} memory above ${THRESHOLD}"
+  description: "Cache memory stayed above ${THRESHOLD} for 5 minutes (configured threshold). Keys will start to be evicted near 100%; check key growth and TTLs."
+- alert: ElasticacheEvictions
+  prefixable: false
+  catalogueId: elasticache-evictions
+  sources:
+  - elasticache
+  severity: warning
+  unit: count
+  threshold: 0
+  for: 0m
+  expr: |-
+    max by (dimension_CacheClusterId) (max_over_time(aws_elasticache_evictions_sum{namespace="${NAMESPACE}",name!="global",tag_Project="${TAG_PROJECT}"}[15m])) > ${THRESHOLD}
+  summary: "${SERVICE_SHORT} cache {{ $labels.dimension_CacheClusterId }} is evicting keys"
+  description: "The cache evicted keys in the last 15 minutes, so it is out of memory and dropping data. Check memory use and key TTLs."

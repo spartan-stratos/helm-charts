@@ -10,6 +10,7 @@ metadata:
   name: ${SERVICE_SHORT}-namespace${NAME_SUFFIX}
   namespace: ${NAMESPACE}
 spec:
+${INHIBIT_RULES}
   route:
     receiver: slack-${SERVICE_SHORT}-${ENV}
     groupBy: [alertname, namespace, service]

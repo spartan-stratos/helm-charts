@@ -1,0 +1,13 @@
+service:
+  name: catalogue-test
+  short: Test
+catalogue:
+  enabled: true
+  alertPrefix: Test
+  container: app
+  podRegex: app-.*
+  sources: {kubeState: true, cadvisor: true, http: true, probe: true, rds: true, elasticache: true}
+  rds: {storageWarningBytes: 1000, storageCriticalBytes: 500}
+  overrides:
+    MemoryNearLimit:
+      threshold: 0.6

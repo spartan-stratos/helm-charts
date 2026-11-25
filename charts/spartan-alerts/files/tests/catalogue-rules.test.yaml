@@ -1,0 +1,690 @@
+# Static expectations pin labels, annotations and threshold boundaries.
+# Deliberate style difference: isolated scenarios avoid unrelated firing alerts.
+# Memory override fires at 61 percent (below default 80), and is silent at 60.
+rule_files:
+- catalogue-rules.yaml
+evaluation_interval: 1m
+tests:
+- name: ContainerRestarting fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_container_status_restarts_total{namespace="default",pod="app-1",container="app"}
+    values: 0+1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestContainerRestarting
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: container-restarting
+        pod: app-1
+      exp_annotations:
+        summary: Test pod app-1 restarted
+        description: The app container restarted in the last 10 minutes (crash or out-of-memory kill). Read the previous container's
+          logs with kubectl -n default logs app-1 --previous.
+- name: ContainerRestarting silent at threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_container_status_restarts_total{namespace="default",pod="app-1",container="app"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestContainerRestarting
+    exp_alerts: []
+- name: PodStuckWaiting fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_container_status_waiting_reason{namespace="default",pod="app-1",container="app",reason="CrashLoopBackOff"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestPodStuckWaiting
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: pod-stuck-waiting
+        pod: app-1
+      exp_annotations:
+        summary: Test pod app-1 is crash-looping or cannot pull its image
+        description: A container has been in CrashLoopBackOff or an image pull error for 5 minutes, so the pod will not become
+          ready. Run kubectl -n default describe pod app-1 for the event and image or crash cause.
+- name: PodStuckWaiting silent at threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_container_status_waiting_reason{namespace="default",pod="app-1",container="app",reason="CrashLoopBackOff"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestPodStuckWaiting
+    exp_alerts: []
+- name: PodFailed fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="default",pod="app-1",phase="Failed"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestPodFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: pod-failed
+        pod: app-1
+      exp_annotations:
+        summary: Test pod app-1 failed
+        description: The pod has been Failed for 5 minutes. Describe the pod and check its container logs.
+- name: PodFailed silent at threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="default",pod="app-1",phase="Failed"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestPodFailed
+    exp_alerts: []
+- name: NoReadyPods fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="default",pod="app-1",phase="Running"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestNoReadyPods
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: no-ready-pods
+      exp_annotations:
+        summary: Test has no running pods
+        description: No pod has been Running for 5 minutes. Check kubectl -n default get pods and describe the newest pod
+          for the scheduling or image error.
+- name: NoReadyPods silent at threshold
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="default",pod="app-1",phase="Running"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestNoReadyPods
+    exp_alerts: []
+- name: MemoryNearLimit fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: container_memory_working_set_bytes{namespace="default",pod="app-1",container="app"}
+    values: 61x30
+  - series: container_spec_memory_limit_bytes{namespace="default",pod="app-1",container="app"}
+    values: 100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestMemoryNearLimit
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: memory-near-limit
+        pod: app-1
+        container: app
+      exp_annotations:
+        summary: Test pod app-1 memory above 0.6 of its limit
+        description: Working-set memory stayed above 0.6 of the container limit for 5 minutes (configured threshold), so an
+          out-of-memory kill is near. Check for growth in heap or off-heap use before raising the limit.
+- name: MemoryNearLimit silent at threshold
+  interval: 1m
+  input_series:
+  - series: container_memory_working_set_bytes{namespace="default",pod="app-1",container="app"}
+    values: 60x30
+  - series: container_spec_memory_limit_bytes{namespace="default",pod="app-1",container="app"}
+    values: 100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestMemoryNearLimit
+    exp_alerts: []
+- name: CpuHigh fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: container_cpu_usage_seconds_total{namespace="default",pod="app-1",container="app"}
+    values: 0+49x30
+  - series: kube_pod_container_resource_limits{namespace="default",pod="app-1",container="app",resource="cpu"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestCpuHigh
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: cpu-high
+        pod: app-1
+        container: app
+      exp_annotations:
+        summary: Test pod app-1 CPU above 0.8 of its limit
+        description: CPU use stayed above 0.8 of the container limit for 5 minutes (configured threshold). Check for a load
+          spike or a busy loop before raising the limit.
+- name: CpuHigh silent at threshold
+  interval: 1m
+  input_series:
+  - series: container_cpu_usage_seconds_total{namespace="default",pod="app-1",container="app"}
+    values: 0+48x30
+  - series: kube_pod_container_resource_limits{namespace="default",pod="app-1",container="app",resource="cpu"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestCpuHigh
+    exp_alerts: []
+- name: CpuThrottled fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: container_cpu_cfs_throttled_periods_total{namespace="default",pod="app-1",container="app"}
+    values: 0+26x30
+  - series: container_cpu_cfs_periods_total{namespace="default",pod="app-1",container="app"}
+    values: 0+100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestCpuThrottled
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: cpu-throttled
+        pod: app-1
+        container: app
+      exp_annotations:
+        summary: Test pod app-1 CPU throttled above 0.25 of periods
+        description: The kernel throttled the container above 0.25 of scheduling periods for 15 minutes, so requests slow
+          down even when CPU use looks low. Raise the CPU limit or reduce load.
+- name: CpuThrottled silent at threshold
+  interval: 1m
+  input_series:
+  - series: container_cpu_cfs_throttled_periods_total{namespace="default",pod="app-1",container="app"}
+    values: 0+25x30
+  - series: container_cpu_cfs_periods_total{namespace="default",pod="app-1",container="app"}
+    values: 0+100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestCpuThrottled
+    exp_alerts: []
+- name: OomKilled fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: container_oom_events_total{namespace="default",pod="app-1",container="app"}
+    values: 0+1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestOomKilled
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: oom-killed
+        pod: app-1
+        container: app
+      exp_annotations:
+        summary: Test pod app-1 was out-of-memory killed
+        description: The kernel killed a process in the app container for exceeding its memory limit in the last 10 minutes.
+          Check heap and off-heap growth, then the memory limit.
+- name: OomKilled silent at threshold
+  interval: 1m
+  input_series:
+  - series: container_oom_events_total{namespace="default",pod="app-1",container="app"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestOomKilled
+    exp_alerts: []
+- name: HttpP95Slow fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="1"}
+    values: 0+1x30
+  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="2"}
+    values: 0+100x30
+  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="+Inf"}
+    values: 0+100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestHttpP95Slow
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: http-p95-slow
+      exp_annotations:
+        summary: Test HTTP p95 above 1 seconds
+        description: Service-wide HTTP p95 stayed above 1 seconds for 5 minutes. Check slow requests and downstream dependency
+          latency.
+- name: HttpP95Slow silent at threshold
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="1"}
+    values: 0+100x30
+  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="2"}
+    values: 0+100x30
+  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="+Inf"}
+    values: 0+100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestHttpP95Slow
+    exp_alerts: []
+- name: Http5xx fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+    values: 0+6x30
+  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="200"}
+    values: 0+94x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestHttp5xx
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: http5xx
+      exp_annotations:
+        summary: Test HTTP 5xx above 0.05 with more than 1 error
+        description: HTTP 5xx exceeded 1 error per 5 minutes and a 0.05 ratio of requests for 5 minutes. The ratio guard suppresses
+          quiet-cluster noise. Check server errors and dependencies.
+- name: Http5xx silent at threshold
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+    values: 0+5x30
+  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="200"}
+    values: 0+95x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestHttp5xx
+    exp_alerts: []
+- name: UptimeProbeFailed fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: probe_success{namespace="default",instance="https://example.test"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestUptimeProbeFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: uptime-probe-failed
+        instance: https://example.test
+      exp_annotations:
+        summary: Test health probe failing for https://example.test
+        description: The public health URL returned a non-2xx or no answer for 2 minutes. This proves the app and load balancer
+          path only, not the database, cache or other dependencies. Check the pods and the ALB target health.
+- name: UptimeProbeFailed silent at threshold
+  interval: 1m
+  input_series:
+  - series: probe_success{namespace="default",instance="https://example.test"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestUptimeProbeFailed
+    exp_alerts: []
+- name: RdsCpuHigh fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 71x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsCpuHigh
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: rds-cpu
+        dimension_DBInstanceIdentifier: db-1
+      exp_annotations:
+        summary: Test database db-1 CPU above 70
+        description: Database CPU stayed above 70 for 5 minutes (configured threshold). Look for a slow query or a load spike
+          before resizing the instance.
+- name: RdsCpuHigh silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 70x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsCpuHigh
+    exp_alerts: []
+- name: RdsCpuCritical fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 81x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsCpuCritical
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: rds-cpu
+        dimension_DBInstanceIdentifier: db-1
+      exp_annotations:
+        summary: Test database db-1 CPU above 80
+        description: Database CPU stayed above 80 for 5 minutes (configured threshold). Look for a slow query or a load spike
+          before resizing the instance.
+- name: RdsCpuCritical silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 80x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsCpuCritical
+    exp_alerts: []
+- name: RdsStorageLow fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_free_storage_space_minimum{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 999x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsStorageLow
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: rds-storage
+        dimension_DBInstanceIdentifier: db-1
+      exp_annotations:
+        summary: Test database db-1 free storage below 1000
+        description: Database free storage stayed below 1000 for 15 minutes. Check storage growth and autoscaling.
+- name: RdsStorageLow silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_free_storage_space_minimum{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 1000x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsStorageLow
+    exp_alerts: []
+- name: RdsStorageCritical fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_free_storage_space_minimum{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 499x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsStorageCritical
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: rds-storage
+        dimension_DBInstanceIdentifier: db-1
+      exp_annotations:
+        summary: Test database db-1 free storage below 500
+        description: Database free storage stayed below 500 for 15 minutes. Check storage growth and autoscaling.
+- name: RdsStorageCritical silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_rds_free_storage_space_minimum{namespace="default",name="db",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 500x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsStorageCritical
+    exp_alerts: []
+- name: ElasticacheCpuHigh fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_engine_cpuutilization_average{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 71x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheCpuHigh
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: elasticache-cpu
+        dimension_CacheClusterId: cache-1
+      exp_annotations:
+        summary: Test cache cache-1 engine CPU above 70
+        description: The cache engine thread stayed above 70 CPU for 5 minutes (configured threshold). Check for hot keys
+          or a burst of commands before resizing the node.
+- name: ElasticacheCpuHigh silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_engine_cpuutilization_average{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 70x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheCpuHigh
+    exp_alerts: []
+- name: ElasticacheCpuCritical fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_engine_cpuutilization_average{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 81x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheCpuCritical
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: elasticache-cpu
+        dimension_CacheClusterId: cache-1
+      exp_annotations:
+        summary: Test cache cache-1 engine CPU above 80
+        description: The cache engine thread stayed above 80 CPU for 5 minutes (configured threshold). Check for hot keys
+          or a burst of commands before resizing the node.
+- name: ElasticacheCpuCritical silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_engine_cpuutilization_average{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 80x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheCpuCritical
+    exp_alerts: []
+- name: ElasticacheMemoryHigh fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_database_memory_usage_percentage_maximum{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 71x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheMemoryHigh
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: elasticache-memory
+        dimension_CacheClusterId: cache-1
+      exp_annotations:
+        summary: Test cache cache-1 memory above 70
+        description: Cache memory stayed above 70 for 5 minutes (configured threshold). Keys will start to be evicted near
+          100%; check key growth and TTLs.
+- name: ElasticacheMemoryHigh silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_database_memory_usage_percentage_maximum{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 70x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheMemoryHigh
+    exp_alerts: []
+- name: ElasticacheMemoryCritical fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_database_memory_usage_percentage_maximum{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 81x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheMemoryCritical
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: elasticache-memory
+        dimension_CacheClusterId: cache-1
+      exp_annotations:
+        summary: Test cache cache-1 memory above 80
+        description: Cache memory stayed above 80 for 5 minutes (configured threshold). Keys will start to be evicted near
+          100%; check key growth and TTLs.
+- name: ElasticacheMemoryCritical silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_database_memory_usage_percentage_maximum{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 80x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheMemoryCritical
+    exp_alerts: []
+- name: ElasticacheEvictions fires just beyond threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_evictions_sum{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheEvictions
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: warning
+        tier: P3
+        catalogue_id: elasticache-evictions
+        dimension_CacheClusterId: cache-1
+      exp_annotations:
+        summary: Test cache cache-1 is evicting keys
+        description: The cache evicted keys in the last 15 minutes, so it is out of memory and dropping data. Check memory
+          use and key TTLs.
+- name: ElasticacheEvictions silent at threshold
+  interval: 1m
+  input_series:
+  - series: aws_elasticache_evictions_sum{namespace="default",name="cache",tag_Project="catalogue-test",dimension_CacheClusterId="cache-1"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: ElasticacheEvictions
+    exp_alerts: []
+- name: Absent telemetry does not page
+  interval: 1m
+  input_series: []
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestNoReadyPods
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: TestPodStuckWaiting
+    exp_alerts: []
+- name: Only another application is Running
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="default",pod="other-1",phase="Running"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestNoReadyPods
+    exp_alerts: []
+- name: Evicted app and failed hook are excluded
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="default",pod="app-1",phase="Failed"}
+    values: 1x30
+  - series: kube_pod_status_phase{namespace="default",pod="hook-1",phase="Failed"}
+    values: 1x30
+  - series: kube_pod_status_reason{namespace="default",pod="app-1",reason="Evicted"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestPodFailed
+    exp_alerts: []
+- name: HTTP zero traffic
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestHttp5xx
+    exp_alerts: []
+- name: HTTP single error
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+    values: 0x18 1x12
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestHttp5xx
+    exp_alerts: []
+- name: RDS excludes global
+  interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{namespace="default",name="global",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: 100x30
+  - series: aws_rds_free_storage_space_minimum{namespace="default",name="global",tag_Project="catalogue-test",dimension_DBInstanceIdentifier="db-1"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsCpuHigh
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: RdsCpuCritical
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: RdsStorageLow
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: RdsStorageCritical
+    exp_alerts: []
+- name: RDS excludes other project
+  interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{namespace="default",name="db",tag_Project="other",dimension_DBInstanceIdentifier="db-1"}
+    values: 100x30
+  - series: aws_rds_free_storage_space_minimum{namespace="default",name="db",tag_Project="other",dimension_DBInstanceIdentifier="db-1"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: RdsCpuHigh
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: RdsCpuCritical
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: RdsStorageLow
+    exp_alerts: []
+  - eval_time: 20m
+    alertname: RdsStorageCritical
+    exp_alerts: []
+- name: Memory default boundary remains above the override, tested separately at 61 percent
+  interval: 1m
+  input_series:
+  - series: container_memory_working_set_bytes{namespace="default",pod="app-1",container="app"}
+    values: 60x30
+  - series: container_spec_memory_limit_bytes{namespace="default",pod="app-1",container="app"}
+    values: 100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestMemoryNearLimit
+    exp_alerts: []
