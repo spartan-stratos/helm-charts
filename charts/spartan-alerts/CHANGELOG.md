@@ -12,9 +12,9 @@ All notable changes to this chart will be documented in this file.
 
 ### Migration
 
-* `service.short` now defaults to `service.name` with a leading `service-` removed.
-* In 0.4.1, a `service-` prefixed `service.name` with unset `service.short` got short name `service`.
-  Set `service.short: service` explicitly to keep Alertmanager receiver and route names, including AlertmanagerConfig names.
+* In 0.4.1, unset `service.short` defaulted to `service` for every consumer; in 0.5.0, it derives from `service.name` with a leading `service-` removed.
+  Consumers with unset `service.short` and `service.name` other than exactly `service` get new Alertmanager receiver, route and AlertmanagerConfig names on upgrade.
+  Set `service.short: service` explicitly to keep the old names.
 
 ## 0.4.1 (2026-11-25)
 

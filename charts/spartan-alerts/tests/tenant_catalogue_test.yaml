@@ -23,6 +23,8 @@ tests:
   set:
     catalogue.sources.rds: true
     catalogue.rds.diskSizeGiB: 20
+    catalogue.rds.warningPercent: 30
+    catalogue.rds.criticalPercent: 20
   asserts:
   - matchRegex:
       path: spec.groups[0].rules[13].expr
@@ -36,6 +38,8 @@ tests:
     catalogue.rds.diskSizeGiB: 20
     catalogue.rds.storageWarningBytes: 1000
     catalogue.rds.storageCriticalBytes: 500
+    catalogue.rds.warningPercent: 0
+    catalogue.rds.criticalPercent: 101
   asserts:
   - matchRegex:
       path: spec.groups[0].rules[13].expr
@@ -56,6 +60,35 @@ tests:
   - matchRegex:
       path: spec.groups[0].rules[14].expr
       pattern: '< 1073741824$'
+- it: rejects zero warning percent when deriving RDS bytes
+  set:
+    catalogue.rds.diskSizeGiB: 20
+    catalogue.rds.warningPercent: 0
+  asserts:
+  - failedTemplate:
+      errorMessage: catalogue.rds.warningPercent and criticalPercent must be in (0,100]
+- it: rejects critical percent above 100 when deriving RDS bytes
+  set:
+    catalogue.rds.diskSizeGiB: 20
+    catalogue.rds.criticalPercent: 101
+  asserts:
+  - failedTemplate:
+      errorMessage: catalogue.rds.warningPercent and criticalPercent must be in (0,100]
+- it: rejects negative percent when deriving RDS bytes
+  set:
+    catalogue.rds.diskSizeGiB: 20
+    catalogue.rds.warningPercent: -1
+  asserts:
+  - failedTemplate:
+      errorMessage: catalogue.rds.warningPercent and criticalPercent must be in (0,100]
+- it: ignores percentages when disk size is zero
+  set:
+    catalogue.rds.diskSizeGiB: 0
+    catalogue.rds.warningPercent: -1
+    catalogue.rds.criticalPercent: 101
+  asserts:
+  - isKind:
+      of: PrometheusRule
 - it: P1 forces critical despite a warning override
   set:
     catalogue.overrides.MemoryNearLimit: {tier: P1, severity: warning}

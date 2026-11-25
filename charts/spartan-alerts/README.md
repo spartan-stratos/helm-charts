@@ -419,10 +419,9 @@ helm upgrade alerts ./charts/spartan-alerts -n notifications -f values.yaml
 
 ### Migrating to 0.5.0
 
-`service.short` now defaults to `service.name` with a leading `service-` removed.
-In 0.4.1, a consumer with a `service-` prefixed `service.name` and unset `service.short` got short name `service`.
-Set `service.short: service` explicitly to keep its Alertmanager receiver and route names, including AlertmanagerConfig names.
-Keep explicit `service.short` when its old value differs from the derived name to preserve routing object names.
+In 0.4.1, unset `service.short` defaulted to `service` for every consumer; in 0.5.0, it derives from `service.name` with a leading `service-` removed.
+Consumers with unset `service.short` and `service.name` other than exactly `service` get new Alertmanager receiver, route and AlertmanagerConfig names on upgrade.
+Set `service.short: service` explicitly to keep the old names.
 Keep the same platform-passed `service.name`, `slack.secretName` and `grafanaUrl` when removing external token substitution.
 Consumer groups can now retain supported tokens directly.
 The compatibility fixtures compare a tenant that renders values with envsubst today against platform values with chart-expanded tokens.
