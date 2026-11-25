@@ -1,4 +1,71 @@
 rules:
+# Seed deviations: namespace pins on durable metrics; configurable service and job selectors;
+# positive JVM limit guard; catalogue thresholds, tiers and optional runbooks replace tenant metadata.
+# Migration failures remain pending during an in-flight retry until a success is observed.
+- alert: DurableQueueNotDraining
+  prefixable: false
+  catalogueId: durable-queue-not-draining
+  sources: [durable]
+  severity: warning
+  unit: count
+  threshold: 0
+  for: 30m
+  expr: durable_queue_depth{namespace="${NAMESPACE}",service_name="${SERVICE_NAME}"} > ${THRESHOLD}
+  summary: '${SERVICE_SHORT} durable queue {{ $labels.queue_name }} has not drained in 30 minutes'
+  description: The queue never reached empty across the window, so jobs are accumulating rather than flowing. Check activity errors in the application logs.
+- alert: DurableActivitiesNotRegistered
+  prefixable: false
+  catalogueId: durable-activities-not-registered
+  sources: [durable]
+  severity: critical
+  unit: count
+  threshold: 0
+  for: 10m
+  expr: durable_runtime_registered_activities{namespace="${NAMESPACE}",service_name="${SERVICE_NAME}"} == ${THRESHOLD}
+  summary: '${SERVICE_SHORT} registered zero durable activities'
+  description: The durable runtime is up but registered no activities, so every durable job will fail to dispatch. Check startup logs for registration errors.
+- alert: JvmHeapHigh
+  prefixable: false
+  catalogueId: jvm-heap-high
+  sources: [otelJvm]
+  severity: warning
+  unit: ratio
+  threshold: 0.9
+  for: 15m
+  expr: |-
+    sum by (k8s_pod_name) (jvm_memory_used_bytes{namespace="${NAMESPACE}",jvm_memory_type="heap"})
+    / on(k8s_pod_name) sum by (k8s_pod_name) (jvm_memory_limit_bytes{namespace="${NAMESPACE}",jvm_memory_type="heap"}) > ${THRESHOLD}
+    and on(k8s_pod_name) sum by (k8s_pod_name) (jvm_memory_limit_bytes{namespace="${NAMESPACE}",jvm_memory_type="heap"}) > 0
+  summary: '${SERVICE_SHORT} pod {{ $labels.k8s_pod_name }} heap above ${THRESHOLD} of its limit'
+  description: Heap stayed near its limit for 15 minutes, so the pod is close to an out-of-memory restart. Check for a leak or a change in load before raising the memory limit.
+- alert: DbPoolHigh
+  prefixable: false
+  catalogueId: db-pool-high
+  sources: [otelDbPool]
+  severity: warning
+  unit: ratio
+  threshold: 0.9
+  for: 10m
+  expr: |-
+    max by (k8s_pod_name) (
+      sum by (k8s_pod_name, pool_name) (db_client_connections_usage{namespace="${NAMESPACE}",state!="idle"})
+      / on(k8s_pod_name, pool_name) max by (k8s_pod_name, pool_name) (db_client_connections_max{namespace="${NAMESPACE}"})
+    ) > ${THRESHOLD}
+  summary: '${SERVICE_SHORT} pod {{ $labels.k8s_pod_name }} database pool above ${THRESHOLD} in use'
+  description: The connection pool stayed near capacity for 10 minutes. Requests will start to queue; look for slow queries or a leaked connection.
+- alert: MigrationJobFailed
+  prefixable: false
+  catalogueId: migration-job-failed
+  sources: [kubeState, migration]
+  severity: critical
+  unit: count
+  threshold: 0
+  for: 5m
+  expr: |-
+    max by (job_name) (kube_job_status_failed{namespace="${NAMESPACE}",job_name=~"${JOB_REGEX}"}) > ${THRESHOLD}
+    unless on(job_name) max by (job_name) (kube_job_status_succeeded{namespace="${NAMESPACE}",job_name=~"${JOB_REGEX}"}) > 0
+  summary: '${SERVICE_SHORT} migration job {{ $labels.job_name }} failed'
+  description: The migration hook failed, so the release is blocked and the running image may not match the schema. Check hook pod logs and migration history before redeploying.
 - alert: ContainerRestarting
   prefixable: true
   perWorkload: true

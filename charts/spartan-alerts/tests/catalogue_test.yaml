@@ -9,6 +9,45 @@ set:
   catalogue.container: app
   catalogue.podRegex: app-.+
 tests:
+- it: rejects workload overrides for shared alerts even when their source is disabled
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.workloads: [{name: alpha, container: app, podRegex: 'app-.*', overrides: {RdsCpuHigh: {threshold: 90}}}]
+  asserts:
+  - failedTemplate:
+      errorMessage: 'workload override requires perWorkload alert: RdsCpuHigh'
+- it: enables all five shared source rules once for multiple workloads
+  values:
+  - ../files/tests/catalogue-workloads-values.yaml
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 33
+  - equal:
+      path: spec.groups[0].rules[0].alert
+      value: DurableQueueNotDraining
+  - notExists:
+      path: spec.groups[0].rules[0].labels.workload
+  - matchRegex:
+      path: spec.groups[0].rules[0].expr
+      pattern: 'service_name="svc"'
+- it: service name and migration regex tokens can be overridden
+  set:
+    catalogue.sources.durable: true
+    catalogue.sources.migration: true
+    catalogue.serviceName: telemetry-service
+    catalogue.migration.jobRegex: hook-.+
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[0].expr
+      pattern: 'service_name="telemetry-service"'
+  - matchRegex:
+      path: spec.groups[0].rules[2].expr
+      pattern: 'job_name=~"hook-.\+"'
 - it: rejects an empty severity override
   set:
     catalogue.overrides.Http5xx.severity: ""

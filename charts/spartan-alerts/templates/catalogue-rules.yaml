@@ -11,7 +11,11 @@
 {{- end -}}
 {{- $catalogue := (.Files.Get "files/catalogue.yaml" | fromYaml).rules -}}
 {{- $known := dict -}}
-{{- range $catalogue -}}{{- $_ := set $known .alert true -}}{{- end -}}
+{{- $perWorkload := dict -}}
+{{- range $catalogue -}}
+{{- $_ := set $known .alert true -}}
+{{- if .perWorkload -}}{{- $_ := set $perWorkload .alert true -}}{{- end -}}
+{{- end -}}
 {{- range $name, $override := $cfg.overrides -}}
 {{- if not (hasKey $known $name) -}}{{- fail (printf "unknown override key: %s" $name) -}}{{- end -}}
 {{- range $field, $value := $override -}}
@@ -38,6 +42,7 @@
 {{- range $field, $value := $override -}}
 {{- if not (has $field (list "threshold" "for" "severity" "enabled")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
 {{- end -}}
+{{- if not (hasKey $perWorkload $name) -}}{{- fail (printf "workload override requires perWorkload alert: %s" $name) -}}{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- $rules := list -}}
@@ -73,6 +78,8 @@
 {{- if contains "." $formatted -}}{{- $formatted = regexReplaceAll "0+$" $formatted "" -}}{{- end -}}
 {{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $target.container "${POD_SELECTOR}" (printf "pod=~%s" ($target.podRegex | quote)) "${WORKLOAD}" $target.name "${HTTP_SELECTOR}" (default (printf "service_name=%s" ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" $.Values.service.short -}}
 {{- $texts := dict "expr" $entry.expr "summary" $entry.summary "description" $entry.description -}}
+{{- $_ := set $tokens "${SERVICE_NAME}" (default $.Values.service.name $cfg.serviceName) -}}
+{{- $_ := set $tokens "${JOB_REGEX}" $cfg.migration.jobRegex -}}
 {{- range $field, $text := $texts -}}
 {{- range $token, $value := $tokens -}}{{- $text = replace $token $value $text -}}{{- end -}}
 {{- $_ := set $texts $field $text -}}
