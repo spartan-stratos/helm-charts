@@ -13,7 +13,7 @@ spec:
 ${INHIBIT_RULES}
   route:
     receiver: slack-${SERVICE_SHORT}-${ENV}
-    groupBy: [alertname, namespace, service]
+    groupBy: [alertname, namespace, service${GROUP_BY_WORKLOAD}]
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 4h
@@ -37,7 +37,7 @@ ${ROUTE_MATCHERS}
           text: |-
             {{ range .Alerts }}*{{ .Annotations.summary }}*{{ if .Annotations.message }}*{{ .Annotations.message }}*{{ end }}
             {{ .Annotations.description }}
-            `cluster=${CLUSTER_NAME}{{ if .Labels.namespace }} namespace={{ .Labels.namespace }}{{ else if .Labels.service }} service={{ .Labels.service }}{{ end }}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.job_name }} job={{ .Labels.job_name }}{{ end }}`
+            `cluster=${CLUSTER_NAME}{{ if .Labels.namespace }} namespace={{ .Labels.namespace }}{{ else if .Labels.service }} service={{ .Labels.service }}{{ end }}${WORKLOAD_TEXT}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.job_name }} job={{ .Labels.job_name }}{{ end }}`
             {{ if .Annotations.runbook_url }}<{{ .Annotations.runbook_url }}|Runbook>{{ end }}
             {{- if .Annotations.dashboard_url }} · <${GRAFANA_URL}{{ .Annotations.dashboard_url }}|Dashboard>{{ end }}
             {{ end }}
@@ -50,7 +50,7 @@ metadata:
 spec:
   route:
     receiver: slack-${SERVICE_SHORT}-${ENV}
-    groupBy: [alertname, namespace, service]
+    groupBy: [alertname, namespace, service${GROUP_BY_WORKLOAD}]
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 4h
@@ -77,7 +77,7 @@ ${ROUTE_MATCHERS}
           text: |-
             {{ range .Alerts }}*{{ .Annotations.summary }}*{{ if .Annotations.message }}*{{ .Annotations.message }}*{{ end }}
             {{ .Annotations.description }}
-            `cluster=${CLUSTER_NAME}{{ if .Labels.namespace }} namespace={{ .Labels.namespace }}{{ else if .Labels.service }} service={{ .Labels.service }}{{ end }}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.job_name }} job={{ .Labels.job_name }}{{ end }}`
+            `cluster=${CLUSTER_NAME}{{ if .Labels.namespace }} namespace={{ .Labels.namespace }}{{ else if .Labels.service }} service={{ .Labels.service }}{{ end }}${WORKLOAD_TEXT}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.job_name }} job={{ .Labels.job_name }}{{ end }}`
             {{ if .Annotations.runbook_url }}<{{ .Annotations.runbook_url }}|Runbook>{{ end }}
             {{- if .Annotations.dashboard_url }} · <${GRAFANA_URL}{{ .Annotations.dashboard_url }}|Dashboard>{{ end }}
             {{ end }}

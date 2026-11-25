@@ -10,15 +10,26 @@
 {{- $matchers = printf "%s        matchType: %s\n" $matchers (.matchType | quote) -}}
 {{- end -}}
 {{- end -}}
+{{- $perWorkload := and .Values.catalogue.enabled (not (empty .Values.catalogue.workloads)) -}}
+{{- $groupByWorkload := "" -}}
+{{- $workloadText := "" -}}
+{{- $inhibitEqual := "namespace, catalogue_id, pod, dimension_DBInstanceIdentifier, dimension_CacheClusterId" -}}
+{{- if $perWorkload -}}
+{{- $groupByWorkload = ", workload" -}}
+{{- $workloadText = "{{ if .Labels.workload }} workload={{ .Labels.workload }}{{ end }}" -}}
+{{- $inhibitEqual = "namespace, catalogue_id, workload, pod, dimension_DBInstanceIdentifier, dimension_CacheClusterId" -}}
+{{- end -}}
 {{- $inhibitRules := "" -}}
 {{- if and .Values.catalogue.enabled .Values.catalogue.inhibit -}}
 {{/* WHY: Absent labels compare equal; per-resource labels keep one database from muting another. */}}
-{{- $inhibitRules = "  inhibitRules:\n    - sourceMatch:\n        - name: severity\n          value: critical\n        - name: catalogue_id\n          matchType: \"=~\"\n          value: \".+\"\n      targetMatch:\n        - name: severity\n          value: warning\n      equal: [namespace, catalogue_id, pod, dimension_DBInstanceIdentifier, dimension_CacheClusterId]\n" -}}
+{{- $inhibitRules = printf "  inhibitRules:\n    - sourceMatch:\n        - name: severity\n          value: critical\n        - name: catalogue_id\n          matchType: \"=~\"\n          value: \".+\"\n      targetMatch:\n        - name: severity\n          value: warning\n      equal: [%s]\n" $inhibitEqual -}}
 {{- end -}}
 {{- if empty .Values.slack.channel -}}
 {{- $manifest = replace "          channel: '#${ALERT_SLACK_CHANNEL}'\n" "" $manifest -}}
 {{- end -}}
 {{- $manifest
+  | replace "${GROUP_BY_WORKLOAD}" $groupByWorkload
+  | replace "${WORKLOAD_TEXT}" $workloadText
   | replace "${NAME_SUFFIX}" $suffix
   | replace "${NAMESPACE}" .Release.Namespace
   | replace "${SERVICE_NAME}" .Values.service.name

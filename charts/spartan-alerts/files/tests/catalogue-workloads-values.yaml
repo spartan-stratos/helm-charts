@@ -1,0 +1,13 @@
+service:
+  name: catalogue-test
+  short: Test
+catalogue:
+  enabled: true
+  workloads:
+  - {name: alpha, container: app, podRegex: 'app-.*', alertPrefix: Alpha}
+  - {name: beta, container: worker, podRegex: 'worker-.*', alertPrefix: Beta}
+  sources: {kubeState: true, cadvisor: true, http: true, probe: true, rds: true, elasticache: true, durable: true, otelJvm: true, otelDbPool: true, migration: true}
+  rds: {storageWarningBytes: 1000, storageCriticalBytes: 500}
+  overrides:
+    MemoryNearLimit:
+      threshold: 0.6

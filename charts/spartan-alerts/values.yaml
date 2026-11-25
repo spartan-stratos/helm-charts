@@ -21,10 +21,13 @@ catalogue:
   alertPrefix: ""
   container: ""
   podRegex: ""
+  workloads: []
   httpSelector: ""
   tagProject: ""
+  serviceName: ""
+  migration: {jobRegex: ".*migrat.*"}
   runbookUrl: ""
-  sources: {kubeState: true, cadvisor: true, http: true, probe: true, rds: false, elasticache: false}
+  sources: {kubeState: true, cadvisor: true, http: true, probe: true, rds: false, elasticache: false, durable: false, otelJvm: false, otelDbPool: false, migration: false}
   rds: {storageWarningBytes: 0, storageCriticalBytes: 0}
   inhibit: true
   overrides: {}

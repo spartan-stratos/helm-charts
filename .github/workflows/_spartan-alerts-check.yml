@@ -1,0 +1,42 @@
+name: Spartan alerts check
+on:
+  workflow_call:
+    inputs:
+      helm-charts-ref:
+        required: true
+        type: string
+      values-files:
+        required: true
+        type: string
+      namespace:
+        required: true
+        type: string
+      release-name:
+        default: alerts
+        type: string
+      service-names:
+        default: ''
+        type: string
+      tests-file:
+        default: ''
+        type: string
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: spartan-stratos/helm-charts
+          ref: ${{ inputs.helm-charts-ref || 'refs/invalid/required-helm-charts-ref' }}
+          path: .spartan-alerts-ci
+      - run: bash .spartan-alerts-ci/.github/scripts/spartan-alerts/install-tools.sh
+      - run: bash .spartan-alerts-ci/.github/scripts/spartan-alerts/check.sh --chart-dir .spartan-alerts-ci/charts/spartan-alerts --values-files "$VALUES_FILES" --namespace "$NAMESPACE" --release-name "$RELEASE_NAME" --service-names "$SERVICE_NAMES" --tests-file "$TESTS_FILE"
+        env:
+          VALUES_FILES: ${{ inputs.values-files }}
+          NAMESPACE: ${{ inputs.namespace }}
+          RELEASE_NAME: ${{ inputs.release-name }}
+          SERVICE_NAMES: ${{ inputs.service-names }}
+          TESTS_FILE: ${{ inputs.tests-file }}

@@ -9,6 +9,53 @@ set:
   catalogue.container: app
   catalogue.podRegex: app-.+
 tests:
+- it: pins default HTTP selectors to the release namespace and service
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[8].expr
+      pattern: 'namespace="alerts-test",service_name="svc"'
+  - matchRegex:
+      path: spec.groups[0].rules[9].expr
+      pattern: 'namespace="alerts-test",service_name="svc"'
+- it: rejects workload overrides for shared alerts even when their source is disabled
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.workloads: [{name: alpha, container: app, podRegex: 'app-.*', overrides: {RdsCpuHigh: {threshold: 90}}}]
+  asserts:
+  - failedTemplate:
+      errorMessage: 'workload override requires perWorkload alert: RdsCpuHigh'
+- it: enables all five shared source rules once for multiple workloads
+  values:
+  - ../files/tests/catalogue-workloads-values.yaml
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 33
+  - equal:
+      path: spec.groups[0].rules[0].alert
+      value: DurableQueueNotDraining
+  - notExists:
+      path: spec.groups[0].rules[0].labels.workload
+  - matchRegex:
+      path: spec.groups[0].rules[0].expr
+      pattern: 'service_name="svc"'
+- it: service name and migration regex tokens can be overridden
+  set:
+    catalogue.sources.durable: true
+    catalogue.sources.migration: true
+    catalogue.serviceName: telemetry-service
+    catalogue.migration.jobRegex: hook-.+
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[0].expr
+      pattern: 'service_name="telemetry-service"'
+  - matchRegex:
+      path: spec.groups[0].rules[2].expr
+      pattern: 'job_name=~"hook-.\+"'
 - it: rejects an empty severity override
   set:
     catalogue.overrides.Http5xx.severity: ""
@@ -356,7 +403,7 @@ tests:
       value: alerts-test
   - matchRegex:
       path: spec.groups[0].rules[8].expr
-      pattern: service_name="svc"
+      pattern: namespace="alerts-test",service_name="svc"
   - matchRegex:
       path: spec.groups[0].rules[2].expr
       pattern: unless on\(pod\) kube_pod_status_reason
@@ -375,6 +422,9 @@ tests:
   - matchRegex:
       path: spec.groups[0].rules[8].expr
       pattern: namespace="custom"
+  - notMatchRegex:
+      path: spec.groups[0].rules[8].expr
+      pattern: 'namespace="alerts-test"|service_name="svc"'
   - matchRegex:
       path: spec.groups[0].rules[11].expr
       pattern: tag_Project="project"
@@ -385,3 +435,193 @@ tests:
   - matchRegex:
       path: spec.groups[0].rules[11].expr
       pattern: name!="global",tag_Project="svc"
+- it: two workloads render per-workload rules with distinct labels and names
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 19
+  - equal:
+      path: spec.groups[0].rules[0].alert
+      value: AlphaContainerRestarting
+  - equal:
+      path: spec.groups[0].rules[1].alert
+      value: BetaContainerRestarting
+  - equal:
+      path: spec.groups[0].rules[0].labels.workload
+      value: alpha
+  - equal:
+      path: spec.groups[0].rules[1].labels.workload
+      value: beta
+  - matchRegex:
+      path: spec.groups[0].rules[0].expr
+      pattern: container="api",pod=~"api-\.\+"
+  - matchRegex:
+      path: spec.groups[0].rules[1].expr
+      pattern: container="worker",pod=~"worker-\.\+"
+- it: entries without perWorkload render once and carry no workload label
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[16].alert
+      value: HttpP95Slow
+  - notExists:
+      path: spec.groups[0].rules[16].labels.workload
+  - equal:
+      path: spec.groups[0].rules[18].alert
+      value: UptimeProbeFailed
+- it: pair guard does not fire across workloads with the same severity
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.overrides.CpuHigh.severity: critical
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 19
+- it: workload override beats global override beats default
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha", "overrides": {"MemoryNearLimit": {"threshold": 0.5}}}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.overrides.MemoryNearLimit.threshold: 0.9
+    catalogue.overrides.CpuHigh.threshold: 0.7
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[8].expr
+      pattern: '> 0\.5$'
+  - matchRegex:
+      path: spec.groups[0].rules[9].expr
+      pattern: '> 0\.9$'
+  - matchRegex:
+      path: spec.groups[0].rules[10].expr
+      pattern: '> 0\.7$'
+  - matchRegex:
+      path: spec.groups[0].rules[14].expr
+      pattern: '> 0$'
+- it: workload override can disable one entry for one workload
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha", "overrides": {"OomKilled": {"enabled": false}}}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 18
+- it: workload alertPrefix falls back to the global prefix
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": ""}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.alertPrefix: Backend
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[1].alert
+      value: BackendContainerRestarting
+  - equal:
+      path: spec.groups[0].rules[16].alert
+      value: BackendHttpP95Slow
+- it: empty workloads keep the unnamed 0.3.0 shape
+  set:
+    catalogue.workloads: []
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 11
+  - notExists:
+      path: spec.groups[0].rules[0].labels.workload
+- it: rejects duplicate workload name
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "alpha", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'duplicate workload name: alpha'
+- it: rejects duplicate workload alertPrefix
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Alpha"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'duplicate workload alertPrefix: Alpha'
+- it: rejects workload without name
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'catalogue.workloads[1].name is required'
+- it: rejects workload without container
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'catalogue.workloads[1].container is required'
+- it: rejects workload without podRegex
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'catalogue.workloads[1].podRegex is required'
+- it: rejects scalar container beside workloads
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.podRegex: ''
+    catalogue.container: app
+  asserts:
+  - failedTemplate:
+      errorMessage: 'catalogue.container and catalogue.podRegex must be empty when catalogue.workloads is set'
+- it: rejects scalar podRegex beside workloads
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: app-.+
+  asserts:
+  - failedTemplate:
+      errorMessage: 'catalogue.container and catalogue.podRegex must be empty when catalogue.workloads is set'
+- it: rejects unknown workload override key
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha", "overrides": {"NoSuchRule": {"threshold": 1}}}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown override key: NoSuchRule'
+- it: rejects unknown workload override field
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha", "overrides": {"Http5xx": {"noSuchField": 1}}}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown override field: noSuchField'
+- it: rejects unknown workload field
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha", "noSuchField": "1"}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown workload field: noSuchField'
+- it: rejects bad severity in a workload override
+  set:
+    catalogue.workloads: [{"name": "alpha", "container": "api", "podRegex": "api-.+", "alertPrefix": "Alpha", "overrides": {"CpuHigh": {"severity": "info"}}}, {"name": "beta", "container": "worker", "podRegex": "worker-.+", "alertPrefix": "Beta"}]
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'bad severity for CpuHigh'

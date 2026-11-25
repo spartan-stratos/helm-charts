@@ -1,0 +1,6 @@
+catalogue:
+  enabled: true
+  container: app
+  podRegex: app-.*
+  httpSelector: 'job="http"'
+  sources: {kubeState: false, cadvisor: false, http: true, probe: false}

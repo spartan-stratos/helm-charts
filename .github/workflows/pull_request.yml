@@ -63,11 +63,55 @@ jobs:
           helm unittest "charts/${{ matrix.chart }}"
 
       - name: Run promtool rule tests
-        if: matrix.chart == 'lgtm-stack' || matrix.chart == 'spartan-alerts' # yq is preinstalled on the runner
+        if: matrix.chart == 'lgtm-stack' # yq is preinstalled on the runner
         run: |
           curl -sSL https://github.com/prometheus/prometheus/releases/download/v3.5.0/prometheus-3.5.0.linux-amd64.tar.gz \
             | sudo tar -xz --strip-components=1 -C /usr/local/bin prometheus-3.5.0.linux-amd64/promtool
           charts/${{ matrix.chart }}/files/tests/test-rules.sh
+
+      - name: Install alert check tools
+        if: matrix.chart == 'spartan-alerts'
+        run: bash .github/scripts/spartan-alerts/install-tools.sh
+
+      - name: Check alert checker fixtures
+        if: matrix.chart == 'spartan-alerts'
+        run: python3 .github/scripts/spartan-alerts/check-rendered.py --self-test
+
+      - name: Check scalar catalogue
+        if: matrix.chart == 'spartan-alerts'
+        run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --values-file charts/spartan-alerts/files/tests/catalogue-values.yaml --namespace default --service-name catalogue-test
+
+      - name: Check reusable workflow invocation
+        if: matrix.chart == 'spartan-alerts'
+        run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --values-files charts/spartan-alerts/files/tests/catalogue-values.yaml --namespace default --release-name alerts --service-names '' --tests-file ''
+
+      - name: Check workloads catalogue
+        if: matrix.chart == 'spartan-alerts'
+        run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --values-file charts/spartan-alerts/files/tests/catalogue-workloads-values.yaml --namespace default --service-name catalogue-test
+
+      - name: Test scalar and workloads rules
+        if: matrix.chart == 'spartan-alerts'
+        run: bash charts/spartan-alerts/files/tests/test-rules.sh
+
+      - name: Check quoted pod regex
+        if: matrix.chart == 'spartan-alerts'
+        run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --values-file charts/spartan-alerts/files/tests/catalogue-values.yaml --namespace default --service-name catalogue-test --set-string 'catalogue.podRegex=app-[a-z0-9]{9\,10}'
+
+      - name: Check negative controls
+        if: matrix.chart == 'spartan-alerts'
+        run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --namespace default --negative-controls
+
+      - name: Fetch base for chart bump check
+        if: matrix.chart == 'spartan-alerts'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git fetch origin "$BASE_SHA"
+
+      - name: Require shipped checker chart bump
+        if: matrix.chart == 'spartan-alerts'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash .github/scripts/spartan-alerts/require-chart-bump.sh "$BASE_SHA"
 
       - name: Check bundled dashboards
         if: matrix.chart == 'lgtm-stack' # jq is preinstalled on the runner
