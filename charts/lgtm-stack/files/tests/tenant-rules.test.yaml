@@ -1,0 +1,63 @@
+rule_files:
+  - tenant-rules.yaml
+evaluation_interval: 1m
+
+tests:
+  - name: fires after 20m of silence
+    interval: 1m
+    input_series:
+      - series: 'up{job="thanos-ruler-operated",ruler="shop-ruler"}'
+        values: '1x30'
+      - series: 'app_requests_total{tenant="shop",namespace="shop-prod"}'
+        values: '1 stale'
+    alert_rule_test:
+      - eval_time: 19m
+        alertname: TenantNoTelemetry
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: TenantNoTelemetry
+        exp_alerts:
+          - exp_labels: { severity: warning, tenant: shop, namespace: monitoring, tenant_namespace: shop-prod }
+            exp_annotations:
+              summary: No telemetry from tenant shop in shop-prod for 20m.
+              description: The OTLP stream for this namespace stopped. Check the tenant collector and app in shop-prod first, then the OTLP gateway receiver for tenant shop.
+      - eval_time: 20m
+        alertname: TenantRulerDown
+        exp_alerts: []
+  - name: stays silent while tenant namespace telemetry arrives
+    interval: 1m
+    input_series:
+      - series: 'up{job="thanos-ruler-operated",ruler="shop-ruler"}'
+        values: '1x30'
+      - series: 'app_requests_total{tenant="shop",namespace="shop-prod"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: TenantNoTelemetry
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: TenantRulerDown
+        exp_alerts: []
+  - name: monitoring self-metrics do not mask tenant namespace silence
+    interval: 1m
+    input_series:
+      - series: 'up{job="thanos-ruler-operated",ruler="shop-ruler"}'
+        values: '1x30'
+      - series: 'loki_request_duration_seconds_count{tenant="shop",namespace="monitoring"}'
+        values: '1x30'
+      - series: 'app_requests_total{tenant="shop",namespace="shop-prod"}'
+        values: '1 stale'
+    alert_rule_test:
+      - eval_time: 19m
+        alertname: TenantNoTelemetry
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: TenantNoTelemetry
+        exp_alerts:
+          - exp_labels: { severity: warning, tenant: shop, namespace: monitoring, tenant_namespace: shop-prod }
+            exp_annotations:
+              summary: No telemetry from tenant shop in shop-prod for 20m.
+              description: The OTLP stream for this namespace stopped. Check the tenant collector and app in shop-prod first, then the OTLP gateway receiver for tenant shop.
+      - eval_time: 20m
+        alertname: TenantRulerDown
+        exp_alerts: []

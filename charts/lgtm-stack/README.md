@@ -267,6 +267,7 @@ Recording rules are not supported on tenant rulers; alerts must use self-contain
 
 When tenant rulers are enabled and at least one tenant has namespaces, one ServiceMonitor scrapes their metrics with a `ruler` label.
 Shared-channel alerts report each unavailable tenant ruler after 5m, plus rule evaluation and alert delivery failures sustained for 10m.
+`TenantNoTelemetry` warns in the shared channel after a tenant namespace stops sending telemetry for 20m.
 Check the affected ruler pod and its `prom-label-proxy-<id>` pod in `monitoring` first.
 
 Set `tenantIsolation.enabled: true` in the same release that enables Loki `auth_enabled` and Tempo multitenancy, never before.

@@ -92,5 +92,24 @@ spec:
           annotations:
             summary: '{{ $o }} $value {{ $c }} alert send failures in 10m; expected 0.'
             description: 'Tenant {{ $o }} reReplaceAll "-ruler$" "" $labels.ruler {{ $c }} alert rules may be silenced. Check the {{ $o }} $labels.ruler {{ $c }} pod and prom-label-proxy-{{ $o }} reReplaceAll "-ruler$" "" $labels.ruler {{ $c }} pod in {{ .Values.namespace }} first.'
+    - name: lgtm-tenant-telemetry
+      rules:
+{{- /* Pin namespace because Loki and Tempo self-metrics carry a native tenant label in monitoring, so a tenant-only selector never goes absent. */}}
+{{- range $active }}
+{{- $tenant := . }}
+{{- range .namespaces }}
+        - alert: TenantNoTelemetry
+          expr: 'absent_over_time({tenant="{{ $tenant.id }}", namespace="{{ . }}"}[15m])'
+          for: 5m
+          labels:
+            severity: warning
+            tenant: {{ $tenant.id | quote }}
+            namespace: {{ $.Values.namespace }}
+            tenant_namespace: {{ . | quote }}
+          annotations:
+            summary: 'No telemetry from tenant {{ $tenant.id }} in {{ . }} for 20m.'
+            description: 'The OTLP stream for this namespace stopped. Check the tenant collector and app in {{ . }} first, then the OTLP gateway receiver for tenant {{ $tenant.id }}.'
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end }}

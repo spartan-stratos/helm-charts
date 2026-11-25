@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.15.0 (2026-11-25)
+
+### Features
+
+* Add `TenantNoTelemetry` to the tenant ruler bundle: one warning per tenant namespace when it has sent no series for 15m, held 5m, routed to the shared channel with the namespace in `tenant_namespace`. The selector pins the tenant namespace, because Loki and Tempo self-metrics carry a native `tenant` label in `monitoring` and would otherwise keep it from ever going absent. Covers metrics only; logs and traces are not checked.
+* Run the tenant rules through promtool in `test-rules.sh`.
+
 ## 0.14.0 (2026-11-25)
 
 ### Features

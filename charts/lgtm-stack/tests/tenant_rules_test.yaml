@@ -130,6 +130,62 @@ tests:
         documentSelector:
           path: kind
           value: PrometheusRule
+  - it: emits telemetry rules for every tenant namespace in the platform namespace
+    set:
+      namespace: platform
+      tenants: [{ id: shop, namespaces: [shop-dev, shop-prod] }]
+    documentSelector:
+      path: kind
+      value: PrometheusRule
+    asserts:
+      - equal:
+          path: spec.groups[1].name
+          value: lgtm-tenant-telemetry
+      - lengthEqual:
+          path: spec.groups[1].rules
+          count: 2
+      - equal:
+          path: spec.groups[1].rules[0]
+          value:
+            alert: TenantNoTelemetry
+            expr: 'absent_over_time({tenant="shop", namespace="shop-dev"}[15m])'
+            for: 5m
+            labels: { severity: warning, tenant: shop, namespace: platform, tenant_namespace: shop-dev }
+            annotations:
+              summary: No telemetry from tenant shop in shop-dev for 20m.
+              description: The OTLP stream for this namespace stopped. Check the tenant collector and app in shop-dev first, then the OTLP gateway receiver for tenant shop.
+      - equal:
+          path: spec.groups[1].rules[1]
+          value:
+            alert: TenantNoTelemetry
+            expr: 'absent_over_time({tenant="shop", namespace="shop-prod"}[15m])'
+            for: 5m
+            labels: { severity: warning, tenant: shop, namespace: platform, tenant_namespace: shop-prod }
+            annotations:
+              summary: No telemetry from tenant shop in shop-prod for 20m.
+              description: The OTLP stream for this namespace stopped. Check the tenant collector and app in shop-prod first, then the OTLP gateway receiver for tenant shop.
+  - it: emits telemetry rules for both active tenants
+    set:
+      tenants: [{ id: first, namespaces: [first] }, { id: second, namespaces: [second] }]
+    documentSelector:
+      path: kind
+      value: PrometheusRule
+    asserts:
+      - lengthEqual:
+          path: spec.groups[1].rules
+          count: 2
+      - equal:
+          path: spec.groups[1].rules[0].expr
+          value: 'absent_over_time({tenant="first", namespace="first"}[15m])'
+      - equal:
+          path: spec.groups[1].rules[0].labels
+          value: { severity: warning, tenant: first, namespace: monitoring, tenant_namespace: first }
+      - equal:
+          path: spec.groups[1].rules[1].expr
+          value: 'absent_over_time({tenant="second", namespace="second"}[15m])'
+      - equal:
+          path: spec.groups[1].rules[1].labels
+          value: { severity: warning, tenant: second, namespace: monitoring, tenant_namespace: second }
   - it: emits no resources without tenants
     set:
       tenants: []

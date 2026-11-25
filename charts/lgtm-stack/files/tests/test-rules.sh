@@ -14,6 +14,7 @@ helm template t ../.. -f rules-values.yaml --set mode=addon --set addon=serviceR
 # Combine both PrometheusRule documents so promtool tests every stack rule group.
 helm template t ../.. -f rules-values.yaml --set mode=addon --set addon=stackRules | yq ea '[select(.kind == "PrometheusRule") | .spec.groups[]] | {"groups": .}' > "$tmp/stack-rules.yaml"
 helm template t ../.. -f rules-values.yaml --set mode=addon --set addon=workloadRules | yq '.spec' > "$tmp/workload-rules.yaml"
+helm template t ../.. -f rules-values.yaml --set mode=addon --set addon=tenantRules | yq 'select(.kind == "PrometheusRule") | .spec' > "$tmp/tenant-rules.yaml"
 # dashboard-stats.test.yaml needs the rule file dashboard-stats.sh generates, so it runs there.
 for test in ./*.test.yaml; do
   if [[ "$test" == ./dashboard-stats.test.yaml ]]; then continue; fi
