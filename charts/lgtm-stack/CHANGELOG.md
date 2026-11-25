@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.13.1 (2026-11-25)
+
+### Bug Fixes
+
+* Reject an invalid `grafana.orgMapping.settleSeconds` when rendering in applications mode with tenant groups, before any Application is applied. Previously the bad value surfaced only as a sync error on the tenant-orgs Application, after Grafana had already rolled. Without tenant groups the setting is unused and still not checked.
+
 ## 0.13.0 (2026-11-24)
 
 ### BREAKING

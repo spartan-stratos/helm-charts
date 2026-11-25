@@ -178,3 +178,50 @@ tests:
       - equal:
           path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
           value: 'sre:*:Admin beta-editor:beta:Viewer'
+  - it: rejects non-numeric settleSeconds with tenant groups
+    set:
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping.settleSeconds: abc
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.orgMapping.settleSeconds must be a non-negative integer'
+  - it: rejects fractional settleSeconds with tenant groups
+    set:
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping.settleSeconds: 1.5
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.orgMapping.settleSeconds must be a non-negative integer'
+  - it: rejects negative settleSeconds with tenant groups
+    set:
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping.settleSeconds: -1
+    asserts:
+      - failedTemplate:
+          errorMessage: 'grafana.orgMapping.settleSeconds must be a non-negative integer'
+  - it: accepts zero settleSeconds with tenant groups
+    set:
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping.settleSeconds: 0
+    documentSelector: { path: metadata.name, value: lgtm-grafana-tenant-orgs }
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.grafana.orgMapping
+          value: { settleSeconds: 0 }
+  - it: accepts positive settleSeconds with tenant groups
+    set:
+      tenants: [{ id: alpha, port: 4320, htpasswdSecret: { name: alpha-otlp, key: htpasswd }, grafana: { viewers: [alpha-viewer] } }]
+      grafana.orgMapping.settleSeconds: 45
+    documentSelector: { path: metadata.name, value: lgtm-grafana-tenant-orgs }
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.grafana.orgMapping
+          value: { settleSeconds: 45 }
+  - it: accepts non-numeric settleSeconds without tenant groups
+    set:
+      grafana.orgMapping.settleSeconds: abc
+    documentSelector: { path: metadata.name, value: lgtm-grafana }
+    asserts:
+      - notFailedTemplate: {}
+      - notExists:
+          path: spec.source.helm.valuesObject["grafana.ini"]["auth.generic_oauth"].org_mapping
