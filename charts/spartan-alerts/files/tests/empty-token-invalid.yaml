@@ -1,0 +1,8 @@
+grafanaUrl: ''
+groups:
+- name: tokens
+  rules:
+  - alert: EmptyToken
+    expr: up == 0
+    annotations:
+      dashboard: '${GRAFANA_URL}/d/test'

@@ -1,0 +1,54 @@
+env: dev
+workloadCluster: stratos-eks-dev
+service:
+  name: service-example
+grafanaUrl: https://grafana.example.test
+slack:
+  secretName: alert-slack-example-dev
+  channel: alerts-test
+externalSecrets:
+  enabled: true
+  secretArn: arn:aws:secretsmanager:us-west-2:123456789012:secret:dummy
+  roleArn: arn:aws:iam::123456789012:role/dummy
+  region: us-west-2
+  serviceAccount: alert-secrets
+groups:
+- name: ${SERVICE_NAME}
+  rules:
+    - alert: MigrationJobFailed
+      expr: max by (job_name) (kube_job_failed{namespace="${NAMESPACE}",condition="true"}) > 0
+      for: 5m
+      labels:
+        namespace: ${NAMESPACE}
+        severity: critical
+      annotations:
+        summary: "${SERVICE_SHORT} migration job {{ $labels.job_name }} failed"
+        description: >-
+          The Flyway pre-upgrade hook failed, so the release is blocked and the running image may not match the
+          schema. Read the hook pod's logs with kubectl -n ${NAMESPACE} logs job/{{ $labels.job_name }},
+          then check flyway_schema_history for a partially applied version before redeploying.
+
+    - alert: DurableQueueNotDraining
+      expr: durable_queue_depth{service_name="${SERVICE_NAME}"} > 0
+      for: 30m
+      labels:
+        namespace: ${NAMESPACE}
+        severity: warning
+      annotations:
+        summary: "${SERVICE_SHORT} durable queue {{ $labels.queue_name }} has not drained in 30 minutes"
+        description: >-
+          The queue never reached empty across the window, so jobs are accumulating rather than flowing. Check
+          the activity errors in Loki with
+          namespace="${NAMESPACE}" filtered on level ERROR.
+
+    - alert: DurableActivitiesNotRegistered
+      expr: durable_runtime_registered_activities{service_name="${SERVICE_NAME}"} == 0
+      for: 10m
+      labels:
+        namespace: ${NAMESPACE}
+        severity: critical
+      annotations:
+        summary: "${SERVICE_SHORT} registered zero durable activities"
+        description: >-
+          The durable runtime is up but registered no activities, so every durable job will fail to dispatch.
+          Check the startup logs in Loki with namespace="${NAMESPACE}" for registration errors.

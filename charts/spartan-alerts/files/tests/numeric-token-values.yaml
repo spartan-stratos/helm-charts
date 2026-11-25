@@ -1,0 +1,5 @@
+groups:
+- name: tokens
+  rules:
+  - record: numeric_capture
+    expr: 'label_replace(up, "target", "${1}", "source", "(.*)")'

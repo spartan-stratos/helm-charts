@@ -2,6 +2,20 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.5.0 (2026-11-25)
+
+### Features
+
+* Derive service short names and expand tenant tokens in consumer groups.
+* Add optional workload disabling, P1-P3 tier overrides and RDS storage percentages.
+* Preserve existing resource names and labels for explicit consumer values.
+
+### Migration
+
+* In 0.4.1, unset `service.short` defaulted to `service` for every consumer; in 0.5.0, it derives from `service.name` with a leading `service-` removed.
+  Consumers with unset `service.short` and `service.name` other than exactly `service` get new Alertmanager receiver, route and AlertmanagerConfig names on upgrade.
+  Set `service.short: service` explicitly to keep the old names.
+
 ## 0.4.1 (2026-11-25)
 
 ### Features

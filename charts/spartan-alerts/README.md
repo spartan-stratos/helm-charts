@@ -26,9 +26,9 @@ All objects use the release namespace. Without external secret synchronization, 
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `service` | `{name: service, short: service}` | Alert identity settings. |
+| `service` | `{name: service, short: ""}` | Alert identity settings. |
 | `service.name` | `service` | Service matcher, rule resource name, and metric selector identity. |
-| `service.short` | `service` | Short name for routing objects, receivers, and alert summaries. |
+| `service.short` | `""` | Explicit short name wins; otherwise use `service.name` with a leading `service-` removed. |
 | `env` | `""` | Environment suffix in receiver names. |
 | `workloadCluster` | `""` | Cluster name displayed in Slack messages. |
 | `grafanaUrl` | `""` | Base URL for alert and dashboard links. |
@@ -43,12 +43,24 @@ All objects use the release namespace. Without external secret synchronization, 
 | `externalSecrets.region` | `""` | Secrets Manager region; required when enabled. |
 | `externalSecrets.serviceAccount` | `alert-secrets` | ServiceAccount used by the SecretStore for JWT authentication. |
 | `externalSecrets.roleArn` | `""` | IAM role ARN annotated on the ServiceAccount; required when enabled. |
-| `groups` | `[]` | PrometheusRule groups rendered verbatim into `spec.groups`, in order. Empty renders no PrometheusRule. |
+| `groups` | `[]` | PrometheusRule groups rendered in order with supported tokens expanded. Empty renders no PrometheusRule. |
 
 The chart's namespace route matches on a static `namespace` label, so every alerting rule needs one.
 For each rule with an `alert` key and no `namespace` label, the chart sets it to the release namespace; an explicit value is kept.
-Recording rules are not changed. Rule content is never passed through Helm templating, so `{{ $labels.x }}` stays literal.
+Recording rules do not receive a namespace label. Rule content is never passed through Helm templating, so `{{ $labels.x }}` stays literal.
 Keep metric selectors scoped to the intended workload when sharing Prometheus.
+
+### Platform values and group tokens
+
+The platform passes `service.name`, `env`, `workloadCluster`, `slack.secretName`, `grafanaUrl` and `externalSecrets.*`.
+`slack.secretName` still defaults to `alert-slack`; `grafanaUrl` still defaults to empty.
+The same secret name is used by SecretStore, ExternalSecret and both Slack receivers.
+
+Group names, rule expressions, label values and annotation values support these tokens:
+`${SERVICE_NAME}`, `${SERVICE_SHORT}`, `${ENV}`, `${NAMESPACE}`, `${CLUSTER_NAME}`,
+`${GRAFANA_URL}`, `${ALERT_SLACK_SECRET}` and `${ALERT_SLACK_CHANNEL}`.
+Unknown uppercase tokens and used tokens with empty values fail rendering.
+Only `${[A-Z][A-Z0-9_]*}` is a token; `${1}` in `label_replace` stays literal.
 
 ### Minimal Example
 
@@ -275,7 +287,9 @@ Override keys use base alert names, even with a prefix. Unknown names or fields 
 Allowed severities are `warning` and `critical`. Ratio thresholds must be in (0, 1]; percent thresholds must be in (0, 100].
 An `enabled: false` override omits a rule. Setting it to true does not bypass source toggles or a zero storage threshold.
 Two rendered rules sharing a workload and catalogue ID cannot have the same final severity.
-Overrides replace the threshold, duration, and severity independently. Descriptions keep their catalogue duration text.
+Overrides replace the threshold, duration, severity and tier independently. Descriptions keep their catalogue duration text.
+`tier` accepts P1, P2 or P3 in catalogue and workload overrides. P1 forces severity critical.
+Without a tier override, critical derives P2 and warning derives P3.
 
 ```yaml
 service:
@@ -302,9 +316,13 @@ catalogue:
 
 This renders BackendMemoryNearLimit at ratio 0.9 for 10m with tier P2.
 Cloud alert names stay unprefixed.
-Derive RDS free storage thresholds from Terraform storage inputs and pass numeric byte values into Helm.
+Set `catalogue.rds.diskSizeGiB` to derive free storage thresholds using `warningPercent` (30) and `criticalPercent` (20).
+For a 20 GiB disk, defaults give 6442450944 and 4294967296 bytes.
+Explicit nonzero `storageWarningBytes` and `storageCriticalBytes` take precedence over derived bytes.
+RDS storage autoscaling grows disks below 10% free. The default 30/20 thresholds fire during normal growth cycles; lower the percents for autoscaling tenants.
+You may also pass numeric byte values directly.
 For example, 30 GiB allocated storage gives 6442450944 bytes at 20% and 3221225472 bytes at 10%.
-The chart does not calculate these percentages or read Terraform state.
+The chart does not read Terraform state.
 An explicit storage alert `threshold` override takes precedence over `rds.storageWarningBytes` or `rds.storageCriticalBytes`.
 
 ### Production Caveat
@@ -398,6 +416,20 @@ They render the chart from the pinned checkout, validate scope, and run promtool
 ```sh
 helm upgrade alerts ./charts/spartan-alerts -n notifications -f values.yaml
 ```
+
+### Migrating to 0.5.0
+
+In 0.4.1, unset `service.short` defaulted to `service` for every consumer; in 0.5.0, it derives from `service.name` with a leading `service-` removed.
+Consumers with unset `service.short` and `service.name` other than exactly `service` get new Alertmanager receiver, route and AlertmanagerConfig names on upgrade.
+Set `service.short: service` explicitly to keep the old names.
+Keep the same platform-passed `service.name`, `slack.secretName` and `grafanaUrl` when removing external token substitution.
+Consumer groups can now retain supported tokens directly.
+The compatibility fixtures compare a tenant that renders values with envsubst today against platform values with chart-expanded tokens.
+See `files/tests/tenant-envsubst-values.yaml` and `files/tests/tenant-platform-values.yaml`.
+`catalogue.workloads[].enabled` defaults to true. Set false to omit that workload's perWorkload rules.
+Validation still checks disabled entries. Disabling every workload omits all perWorkload rules without scalar fallback.
+Lists do not merge across values files; a per-environment change must restate the whole workload list.
+RDS disk size and tier overrides are opt-in; explicit existing byte thresholds and default labels keep their behavior.
 
 ### Migrating to 0.4.0
 

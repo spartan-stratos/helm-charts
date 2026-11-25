@@ -1,5 +1,10 @@
 {{- if .Values.catalogue.enabled -}}
 {{- $cfg := .Values.catalogue -}}
+{{- if and (gt (float64 $cfg.rds.diskSizeGiB) 0.0) (or (eq (float64 $cfg.rds.storageWarningBytes) 0.0) (eq (float64 $cfg.rds.storageCriticalBytes) 0.0)) -}}
+{{- if or (le (float64 $cfg.rds.warningPercent) 0.0) (gt (float64 $cfg.rds.warningPercent) 100.0) (le (float64 $cfg.rds.criticalPercent) 0.0) (gt (float64 $cfg.rds.criticalPercent) 100.0) -}}
+{{- fail "catalogue.rds.warningPercent and criticalPercent must be in (0,100]" -}}
+{{- end -}}
+{{- end -}}
 {{- if eq .Values.nameSuffix "catalogue" -}}{{- fail "nameSuffix must not be catalogue" -}}{{- end -}}
 {{- $workloads := default (list) $cfg.workloads -}}
 {{- if $workloads -}}
@@ -19,14 +24,15 @@
 {{- range $name, $override := $cfg.overrides -}}
 {{- if not (hasKey $known $name) -}}{{- fail (printf "unknown override key: %s" $name) -}}{{- end -}}
 {{- range $field, $value := $override -}}
-{{- if not (has $field (list "threshold" "for" "severity" "enabled")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
+{{- if not (has $field (list "threshold" "for" "severity" "enabled" "tier")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
 {{- end -}}
+{{- if and (hasKey $override "tier") (not (has $override.tier (list "P1" "P2" "P3"))) -}}{{- fail (printf "bad tier for %s" $name) -}}{{- end -}}
 {{- end -}}
 {{- $names := dict -}}
 {{- $prefixes := dict -}}
 {{- range $index, $workload := $workloads -}}
 {{- range $field, $value := $workload -}}
-{{- if not (has $field (list "name" "container" "podRegex" "alertPrefix" "overrides")) -}}{{- fail (printf "unknown workload field: %s" $field) -}}{{- end -}}
+{{- if not (has $field (list "name" "container" "podRegex" "alertPrefix" "overrides" "enabled")) -}}{{- fail (printf "unknown workload field: %s" $field) -}}{{- end -}}
 {{- end -}}
 {{- $_ := required (printf "catalogue.workloads[%d].name is required" $index) $workload.name -}}
 {{- $_ := required (printf "catalogue.workloads[%d].container is required" $index) $workload.container -}}
@@ -40,28 +46,36 @@
 {{- range $name, $override := (default (dict) $workload.overrides) -}}
 {{- if not (hasKey $known $name) -}}{{- fail (printf "unknown override key: %s" $name) -}}{{- end -}}
 {{- range $field, $value := $override -}}
-{{- if not (has $field (list "threshold" "for" "severity" "enabled")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
+{{- if not (has $field (list "threshold" "for" "severity" "enabled" "tier")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
 {{- end -}}
+{{- if and (hasKey $override "tier") (not (has $override.tier (list "P1" "P2" "P3"))) -}}{{- fail (printf "bad tier for %s" $name) -}}{{- end -}}
 {{- if not (hasKey $perWorkload $name) -}}{{- fail (printf "workload override requires perWorkload alert: %s" $name) -}}{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- $rules := list -}}
+{{- $activeWorkloads := list -}}
+{{- range $workload := $workloads -}}
+{{- if or (not (hasKey $workload "enabled")) $workload.enabled -}}{{- $activeWorkloads = append $activeWorkloads $workload -}}{{- end -}}
+{{- end -}}
 {{- $pairs := dict -}}
 {{- range $catalogue -}}
 {{- $entry := . -}}
 {{/* WHY: with no workloads the scalar values act as one unnamed workload, so output matches 0.3.0. */}}
 {{- $targets := list (dict "name" "" "container" $cfg.container "podRegex" $cfg.podRegex "alertPrefix" $cfg.alertPrefix "overrides" (dict)) -}}
-{{- if and $entry.perWorkload $workloads -}}{{- $targets = $workloads -}}{{- end -}}
+{{- if and $entry.perWorkload $workloads -}}{{- $targets = $activeWorkloads -}}{{- end -}}
 {{- range $target := $targets -}}
 {{- $override := dict -}}
 {{- range $field, $value := (default (dict) (index $cfg.overrides $entry.alert)) -}}{{- $_ := set $override $field $value -}}{{- end -}}
 {{- range $field, $value := (default (dict) (index (default (dict) (index $target "overrides")) $entry.alert)) -}}{{- $_ := set $override $field $value -}}{{- end -}}
 {{- $severity := $entry.severity -}}
 {{- if hasKey $override "severity" -}}{{- $severity = $override.severity -}}{{- end -}}
+{{- if eq (default "" $override.tier) "P1" -}}{{- $severity = "critical" -}}{{- end -}}
 {{- if not (has $severity (list "warning" "critical")) -}}{{- fail (printf "bad severity for %s" $entry.alert) -}}{{- end -}}
 {{- $threshold := $entry.threshold -}}
 {{- if eq $entry.alert "RdsStorageLow" -}}{{- $threshold = $cfg.rds.storageWarningBytes -}}{{- end -}}
 {{- if eq $entry.alert "RdsStorageCritical" -}}{{- $threshold = $cfg.rds.storageCriticalBytes -}}{{- end -}}
+{{- if and (eq (float64 $threshold) 0.0) (eq $entry.alert "RdsStorageLow") -}}{{- $threshold = divf (mulf $cfg.rds.diskSizeGiB 1073741824 $cfg.rds.warningPercent) 100 -}}{{- end -}}
+{{- if and (eq (float64 $threshold) 0.0) (eq $entry.alert "RdsStorageCritical") -}}{{- $threshold = divf (mulf $cfg.rds.diskSizeGiB 1073741824 $cfg.rds.criticalPercent) 100 -}}{{- end -}}
 {{- if hasKey $override "threshold" -}}{{- $threshold = $override.threshold -}}{{- end -}}
 {{- $number := float64 $threshold -}}
 {{- if and (eq $entry.unit "ratio") (or (le $number 0.0) (gt $number 1.0)) -}}{{- fail (printf "ratio threshold outside (0,1] for %s" $entry.alert) -}}{{- end -}}
@@ -76,7 +90,7 @@
 {{- $_ := set $pairs $pair true -}}
 {{- $formatted := printf "%.10f" $number | trimSuffix "0000000000" | trimSuffix "." -}}
 {{- if contains "." $formatted -}}{{- $formatted = regexReplaceAll "0+$" $formatted "" -}}{{- end -}}
-{{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $target.container "${POD_SELECTOR}" (printf "pod=~%s" ($target.podRegex | quote)) "${WORKLOAD}" $target.name "${HTTP_SELECTOR}" (default (printf "namespace=%s,service_name=%s" ($.Release.Namespace | quote) ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" $.Values.service.short -}}
+{{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $target.container "${POD_SELECTOR}" (printf "pod=~%s" ($target.podRegex | quote)) "${WORKLOAD}" $target.name "${HTTP_SELECTOR}" (default (printf "namespace=%s,service_name=%s" ($.Release.Namespace | quote) ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" (include "spartan-alerts.short" $) -}}
 {{- $texts := dict "expr" $entry.expr "summary" $entry.summary "description" $entry.description -}}
 {{- $_ := set $tokens "${SERVICE_NAME}" (default $.Values.service.name $cfg.serviceName) -}}
 {{- $_ := set $tokens "${JOB_REGEX}" $cfg.migration.jobRegex -}}
@@ -90,6 +104,7 @@
 {{- if $entry.prefixable -}}{{- $name = printf "%s%s" (default $cfg.alertPrefix (index $target "alertPrefix")) $entry.alert -}}{{- end -}}
 {{- $duration := $entry.for -}}{{- if hasKey $override "for" -}}{{- $duration = $override.for -}}{{- end -}}
 {{- $labels := dict "namespace" $.Release.Namespace "severity" $severity "tier" (ternary "P2" "P3" (eq $severity "critical")) "catalogue_id" $entry.catalogueId -}}
+{{- if hasKey $override "tier" -}}{{- $_ := set $labels "tier" $override.tier -}}{{- end -}}
 {{- if $target.name -}}{{- $_ := set $labels "workload" $target.name -}}{{- end -}}
 {{- $rules = append $rules (dict "alert" $name "expr" $texts.expr "for" $duration "labels" $labels "annotations" $annotations) -}}
 {{- end -}}

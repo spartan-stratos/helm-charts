@@ -1,11 +1,21 @@
 {{- if .Values.groups }}
 {{- $ns := .Release.Namespace -}}
 {{- $groups := list -}}
+{{- $tokens := include "spartan-alerts.tokens" . | fromJson -}}
 {{- range .Values.groups -}}
 {{- $group := deepCopy . -}}
+{{- $_ := set $group "name" (include "spartan-alerts.expand" (dict "text" $group.name "tokens" $tokens)) -}}
 {{- $rules := list -}}
 {{- range (default (list) $group.rules) -}}
 {{- $rule := . -}}
+{{- if hasKey $rule "expr" -}}
+{{- $_ := set $rule "expr" (include "spartan-alerts.expand" (dict "text" $rule.expr "tokens" $tokens)) -}}
+{{- end -}}
+{{- range $field := list "labels" "annotations" -}}
+{{- range $key, $value := (default (dict) (index $rule $field)) -}}
+{{- $_ := set (index $rule $field) $key (include "spartan-alerts.expand" (dict "text" $value "tokens" $tokens)) -}}
+{{- end -}}
+{{- end -}}
 {{- if hasKey $rule "alert" -}}
 {{- $labels := default (dict) $rule.labels -}}
 {{- if not (hasKey $labels "namespace") -}}
