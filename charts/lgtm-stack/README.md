@@ -487,6 +487,15 @@ folder named by annotation `grafana_folder`. Three sources use it:
 
 The RED dashboard is empty until a service sends traces (the `spartan` chart's `observability` block).
 
+The self-monitoring dashboard opens with stat panels: firing alerts, pod restarts, scrape targets down, data dropped,
+failed alert notifications, worst container memory against its limit, worst PVC fill, stored size per backend,
+Prometheus TSDB against its size limit, configured retention, Prometheus history depth, metrics, logs and traces
+ingest, Loki retention last run, and node CPU and memory for the node running Loki. Health and flow stats read 0
+when their series are absent; scrape targets down also counts an expected job that is not scraped at all. Retention
+configured comes from the `lgtm_retention_seconds` recording rule (one series each for Loki and Tempo, from the
+configured Loki and Tempo retention), so it shows "not reported" until that rule exists. The stat expressions are
+unit-tested, absent paths included, by `files/tests/dashboard-stats.sh`, which `files/tests/test-rules.sh` runs.
+
 A project's own dashboards go in its [project folder](#project-folder).
 
 ### Changing a dashboard

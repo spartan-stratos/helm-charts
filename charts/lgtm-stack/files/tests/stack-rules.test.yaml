@@ -4,6 +4,14 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
+  - promql_expr_test:
+      - expr: lgtm_retention_seconds
+        eval_time: 1m
+        exp_samples:
+          - labels: 'lgtm_retention_seconds{component="loki"}'
+            value: 2592000
+          - labels: 'lgtm_retention_seconds{component="tempo"}'
+            value: 1296000
   - interval: 1m
     input_series:
       # Loki rate-limits one tenant's lines from minute 5

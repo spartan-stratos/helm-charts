@@ -1,0 +1,122 @@
+suite: Retention rules
+templates:
+  - templates/applications.yaml
+  - templates/addon.yaml
+set:
+  argocd.project: example
+  argocd.destination.name: example
+  cluster.name: example
+tests:
+  - it: passes preset retention to stack rules
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-stack-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.retention
+          value: { loki: 1209600, tempo: 604800 }
+  - it: passes overridden retention to stack rules
+    template: templates/applications.yaml
+    set:
+      components.loki.values.loki.limits_config.retention_period: 720h
+    documentSelector:
+      path: metadata.name
+      value: lgtm-stack-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.retention.loki
+          value: 2592000
+  - it: sums compound durations
+    template: templates/applications.yaml
+    set:
+      components.loki.values.loki.limits_config.retention_period: 1h30m
+    documentSelector:
+      path: metadata.name
+      value: lgtm-stack-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.retention.loki
+          value: 5400
+  - it: preserves zero retention
+    template: templates/applications.yaml
+    set:
+      components.loki.values.loki.limits_config.retention_period: 0
+    documentSelector:
+      path: metadata.name
+      value: lgtm-stack-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.retention.loki
+          value: 0
+  - it: reports no deletion when retention is disabled
+    template: templates/applications.yaml
+    set:
+      components.loki.values.loki.compactor.retention_enabled: false
+    documentSelector:
+      path: metadata.name
+      value: lgtm-stack-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.retention.loki
+          value: 0
+  - it: passes null for disabled Loki
+    template: templates/applications.yaml
+    set:
+      components.loki.enabled: false
+    documentSelector:
+      path: metadata.name
+      value: lgtm-stack-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.retention.loki
+          value: null
+  - it: rejects an invalid duration naming its value
+    template: templates/applications.yaml
+    set:
+      components.loki.values.loki.limits_config.retention_period: 30 days
+    asserts:
+      - failedTemplate:
+          errorMessage: 'invalid retention duration "30 days"'
+  - it: omits the Loki rule when its retention is null
+    template: templates/addon.yaml
+    set:
+      mode: addon
+      addon: stackRules
+      retention: { tempo: 604800 }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-retention
+    asserts:
+      - equal:
+          path: spec.groups[0].rules
+          value:
+            - record: lgtm_retention_seconds
+              expr: vector(604800)
+              labels: { component: tempo }
+  - it: renders float retention without scientific notation
+    template: templates/addon.yaml
+    set:
+      mode: addon
+      addon: stackRules
+      retention: { loki: 2592000.0 }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-retention
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: vector(2592000)
+  - it: renders zero as a recording rule
+    template: templates/addon.yaml
+    set:
+      mode: addon
+      addon: stackRules
+      retention: { loki: 0 }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-retention
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: vector(0)

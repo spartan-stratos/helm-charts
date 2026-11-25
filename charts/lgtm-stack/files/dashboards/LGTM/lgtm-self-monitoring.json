@@ -19,7 +19,7 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Node and pods",
+      "title": "Health, capacity and flow",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -30,10 +30,10 @@
       "panels": []
     },
     {
-      "id": 2,
+      "id": 24,
       "type": "stat",
-      "title": "Node memory used",
-      "description": "Nodes running node-exporter, i.e. the LGTM node when placement pins the stack. Above ~60% for days: move to the next size",
+      "title": "Firing alerts",
+      "description": "Firing monitoring or Lgtm alerts. Missing alert telemetry reads zero; it does not prove alert evaluation is healthy.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -41,7 +41,7 @@
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -50,79 +50,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)",
-          "legendFormat": "__auto",
+          "expr": "count(ALERTS{alertstate=\"firing\",namespace=\"monitoring\"} or ALERTS{alertstate=\"firing\",alertname=~\"Lgtm.*\"}) or vector(0)",
+          "legendFormat": "alerts",
           "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.6
-              },
-              {
-                "color": "red",
-                "value": 0.85
-              }
-            ]
-          },
-          "decimals": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto",
-        "justifyMode": "auto",
-        "orientation": "auto"
-      }
-    },
-    {
-      "id": 3,
-      "type": "stat",
-      "title": "Node CPU used",
-      "description": "vCPU in use. A t3.large earns 0.6 vCPU of baseline; staying above it spends CPU credits",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 6,
-        "y": 1,
-        "w": 6,
-        "h": 4
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\"}[$__rate_interval]))",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -135,8 +67,20 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "orange",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 1
               }
             ]
           },
@@ -160,18 +104,18 @@
       }
     },
     {
-      "id": 4,
+      "id": 25,
       "type": "stat",
-      "title": "Firing alerts",
-      "description": "",
+      "title": "Pod restarts (1h)",
+      "description": "Monitoring container restarts in one hour. Counter resets or missing scrape history can undercount.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "x": 12,
+        "x": 4,
         "y": 1,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -180,10 +124,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count(ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor\"}) or vector(0)",
-          "legendFormat": "__auto",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"monitoring\"}[1h])) or vector(0)",
+          "legendFormat": "restarts",
           "refId": "A",
-          "range": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -196,15 +141,24 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "orange",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
               },
               {
                 "color": "orange",
                 "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
               }
             ]
-          }
+          },
+          "decimals": 2
         },
         "overrides": []
       },
@@ -224,18 +178,18 @@
       }
     },
     {
-      "id": 5,
+      "id": 26,
       "type": "stat",
-      "title": "Pod restarts (1h)",
-      "description": "",
+      "title": "Scrape targets down",
+      "description": "Down monitoring targets plus missing expected backend jobs: monitoring/loki, tempo, and kube-prometheus-stack-prometheus. Extra targets in a job are not an inventory of expected replicas.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "x": 18,
+        "x": 8,
         "y": 1,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -244,10 +198,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"monitoring\"}[1h])) or vector(0)",
-          "legendFormat": "__auto",
+          "expr": "(count(up{namespace=\"monitoring\"} == 0) or vector(0)) + (3 - count(count by (job) (up{job=~\"monitoring/loki|tempo|kube-prometheus-stack-prometheus\"})) or vector(3))",
+          "legendFormat": "targets",
           "refId": "A",
-          "range": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -260,8 +215,82 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "orange",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 27,
+      "type": "stat",
+      "title": "Data dropped (1h)",
+      "description": "Loki discarded samples, Tempo discarded spans and Alloy dropped log entries in one hour. New discard counters lose their first increment; missing counters read zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(loki_discarded_samples_total[1h])) or vector(0)) + (sum(increase(tempo_discarded_spans_total[1h])) or vector(0)) + (sum(increase(loki_write_dropped_entries_total[1h])) or vector(0))",
+          "legendFormat": "dropped",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
               },
               {
                 "color": "orange",
@@ -269,11 +298,969 @@
               },
               {
                 "color": "red",
-                "value": 5
+                "value": 100
               }
             ]
           },
-          "decimals": 0
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 28,
+      "type": "stat",
+      "title": "Alert notifications failed (24h)",
+      "description": "Failed Alertmanager notifications in 24 hours. Missing notification telemetry reads zero and cannot prove delivery.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(alertmanager_notifications_failed_total[24h])) or vector(0))",
+          "legendFormat": "failed",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 29,
+      "type": "stat",
+      "title": "Worst container memory vs limit",
+      "description": "Highest monitoring container working set divided by its memory limit. Containers without a limit drop out; missing telemetry reads zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(max by (namespace,pod,container) (container_memory_working_set_bytes{namespace=\"monitoring\",container!=\"\",container!=\"POD\"}) / on (namespace,pod,container) (max by (namespace,pod,container) (kube_pod_container_resource_limits{namespace=\"monitoring\",resource=\"memory\"}) > 0)) or vector(0)",
+          "legendFormat": "ratio",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "Worst PVC fill",
+      "description": "Highest used/capacity ratio for monitoring PVCs. Missing volume metrics read zero and object storage is not measured.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(kubelet_volume_stats_used_bytes{namespace=\"monitoring\"} / kubelet_volume_stats_capacity_bytes{namespace=\"monitoring\"}) or vector(0)",
+          "legendFormat": "fill",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "orange",
+                "value": 0.75
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Stored size per backend",
+      "description": "Used PVC bytes for each backend, including WAL and local data. Object storage and unreported PVCs are not measured.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 5,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(max by (namespace,persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"monitoring\",persistentvolumeclaim=~\".*loki.*\"})) or vector(0)",
+          "legendFormat": "loki",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(max by (namespace,persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"monitoring\",persistentvolumeclaim=~\".*tempo.*\"})) or vector(0)",
+          "legendFormat": "tempo",
+          "refId": "B",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(max by (namespace,persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"monitoring\",persistentvolumeclaim=~\".*prometheus.*\"})) or vector(0)",
+          "legendFormat": "prometheus",
+          "refId": "C",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 32,
+      "type": "stat",
+      "title": "Prometheus TSDB vs size limit",
+      "description": "Prometheus block bytes divided by a positive retention size limit. WAL/head bytes are excluded; unset limits or missing telemetry read zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(prometheus_tsdb_storage_blocks_bytes{job=\"kube-prometheus-stack-prometheus\"}) / (max(prometheus_tsdb_retention_limit_bytes{job=\"kube-prometheus-stack-prometheus\"}) > 0)) or vector(0)",
+          "legendFormat": "ratio",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.95
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 33,
+      "type": "stat",
+      "title": "Retention configured",
+      "description": "Default retention by backend, not per-tenant overrides. Zero means no deletion; missing telemetry also falls back to zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (component) (lgtm_retention_seconds{component=\"loki\"})",
+          "legendFormat": "loki",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (component) (lgtm_retention_seconds{component=\"tempo\"})",
+          "legendFormat": "tempo",
+          "refId": "B",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(prometheus_tsdb_retention_limit_seconds{job=\"kube-prometheus-stack-prometheus\"})",
+          "legendFormat": "prometheus",
+          "refId": "C",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurations",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              }
+            ]
+          },
+          "decimals": 1,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "no deletion",
+                  "color": "orange"
+                }
+              }
+            }
+          ],
+          "noValue": "not reported"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 34,
+      "type": "stat",
+      "title": "Prometheus history depth",
+      "description": "Elapsed seconds since the oldest Prometheus TSDB sample. Restarts, retention and missing telemetry can shorten the reported history.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(time() - (min(prometheus_tsdb_lowest_timestamp_seconds{job=\"kube-prometheus-stack-prometheus\"}))) or vector(0)",
+          "legendFormat": "history",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurations",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 35,
+      "type": "stat",
+      "title": "Metrics ingest",
+      "description": "Prometheus samples appended per second. This includes internal samples and is not remote-write delivery proof. Missing telemetry reads zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(prometheus_tsdb_head_samples_appended_total{job=\"kube-prometheus-stack-prometheus\"}[5m])) or vector(0)",
+          "legendFormat": "Metrics ingest",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 36,
+      "type": "stat",
+      "title": "Logs ingest",
+      "description": "Loki distributor bytes received per second. Accepted ingestion does not prove durable storage. Missing telemetry reads zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 9,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(loki_distributor_bytes_received_total[5m])) or vector(0)",
+          "legendFormat": "Logs ingest",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 37,
+      "type": "stat",
+      "title": "Traces ingest",
+      "description": "Tempo distributor spans received per second. Accepted spans do not prove query availability. Missing telemetry reads zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 9,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(tempo_distributor_spans_received_total[5m])) or vector(0)",
+          "legendFormat": "Traces ingest",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 38,
+      "type": "stat",
+      "title": "Loki retention last run",
+      "description": "Seconds since the last successful Loki retention run. Missing telemetry reads as time since epoch; disabled retention also appears overdue.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "time() - (max(loki_compactor_apply_retention_last_successful_run_timestamp_seconds) or vector(0))",
+          "legendFormat": "age",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurations",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "orange",
+                "value": 3600
+              },
+              {
+                "color": "red",
+                "value": 10800
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 39,
+      "type": "stat",
+      "title": "LGTM node CPU used",
+      "description": "Busy vCPU on the node running loki-0. Meaningful when placement pins LGTM to its own node; other colocated workloads count too and missing telemetry reads zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 9,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\"}[5m]) * on(instance) group_left() label_replace(max by (host_ip) (kube_pod_info{namespace=\"monitoring\",pod=\"loki-0\"}), \"instance\", \"$1:9100\", \"host_ip\", \"(.*)\")) or vector(0)",
+          "legendFormat": "vCPU",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 40,
+      "type": "stat",
+      "title": "LGTM node memory used",
+      "description": "Memory usage on the node running loki-0. Meaningful when placement pins LGTM to its own node; other colocated workloads count too and missing telemetry reads zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 9,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(1 - sum(node_memory_MemAvailable_bytes * on(instance) label_replace(max by (host_ip) (kube_pod_info{namespace=\"monitoring\",pod=\"loki-0\"}), \"instance\", \"$1:9100\", \"host_ip\", \"(.*)\")) / sum(node_memory_MemTotal_bytes * on(instance) label_replace(max by (host_ip) (kube_pod_info{namespace=\"monitoring\",pod=\"loki-0\"}), \"instance\", \"$1:9100\", \"host_ip\", \"(.*)\"))) or vector(0)",
+          "legendFormat": "used",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-06
+              },
+              {
+                "color": "orange",
+                "value": 0.6
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
+            ]
+          },
+          "decimals": 2
         },
         "overrides": []
       },
@@ -303,7 +1290,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 13,
         "w": 12,
         "h": 8
       },
@@ -357,7 +1344,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 5,
+        "y": 13,
         "w": 12,
         "h": 8
       },
@@ -407,7 +1394,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 13,
+        "y": 21,
         "w": 24,
         "h": 1
       },
@@ -424,7 +1411,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 22,
         "w": 12,
         "h": 8
       },
@@ -507,7 +1494,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 14,
+        "y": 22,
         "w": 12,
         "h": 8
       },
@@ -582,7 +1569,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 30,
         "w": 24,
         "h": 1
       },
@@ -599,7 +1586,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 31,
         "w": 8,
         "h": 8
       },
@@ -609,7 +1596,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(prometheus_tsdb_head_series)",
+          "expr": "sum(prometheus_tsdb_head_series{job=\"kube-prometheus-stack-prometheus\"})",
           "legendFormat": "series",
           "refId": "A",
           "range": true
@@ -653,7 +1640,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 23,
+        "y": 31,
         "w": 8,
         "h": 8
       },
@@ -663,7 +1650,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(prometheus_tsdb_head_samples_appended_total[$__rate_interval]))",
+          "expr": "sum(rate(prometheus_tsdb_head_samples_appended_total{job=\"kube-prometheus-stack-prometheus\"}[$__rate_interval]))",
           "legendFormat": "samples/s",
           "refId": "A",
           "range": true
@@ -707,7 +1694,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 23,
+        "y": 31,
         "w": 8,
         "h": 8
       },
@@ -717,7 +1704,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(prometheus_tsdb_storage_blocks_bytes)",
+          "expr": "sum(prometheus_tsdb_storage_blocks_bytes{job=\"kube-prometheus-stack-prometheus\"})",
           "legendFormat": "blocks",
           "refId": "A",
           "range": true
@@ -727,7 +1714,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(prometheus_tsdb_retention_limit_bytes) > 0",
+          "expr": "max(prometheus_tsdb_retention_limit_bytes{job=\"kube-prometheus-stack-prometheus\"}) > 0",
           "legendFormat": "retentionSize",
           "refId": "B",
           "range": true
@@ -771,7 +1758,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 39,
         "w": 8,
         "h": 8
       },
@@ -781,7 +1768,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (code) (rate(prometheus_http_requests_total{handler=\"/api/v1/write\"}[$__rate_interval]))",
+          "expr": "sum by (code) (rate(prometheus_http_requests_total{job=\"kube-prometheus-stack-prometheus\",handler=\"/api/v1/write\"}[$__rate_interval]))",
           "legendFormat": "{{code}}",
           "refId": "A",
           "range": true
@@ -825,7 +1812,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 31,
+        "y": 39,
         "w": 8,
         "h": 8
       },
@@ -835,7 +1822,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(prometheus_rule_evaluation_failures_total[$__rate_interval])) or vector(0)",
+          "expr": "sum(rate(prometheus_rule_evaluation_failures_total{job=\"kube-prometheus-stack-prometheus\"}[$__rate_interval])) or vector(0)",
           "legendFormat": "failures/s",
           "refId": "A",
           "range": true
@@ -879,7 +1866,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 31,
+        "y": 39,
         "w": 8,
         "h": 8
       },
@@ -939,7 +1926,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 47,
         "w": 24,
         "h": 1
       },
@@ -956,7 +1943,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 48,
         "w": 8,
         "h": 8
       },
@@ -1010,7 +1997,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 40,
+        "y": 48,
         "w": 8,
         "h": 8
       },
@@ -1064,7 +2051,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 40,
+        "y": 48,
         "w": 8,
         "h": 8
       },
@@ -1128,7 +2115,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 56,
         "w": 12,
         "h": 8
       },
@@ -1192,7 +2179,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 48,
+        "y": 56,
         "w": 12,
         "h": 8
       },

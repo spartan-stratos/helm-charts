@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.14.0 (2026-11-25)
+
+### Features
+
+* Add stat panels to the LGTM self-monitoring dashboard: firing alerts, pod restarts, scrape targets down, data dropped, failed notifications, worst container memory and PVC fill, stored size per backend, Prometheus TSDB against its limit, configured retention, history depth, ingest rates, Loki retention last run and node CPU and memory. Health and flow stats read 0 when their series are absent.
+* Add the `lgtm_retention_seconds` recording rule for the configured Loki and Tempo retention. The retention stat shows "not reported" until the rule exists.
+* Add `files/tests/dashboard-stats.sh`, a promtool test of every stat expression including the absent-series paths, and run it from `test-rules.sh`, which CI already runs.
+
 ## 0.13.1 (2026-11-25)
 
 ### Bug Fixes

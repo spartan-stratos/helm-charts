@@ -1,0 +1,159 @@
+# Tests for the stat panels of the LGTM self-monitoring dashboard; dashboard-stats.sh generates the rule file.
+rule_files:
+  - dashboard-stats-rules.yaml
+evaluation_interval: 1m
+
+tests:
+  # Nothing scraped: health and flow stats read 0 rather than No data. Only a dummy series exists.
+  - name: absent series
+    interval: 1m
+    input_series:
+      - series: 'dummy'
+        values: '0x70'
+    promql_expr_test:
+      - {expr: dashboard_stat_24_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_24_A', value: 0}]}
+      - {expr: dashboard_stat_25_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_25_A', value: 0}]}
+      # No expected job is scraped: all three are counted missing.
+      - {expr: dashboard_stat_26_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_26_A', value: 3}]}
+      - {expr: dashboard_stat_27_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_27_A', value: 0}]}
+      - {expr: dashboard_stat_28_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_28_A', value: 0}]}
+      - {expr: dashboard_stat_29_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_29_A', value: 0}]}
+      - {expr: dashboard_stat_30_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_30_A', value: 0}]}
+      - {expr: dashboard_stat_31_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_31_A', value: 0}]}
+      - {expr: dashboard_stat_31_B, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_31_B', value: 0}]}
+      - {expr: dashboard_stat_31_C, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_31_C', value: 0}]}
+      - {expr: dashboard_stat_32_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_32_A', value: 0}]}
+      # Retention configured has no or vector(0) on purpose: absent stays empty (No data).
+      - {expr: dashboard_stat_33_A, eval_time: 60m}
+      - {expr: dashboard_stat_33_B, eval_time: 60m}
+      - {expr: dashboard_stat_33_C, eval_time: 60m}
+      - {expr: dashboard_stat_34_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_34_A', value: 0}]}
+      - {expr: dashboard_stat_35_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_35_A', value: 0}]}
+      - {expr: dashboard_stat_36_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_36_A', value: 0}]}
+      - {expr: dashboard_stat_37_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_37_A', value: 0}]}
+      # No successful run ever: the age equals the eval time (3600s), which reads as stale.
+      - {expr: dashboard_stat_38_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_38_A', value: 3600}]}
+      - {expr: dashboard_stat_39_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_39_A', value: 0}]}
+      - {expr: dashboard_stat_40_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_40_A', value: 0}]}
+
+  # Healthy values for every stat.
+  - name: healthy
+    interval: 1m
+    input_series:
+      - {series: 'ALERTS{alertstate="firing",namespace="monitoring",alertname="Foo"}', values: '1x70'}
+      - {series: 'ALERTS{alertstate="firing",namespace="other",alertname="LgtmBar"}', values: '1x70'}
+      - {series: 'ALERTS{alertstate="firing",namespace="other",alertname="Unrelated"}', values: '1x70'}
+      - {series: 'kube_pod_container_status_restarts_total{namespace="monitoring",pod="a",container="c"}', values: '0+1x70'}
+      - {series: 'up{namespace="monitoring",job="monitoring/loki"}', values: '1x70'}
+      - {series: 'up{namespace="monitoring",job="tempo"}', values: '1x70'}
+      - {series: 'up{namespace="monitoring",job="kube-prometheus-stack-prometheus"}', values: '1x70'}
+      - {series: 'loki_discarded_samples_total', values: '0+1x70'}
+      - {series: 'tempo_discarded_spans_total', values: '0+2x70'}
+      - {series: 'loki_write_dropped_entries_total', values: '0+3x70'}
+      - {series: 'alertmanager_notifications_failed_total', values: '0+1x70'}
+      - {series: 'container_memory_working_set_bytes{namespace="monitoring",pod="p",container="c"}', values: '50x70'}
+      - {series: 'container_memory_working_set_bytes{namespace="monitoring",pod="p",container="nolimit"}', values: '900x70'}
+      - {series: 'kube_pod_container_resource_limits{namespace="monitoring",pod="p",container="c",resource="memory"}', values: '100x70'}
+      - {series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="data-loki-0"}', values: '100x70'}
+      - {series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="data-tempo-0"}', values: '200x70'}
+      - {series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="prometheus-db-0"}', values: '300x70'}
+      - {series: 'kubelet_volume_stats_capacity_bytes{namespace="monitoring",persistentvolumeclaim="data-loki-0"}', values: '1000x70'}
+      - {series: 'kubelet_volume_stats_capacity_bytes{namespace="monitoring",persistentvolumeclaim="data-tempo-0"}', values: '400x70'}
+      - {series: 'kubelet_volume_stats_capacity_bytes{namespace="monitoring",persistentvolumeclaim="prometheus-db-0"}', values: '1000x70'}
+      - {series: 'prometheus_tsdb_storage_blocks_bytes{job="kube-prometheus-stack-prometheus"}', values: '50x70'}
+      - {series: 'prometheus_tsdb_retention_limit_bytes{job="kube-prometheus-stack-prometheus"}', values: '100x70'}
+      - {series: 'lgtm_retention_seconds{component="loki"}', values: '2592000x70'}
+      - {series: 'lgtm_retention_seconds{component="tempo"}', values: '1296000x70'}
+      - {series: 'prometheus_tsdb_retention_limit_seconds{job="kube-prometheus-stack-prometheus"}', values: '864000x70'}
+      - {series: 'prometheus_tsdb_lowest_timestamp_seconds{job="kube-prometheus-stack-prometheus"}', values: '600x70'}
+      - {series: 'prometheus_tsdb_head_samples_appended_total{job="kube-prometheus-stack-prometheus"}', values: '0+60x70'}
+      - {series: 'loki_distributor_bytes_received_total', values: '0+120x70'}
+      - {series: 'tempo_distributor_spans_received_total', values: '0+180x70'}
+      - {series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds', values: '3000x70'}
+      - {series: 'kube_pod_info{namespace="monitoring",pod="loki-0",host_ip="10.0.0.1",uid="u1"}', values: '1x70'}
+      - {series: 'node_cpu_seconds_total{instance="10.0.0.1:9100",cpu="0",mode="user"}', values: '0+30x70'}
+      - {series: 'node_cpu_seconds_total{instance="10.0.0.1:9100",cpu="0",mode="idle"}', values: '0+30x70'}
+      - {series: 'node_cpu_seconds_total{instance="10.0.0.2:9100",cpu="0",mode="user"}', values: '0+30x70'}
+      - {series: 'node_memory_MemAvailable_bytes{instance="10.0.0.1:9100"}', values: '1x70'}
+      - {series: 'node_memory_MemTotal_bytes{instance="10.0.0.1:9100"}', values: '4x70'}
+    promql_expr_test:
+      # Foo matches by namespace, LgtmBar by name only.
+      - {expr: dashboard_stat_24_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_24_A', value: 2}]}
+      - {expr: dashboard_stat_25_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_25_A', value: 60}]}
+      - {expr: dashboard_stat_26_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_26_A', value: 0}]}
+      # 60 + 120 + 180: all three counters summed.
+      - {expr: dashboard_stat_27_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_27_A', value: 360}]}
+      - {expr: dashboard_stat_28_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_28_A', value: 60}]}
+      # The container with no limit is excluded; c is 50 of 100.
+      - {expr: dashboard_stat_29_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_29_A', value: 0.5}]}
+      # tempo is the fullest: 200 of 400.
+      - {expr: dashboard_stat_30_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_30_A', value: 0.5}]}
+      - {expr: dashboard_stat_31_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_31_A', value: 100}]}
+      - {expr: dashboard_stat_31_B, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_31_B', value: 200}]}
+      - {expr: dashboard_stat_31_C, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_31_C', value: 300}]}
+      - {expr: dashboard_stat_32_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_32_A', value: 0.5}]}
+      - {expr: dashboard_stat_33_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_33_A{component="loki"}', value: 2592000}]}
+      - {expr: dashboard_stat_33_B, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_33_B{component="tempo"}', value: 1296000}]}
+      - {expr: dashboard_stat_33_C, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_33_C', value: 864000}]}
+      - {expr: dashboard_stat_34_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_34_A', value: 3000}]}
+      - {expr: dashboard_stat_35_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_35_A', value: 1}]}
+      - {expr: dashboard_stat_36_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_36_A', value: 2}]}
+      - {expr: dashboard_stat_37_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_37_A', value: 3}]}
+      - {expr: dashboard_stat_38_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_38_A', value: 600}]}
+      # user is 0.5 core on the loki node (idle excluded; the other node is not joined).
+      - {expr: dashboard_stat_39_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_39_A', value: 0.5}]}
+      - {expr: dashboard_stat_40_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_40_A', value: 0.75}]}
+
+  # Only some of the three drop counters exist: the stat sums those present instead of returning the first.
+  - name: data dropped partial counters
+    interval: 1m
+    input_series:
+      - {series: 'loki_discarded_samples_total', values: '0+1x70'}
+      - {series: 'tempo_discarded_spans_total', values: '0+2x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_27_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_27_A', value: 180}]}
+
+  - name: data dropped only the last counter
+    interval: 1m
+    input_series:
+      - {series: 'loki_write_dropped_entries_total', values: '0+3x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_27_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_27_A', value: 180}]}
+
+  # An expected job that is not scraped at all counts as down, on top of a scraped target that is down.
+  - name: scrape targets missing job
+    interval: 1m
+    input_series:
+      - {series: 'up{namespace="monitoring",job="monitoring/loki"}', values: '1x70'}
+      - {series: 'up{namespace="monitoring",job="tempo"}', values: '1x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_26_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_26_A', value: 1}]}
+
+  - name: scrape targets down plus missing job
+    interval: 1m
+    input_series:
+      - {series: 'up{namespace="monitoring",job="monitoring/loki"}', values: '0x70'}
+      - {series: 'up{namespace="monitoring",job="tempo"}', values: '1x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_26_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_26_A', value: 2}]}
+
+  # An Lgtm alert without a namespace label is still counted.
+  - name: firing alert without namespace
+    interval: 1m
+    input_series:
+      - {series: 'ALERTS{alertstate="firing",alertname="LgtmLokiDown"}', values: '1x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_24_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_24_A', value: 1}]}
+
+  # Two kube_pod_info series for loki-0 with different uids (a restarted pod object) must not break the node join.
+  - name: node join with duplicate pod uids
+    interval: 1m
+    input_series:
+      - {series: 'kube_pod_info{namespace="monitoring",pod="loki-0",host_ip="10.0.0.1",uid="u1"}', values: '1x70'}
+      - {series: 'kube_pod_info{namespace="monitoring",pod="loki-0",host_ip="10.0.0.1",uid="u2"}', values: '1x70'}
+      - {series: 'node_cpu_seconds_total{instance="10.0.0.1:9100",cpu="0",mode="user"}', values: '0+60x70'}
+      - {series: 'node_memory_MemAvailable_bytes{instance="10.0.0.1:9100"}', values: '1x70'}
+      - {series: 'node_memory_MemTotal_bytes{instance="10.0.0.1:9100"}', values: '4x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_39_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_39_A', value: 1}]}
+      - {expr: dashboard_stat_40_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_40_A', value: 0.75}]}
