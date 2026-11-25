@@ -487,6 +487,7 @@ folder named by annotation `grafana_folder`. Three sources use it:
 | `LGTM` | **LGTM Lite self-monitoring**: node and pod usage against the sizing thresholds, PVCs, Prometheus series and TSDB size, Loki, Tempo and Alloy throughput and drops | this chart |
 
 The RED dashboard is empty until a service sends traces (the `spartan` chart's `observability` block).
+Span metrics now carry `tenant` and `namespace` labels for tenant ruler queries.
 
 The self-monitoring dashboard opens with stat panels: firing alerts, pod restarts, scrape targets down, data dropped,
 failed alert notifications, worst container memory against its limit, worst PVC fill, stored size per backend,
@@ -625,7 +626,7 @@ critical:
 Services below `minRequestRate` (0.1 req/s) are not alerted on. `overrides.<service>` is merged over the defaults for
 that service, e.g. `payments: { errorRate: { critical: 0.01 } }`, or `batch: { enabled: false }` to skip it; drop a
 severity's threshold to skip that severity. The alerts carry `service` (inhibition matches on it, so one service's
-critical does not hide another's warning) but no `namespace`, which span metrics do not have.
+critical does not hide another's warning); service recording rules aggregate away `tenant` and `namespace`, with alert namespaces supplied by the static mapping above.
 
 Span metrics leave out health checks (`url.path` `/health`, `/healthz`, `/livez`, `/readyz`, `/ping`, `/metrics`,
 `/prometheus`, each also under `/actuator`, and their subpaths) and `OPTIONS` requests, so probes and CORS preflights
