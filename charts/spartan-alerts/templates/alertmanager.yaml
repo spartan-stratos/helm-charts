@@ -10,6 +10,11 @@
 {{- $matchers = printf "%s        matchType: %s\n" $matchers (.matchType | quote) -}}
 {{- end -}}
 {{- end -}}
+{{- $inhibitRules := "" -}}
+{{- if and .Values.catalogue.enabled .Values.catalogue.inhibit -}}
+{{/* WHY: Absent labels compare equal; per-resource labels keep one database from muting another. */}}
+{{- $inhibitRules = "  inhibitRules:\n    - sourceMatch:\n        - name: severity\n          value: critical\n        - name: catalogue_id\n          matchType: \"=~\"\n          value: \".+\"\n      targetMatch:\n        - name: severity\n          value: warning\n      equal: [namespace, catalogue_id, pod, dimension_DBInstanceIdentifier, dimension_CacheClusterId]\n" -}}
+{{- end -}}
 {{- if empty .Values.slack.channel -}}
 {{- $manifest = replace "          channel: '#${ALERT_SLACK_CHANNEL}'\n" "" $manifest -}}
 {{- end -}}
@@ -24,4 +29,5 @@
   | replace "${ALERT_SLACK_SECRET}" .Values.slack.secretName
   | replace "${ALERT_SLACK_CHANNEL}" .Values.slack.channel
   | replace "${ROUTE_MATCHERS}\n" $matchers
+  | replace "${INHIBIT_RULES}\n" $inhibitRules
 }}

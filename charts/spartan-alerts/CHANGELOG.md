@@ -2,6 +2,12 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.3.0 (2026-11-25)
+
+### Features
+
+* Add an opt-in alert catalogue with source toggles, per-alert overrides, storage thresholds, runbook links, and critical-to-warning inhibition.
+
 ## 0.2.0 (2026-11-22)
 
 ### Features

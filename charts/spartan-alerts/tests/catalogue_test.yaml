@@ -1,0 +1,387 @@
+suite: catalogue rules
+templates:
+- templates/catalogue-rules.yaml
+release:
+  namespace: alerts-test
+set:
+  service.name: svc
+  catalogue.enabled: true
+  catalogue.container: app
+  catalogue.podRegex: app-.+
+tests:
+- it: rejects an empty severity override
+  set:
+    catalogue.overrides.Http5xx.severity: ""
+  asserts:
+  - failedTemplate:
+      errorMessage: bad severity for Http5xx
+- it: disabled produces no document
+  set:
+    catalogue.enabled: false
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: default enabled sources produce eleven entries
+  set: {}
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 11
+  - equal:
+      path: metadata.name
+      value: svc-catalogue
+  - equal:
+      path: metadata.namespace
+      value: alerts-test
+  - equal:
+      path: spec.groups[0].name
+      value: spartan-alerts-catalogue
+- it: disabling kubeState gates all dependent entries
+  set:
+    catalogue.sources.kubeState: false
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 6
+- it: disabling cadvisor gates all dependent entries
+  set:
+    catalogue.sources.cadvisor: false
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 7
+- it: disabling http gates all dependent entries
+  set:
+    catalogue.sources.http: false
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 9
+- it: disabling probe gates all dependent entries
+  set:
+    catalogue.sources.probe: false
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 10
+- it: enabling rds adds its entries
+  set:
+    catalogue.sources.rds: true
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 13
+- it: enabling elasticache adds its entries
+  set:
+    catalogue.sources.elasticache: true
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 16
+- it: zero storage thresholds omit storage entries
+  set:
+    catalogue.sources.rds: true
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 13
+- it: pins the existing consumer alert names and only prefixes application entries
+  set:
+    catalogue.alertPrefix: Backend
+    catalogue.sources.rds: true
+    catalogue.sources.elasticache: true
+    catalogue.rds.storageWarningBytes: 6442450944
+    catalogue.rds.storageCriticalBytes: 4294967296
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 20
+  - equal:
+      path: spec.groups[0].rules[0].alert
+      value: BackendContainerRestarting
+  - equal:
+      path: spec.groups[0].rules[1].alert
+      value: BackendPodStuckWaiting
+  - equal:
+      path: spec.groups[0].rules[2].alert
+      value: BackendPodFailed
+  - equal:
+      path: spec.groups[0].rules[3].alert
+      value: BackendNoReadyPods
+  - equal:
+      path: spec.groups[0].rules[4].alert
+      value: BackendMemoryNearLimit
+  - equal:
+      path: spec.groups[0].rules[5].alert
+      value: BackendCpuHigh
+  - equal:
+      path: spec.groups[0].rules[6].alert
+      value: BackendCpuThrottled
+  - equal:
+      path: spec.groups[0].rules[7].alert
+      value: BackendOomKilled
+  - equal:
+      path: spec.groups[0].rules[8].alert
+      value: BackendHttpP95Slow
+  - equal:
+      path: spec.groups[0].rules[9].alert
+      value: BackendHttp5xx
+  - equal:
+      path: spec.groups[0].rules[10].alert
+      value: BackendUptimeProbeFailed
+  - equal:
+      path: spec.groups[0].rules[11].alert
+      value: RdsCpuHigh
+  - equal:
+      path: spec.groups[0].rules[12].alert
+      value: RdsCpuCritical
+  - equal:
+      path: spec.groups[0].rules[13].alert
+      value: RdsStorageLow
+  - equal:
+      path: spec.groups[0].rules[14].alert
+      value: RdsStorageCritical
+  - equal:
+      path: spec.groups[0].rules[15].alert
+      value: ElasticacheCpuHigh
+  - equal:
+      path: spec.groups[0].rules[16].alert
+      value: ElasticacheCpuCritical
+  - equal:
+      path: spec.groups[0].rules[17].alert
+      value: ElasticacheMemoryHigh
+  - equal:
+      path: spec.groups[0].rules[18].alert
+      value: ElasticacheMemoryCritical
+  - equal:
+      path: spec.groups[0].rules[19].alert
+      value: ElasticacheEvictions
+- it: threshold override replaces expression and annotations
+  set:
+    catalogue.overrides.MemoryNearLimit.threshold: 0.9
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[4].expr
+      pattern: '> 0\.9$'
+  - matchRegex:
+      path: spec.groups[0].rules[4].annotations.summary
+      pattern: above 0\.9
+- it: for override wins
+  set:
+    catalogue.overrides.ContainerRestarting.for: 12m
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[0].for
+      value: 12m
+- it: severity override derives tier
+  set:
+    catalogue.overrides.ContainerRestarting.severity: warning
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[0].labels.severity
+      value: warning
+  - equal:
+      path: spec.groups[0].rules[0].labels.tier
+      value: P3
+  - equal:
+      path: spec.groups[0].rules[4].labels.tier
+      value: P3
+- it: critical severity derives P2
+  set:
+    catalogue.overrides.MemoryNearLimit.severity: critical
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[4].labels.tier
+      value: P2
+  - equal:
+      path: spec.groups[0].rules[0].labels.tier
+      value: P2
+- it: enabled override removes entry
+  set:
+    catalogue.overrides.ContainerRestarting.enabled: false
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 10
+  - equal:
+      path: spec.groups[0].rules[0].alert
+      value: PodStuckWaiting
+- it: valid override for disabled source is accepted
+  set:
+    catalogue.overrides.RdsStorageLow.threshold: 6442450944
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 11
+- it: explicit storage override wins and formats bytes
+  set:
+    catalogue.sources.rds: true
+    catalogue.rds.storageWarningBytes: 123
+    catalogue.overrides.RdsStorageLow.threshold: 6442450944
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 14
+  - matchRegex:
+      path: spec.groups[0].rules[13].expr
+      pattern: < 6442450944$
+  - matchRegex:
+      path: spec.groups[0].rules[13].annotations.summary
+      pattern: '6442450944'
+- it: rds storage inputs render without exponent
+  set:
+    catalogue.sources.rds: true
+    catalogue.rds.storageWarningBytes: 6442450944
+    catalogue.rds.storageCriticalBytes: 4294967296
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[13].expr
+      pattern: < 6442450944$
+  - matchRegex:
+      path: spec.groups[0].rules[14].expr
+      pattern: < 4294967296$
+- it: runbook URL attaches to rules
+  set:
+    catalogue.runbookUrl: https://example.com/runbook
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[0].annotations.runbook_url
+      value: https://example.com/runbook
+  - equal:
+      path: spec.groups[0].rules[10].annotations.runbook_url
+      value: https://example.com/runbook
+- it: empty runbook omits annotation
+  set: {}
+  asserts:
+  - notExists:
+      path: spec.groups[0].rules[0].annotations.runbook_url
+- it: name suffix names separate rule resource
+  set:
+    nameSuffix: prod
+  asserts:
+  - equal:
+      path: metadata.name
+      value: svc-prod-catalogue
+- it: rejects unknown override key
+  set:
+    catalogue.overrides.NoSuchRule.threshold: 1
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown override key: NoSuchRule'
+- it: rejects unknown override field
+  set:
+    catalogue.overrides.Http5xx.noSuchField: 1
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown override field: noSuchField'
+- it: rejects bad severity
+  set:
+    catalogue.overrides.Http5xx.severity: info
+  asserts:
+  - failedTemplate:
+      errorMessage: bad severity for Http5xx
+- it: rejects ratio too high
+  set:
+    catalogue.overrides.Http5xx.threshold: 1.5
+  asserts:
+  - failedTemplate:
+      errorMessage: ratio threshold outside (0,1] for Http5xx
+- it: rejects ratio zero
+  set:
+    catalogue.overrides.Http5xx.threshold: 0
+  asserts:
+  - failedTemplate:
+      errorMessage: ratio threshold outside (0,1] for Http5xx
+- it: rejects percent too high
+  set:
+    catalogue.overrides.RdsCpuHigh.threshold: 150
+  asserts:
+  - failedTemplate:
+      errorMessage: percent threshold outside (0,100] for RdsCpuHigh
+- it: rejects percent zero
+  set:
+    catalogue.overrides.RdsCpuHigh.threshold: 0
+  asserts:
+  - failedTemplate:
+      errorMessage: percent threshold outside (0,100] for RdsCpuHigh
+- it: rejects missing container
+  set:
+    catalogue.container: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: catalogue.container is required
+- it: rejects missing pod regex
+  set:
+    catalogue.podRegex: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: catalogue.podRegex is required
+- it: rejects same severity pair
+  set:
+    catalogue.sources.rds: true
+    catalogue.overrides.RdsCpuHigh.severity: critical
+  asserts:
+  - failedTemplate:
+      errorMessage: same-severity pair for rds-cpu
+- it: rejects reserved suffix
+  set:
+    nameSuffix: catalogue
+  asserts:
+  - failedTemplate:
+      errorMessage: nameSuffix must not be catalogue
+- it: container and pod regex are unnecessary without their sources
+  set:
+    catalogue.sources.kubeState: false
+    catalogue.sources.cadvisor: false
+    catalogue.container: ''
+    catalogue.podRegex: ''
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 3
+- it: tokens render and Prometheus templates stay literal
+  set: {}
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[0].expr
+      pattern: container="app",pod=~"app-.+"
+  - equal:
+      path: spec.groups[0].rules[0].annotations.summary
+      value: service pod {{ $labels.pod }} restarted
+  - equal:
+      path: spec.groups[0].rules[0].labels.catalogue_id
+      value: container-restarting
+  - equal:
+      path: spec.groups[0].rules[0].labels.namespace
+      value: alerts-test
+  - matchRegex:
+      path: spec.groups[0].rules[8].expr
+      pattern: service_name="svc"
+  - matchRegex:
+      path: spec.groups[0].rules[2].expr
+      pattern: unless on\(pod\) kube_pod_status_reason
+  - notMatchRegex:
+      path: spec.groups[0].rules[3].expr
+      pattern: vector
+  - matchRegex:
+      path: spec.groups[0].rules[9].expr
+      pattern: '>= 2'
+- it: HTTP selector and project tag can be overridden
+  set:
+    catalogue.httpSelector: namespace="custom"
+    catalogue.tagProject: project
+    catalogue.sources.rds: true
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[8].expr
+      pattern: namespace="custom"
+  - matchRegex:
+      path: spec.groups[0].rules[11].expr
+      pattern: tag_Project="project"
+- it: project tag defaults to service name
+  set:
+    catalogue.sources.rds: true
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[11].expr
+      pattern: name!="global",tag_Project="svc"

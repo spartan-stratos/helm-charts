@@ -4,6 +4,44 @@ templates:
 release:
   namespace: alerts-test
 tests:
+  - it: "should omit inhibition when catalogue is disabled"
+    set:
+      catalogue.enabled: false
+    asserts:
+      - notExists:
+          path: spec.inhibitRules
+  - it: "should inhibit matching catalogue warnings only in the namespace document"
+    set:
+      catalogue.enabled: true
+      catalogue.container: app
+      catalogue.podRegex: app-.*
+    asserts:
+      - equal:
+          path: spec.inhibitRules
+          value:
+            - sourceMatch:
+                - name: severity
+                  value: critical
+                - name: catalogue_id
+                  matchType: "=~"
+                  value: ".+"
+              targetMatch:
+                - name: severity
+                  value: warning
+              equal: [namespace, catalogue_id, pod, dimension_DBInstanceIdentifier, dimension_CacheClusterId]
+        documentIndex: 0
+      - notExists:
+          path: spec.inhibitRules
+        documentIndex: 1
+  - it: "should omit inhibition when explicitly disabled"
+    set:
+      catalogue.enabled: true
+      catalogue.inhibit: false
+      catalogue.container: app
+      catalogue.podRegex: app-.*
+    asserts:
+      - notExists:
+          path: spec.inhibitRules
   - it: "should keep default routing names and matchers unchanged"
     asserts:
       - equal:

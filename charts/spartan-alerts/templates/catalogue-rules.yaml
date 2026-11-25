@@ -1,0 +1,65 @@
+{{- if .Values.catalogue.enabled -}}
+{{- $cfg := .Values.catalogue -}}
+{{- if eq .Values.nameSuffix "catalogue" -}}{{- fail "nameSuffix must not be catalogue" -}}{{- end -}}
+{{- if or $cfg.sources.kubeState $cfg.sources.cadvisor -}}
+{{- $_ := required "catalogue.container is required" $cfg.container -}}
+{{- $_ := required "catalogue.podRegex is required" $cfg.podRegex -}}
+{{- end -}}
+{{- $catalogue := (.Files.Get "files/catalogue.yaml" | fromYaml).rules -}}
+{{- $known := dict -}}
+{{- range $catalogue -}}{{- $_ := set $known .alert true -}}{{- end -}}
+{{- range $name, $override := $cfg.overrides -}}
+{{- if not (hasKey $known $name) -}}{{- fail (printf "unknown override key: %s" $name) -}}{{- end -}}
+{{- range $field, $value := $override -}}
+{{- if not (has $field (list "threshold" "for" "severity" "enabled")) -}}{{- fail (printf "unknown override field: %s" $field) -}}{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- $rules := list -}}
+{{- $pairs := dict -}}
+{{- range $catalogue -}}
+{{- $entry := . -}}
+{{- $override := default (dict) (index $cfg.overrides .alert) -}}
+{{- $severity := .severity -}}
+{{- if hasKey $override "severity" -}}{{- $severity = $override.severity -}}{{- end -}}
+{{- if not (has $severity (list "warning" "critical")) -}}{{- fail (printf "bad severity for %s" .alert) -}}{{- end -}}
+{{- $threshold := .threshold -}}
+{{- if eq .alert "RdsStorageLow" -}}{{- $threshold = $cfg.rds.storageWarningBytes -}}{{- end -}}
+{{- if eq .alert "RdsStorageCritical" -}}{{- $threshold = $cfg.rds.storageCriticalBytes -}}{{- end -}}
+{{- if hasKey $override "threshold" -}}{{- $threshold = $override.threshold -}}{{- end -}}
+{{- $number := float64 $threshold -}}
+{{- if and (eq .unit "ratio") (or (le $number 0.0) (gt $number 1.0)) -}}{{- fail (printf "ratio threshold outside (0,1] for %s" .alert) -}}{{- end -}}
+{{- if and (eq .unit "percent") (or (le $number 0.0) (gt $number 100.0)) -}}{{- fail (printf "percent threshold outside (0,100] for %s" .alert) -}}{{- end -}}
+{{- $enabled := true -}}
+{{- range .sources -}}{{- if not (index $cfg.sources .) -}}{{- $enabled = false -}}{{- end -}}{{- end -}}
+{{- if and (hasKey $override "enabled") (not $override.enabled) -}}{{- $enabled = false -}}{{- end -}}
+{{- if and (eq .unit "bytes") (eq $number 0.0) -}}{{- $enabled = false -}}{{- end -}}
+{{- if $enabled -}}
+{{- $pair := printf "%s/%s" .catalogueId $severity -}}
+{{- if hasKey $pairs $pair -}}{{- fail (printf "same-severity pair for %s" .catalogueId) -}}{{- end -}}
+{{- $_ := set $pairs $pair true -}}
+{{- $formatted := printf "%.10f" $number | trimSuffix "0000000000" | trimSuffix "." -}}
+{{- if contains "." $formatted -}}{{- $formatted = regexReplaceAll "0+$" $formatted "" -}}{{- end -}}
+{{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $cfg.container "${POD_SELECTOR}" (printf "pod=~%s" ($cfg.podRegex | quote)) "${HTTP_SELECTOR}" (default (printf "service_name=%s" ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" $.Values.service.short -}}
+{{- $texts := dict "expr" .expr "summary" .summary "description" .description -}}
+{{- range $field, $text := $texts -}}
+{{- range $token, $value := $tokens -}}{{- $text = replace $token $value $text -}}{{- end -}}
+{{- $_ := set $texts $field $text -}}
+{{- end -}}
+{{- $annotations := dict "summary" $texts.summary "description" $texts.description -}}
+{{- if $cfg.runbookUrl -}}{{- $_ := set $annotations "runbook_url" $cfg.runbookUrl -}}{{- end -}}
+{{- $name := .alert -}}
+{{- if .prefixable -}}{{- $name = printf "%s%s" $cfg.alertPrefix .alert -}}{{- end -}}
+{{- $duration := .for -}}{{- if hasKey $override "for" -}}{{- $duration = $override.for -}}{{- end -}}
+{{- $rules = append $rules (dict "alert" $name "expr" $texts.expr "for" $duration "labels" (dict "namespace" $.Release.Namespace "severity" $severity "tier" (ternary "P2" "P3" (eq $severity "critical")) "catalogue_id" .catalogueId) "annotations" $annotations) -}}
+{{- end -}}
+{{- end -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ if .Values.nameSuffix }}{{ printf "%s-%s-catalogue" .Values.service.name .Values.nameSuffix | quote }}{{ else }}{{ printf "%s-catalogue" .Values.service.name | quote }}{{ end }}
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  groups:
+    - name: spartan-alerts-catalogue
+      rules: {{ toYaml $rules | nindent 8 }}
+{{- end }}
