@@ -158,6 +158,20 @@ spec:
         mode: addon
         addon: {{ $key }}
         namespace: {{ $.Values.namespace }}
+        {{- if eq $key "stackRules" }}
+        {{- $retention := dict "loki" nil "tempo" nil }}
+        {{- if $.Values.components.loki.enabled }}
+        {{- $loki := include "lgtm-stack.values" (list $ "loki" $components.loki) | fromYaml }}
+        {{- $seconds := include "lgtm-stack.retentionSeconds" $loki.loki.limits_config.retention_period | int64 }}
+        {{- if not $loki.loki.compactor.retention_enabled }}{{ $seconds = int64 0 }}{{ end }}
+        {{- $_ := set $retention "loki" $seconds }}
+        {{- end }}
+        {{- if $.Values.components.tempo.enabled }}
+        {{- $tempo := include "lgtm-stack.values" (list $ "tempo" $components.tempo) | fromYaml }}
+        {{- $_ := set $retention "tempo" (include "lgtm-stack.retentionSeconds" $tempo.tempo.retention | int64) }}
+        {{- end }}
+        retention: {{- toYaml $retention | nindent 10 }}
+        {{- end }}
         {{- if eq $key "networkPolicy" }}
         networkPolicy: {{- toYaml $.Values.networkPolicy | nindent 10 }}
         {{- end }}

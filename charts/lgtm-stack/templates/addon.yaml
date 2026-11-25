@@ -50,6 +50,12 @@ data:
 ---
 {{ include (printf "lgtm-stack.rules.%s" .) $ }}
 {{- end }}
+{{- if eq .Values.addon "stackRules" }}
+{{- with include "lgtm-stack.rules.retention" . }}
+---
+{{ . }}
+{{- end }}
+{{- end }}
 {{- range $a.files }}
 {{- $m := $.Files.Get (printf "files/manifests/%s" .)
   | replace "__CLUSTER_NAME__" (required "cluster.name is required" $.Values.cluster.name)

@@ -2,6 +2,48 @@
 Rule bundles rendered in addon mode from alerting.rules. $o and $c print the braces of Prometheus templates.
 */}}
 
+{{- define "lgtm-stack.retentionSeconds" -}}
+{{- $value := toString . -}}
+{{- if eq $value "0" -}}
+0
+{{- else -}}
+{{- if not (regexMatch "^([0-9]+(ms|s|m|h|d|w|y))+$" $value) -}}
+{{- fail (printf "invalid retention duration %q" $value) -}}
+{{- end -}}
+{{- $milliseconds := int64 0 -}}
+{{- $units := dict "ms" 1 "s" 1000 "m" 60000 "h" 3600000 "d" 86400000 "w" 604800000 "y" 31536000000 -}}
+{{- range regexFindAll "[0-9]+(ms|s|m|h|d|w|y)" $value -1 -}}
+{{- $unit := regexFind "ms|s|m|h|d|w|y" . -}}
+{{- $milliseconds = add $milliseconds (mul (int64 (trimSuffix $unit .)) (index $units $unit)) -}}
+{{- end -}}
+{{- div $milliseconds 1000 -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "lgtm-stack.rules.retention" -}}
+{{- $retention := .Values.retention | default dict -}}
+{{- if or (ne (index $retention "loki") nil) (ne (index $retention "tempo") nil) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lgtm-retention
+  namespace: {{ .Values.namespace }}
+spec:
+  groups:
+    - name: lgtm-retention
+      rules:
+{{- range $component := list "loki" "tempo" }}
+{{- $seconds := index $retention $component }}
+{{- if ne $seconds nil }}
+        - record: lgtm_retention_seconds
+          expr: vector({{ $seconds | int64 }})
+          labels:
+            component: {{ $component }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
 {{/* RED alerts per service from Tempo span metrics (server spans), with per-service overrides */}}
 {{- define "lgtm-stack.rules.services" -}}
 {{- $o := "{{" }}{{ $c := "}}" -}}
