@@ -1,6 +1,7 @@
 {{- if eq .Values.mode "applications" }}
 {{- include "lgtm-stack.validateRemovedGrafanaKeys" . }}
 {{- include "lgtm-stack.validateTenantDashboards" . }}
+{{- include "lgtm-stack.validateSettleSeconds" . }}
 {{- $mapping := include "lgtm-stack.orgMapping" . }}
 {{- $_ := required "argocd.project is required" .Values.argocd.project }}
 {{- $_ := required "cluster.name is required" .Values.cluster.name }}

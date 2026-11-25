@@ -27,6 +27,16 @@
 {{- end -}}
 {{- end -}}
 
+{{- define "lgtm-stack.validateSettleSeconds" -}}
+{{- $mapping := include "lgtm-stack.orgMapping" . -}}
+{{- if $mapping -}}
+{{- $settle := dig "settleSeconds" 120 .Values.grafana.orgMapping -}}
+{{- if not (regexMatch "^[0-9]+$" (toString $settle)) -}}
+{{- fail "grafana.orgMapping.settleSeconds must be a non-negative integer" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "lgtm-stack.hasTenantDashboards" -}}
 {{- range .Values.tenants -}}
 {{- if hasKey (.grafana | default dict) "orgId" -}}true{{- end -}}
