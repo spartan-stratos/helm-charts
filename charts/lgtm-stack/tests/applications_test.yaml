@@ -131,7 +131,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.15.0
+          value: 0.16.0
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
@@ -255,6 +255,51 @@ tests:
       - equal:
           path: spec.source.helm.valuesObject.tempo.overrides.defaults.metrics_generator.processor.span_metrics.filter_policies[1].exclude.attributes[0]
           value: { key: span.http.request.method, value: OPTIONS }
+
+  - it: "labels span metrics for tenant rulers"
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-tempo
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.metricsGenerator.registry.inject_tenant_id_as
+          value: tenant
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.overrides.defaults.metrics_generator.processor.span_metrics.dimension_mappings
+          value: [{ name: namespace, source_labels: [k8s.namespace.name] }]
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.overrides.defaults.metrics_generator.processor.span_metrics.dimensions
+          value: [http.response.status_code, http.request.method, http.route]
+
+  - it: "merges consumer Tempo values with span metric label defaults"
+    template: templates/applications.yaml
+    set:
+      components.tempo.values.tempo:
+        metricsGenerator:
+          remoteWriteUrl: http://custom-prometheus:9090/api/v1/write
+        overrides:
+          defaults:
+            metrics_generator:
+              processor:
+                span_metrics:
+                  dimensions: [http.route]
+    documentSelector:
+      path: metadata.name
+      value: lgtm-tempo
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.metricsGenerator.remoteWriteUrl
+          value: http://custom-prometheus:9090/api/v1/write
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.metricsGenerator.registry.inject_tenant_id_as
+          value: tenant
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.overrides.defaults.metrics_generator.processor.span_metrics.dimension_mappings
+          value: [{ name: namespace, source_labels: [k8s.namespace.name] }]
+      - equal:
+          path: spec.source.helm.valuesObject.tempo.overrides.defaults.metrics_generator.processor.span_metrics.dimensions
+          value: [http.route]
 
   - it: "requires a path for the project folder"
     template: templates/applications.yaml

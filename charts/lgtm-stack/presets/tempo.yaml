@@ -14,6 +14,8 @@ tempo:
   # Span metrics + service graph, remote-written to Prometheus (receiver enabled in kube-prometheus-stack)
   metricsGenerator:
     enabled: true
+    # Use the Tempo org id because an app could set its own tenant resource attribute.
+    registry: { inject_tenant_id_as: tenant }
     remoteWriteUrl: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
   overrides:
     defaults:
@@ -23,6 +25,8 @@ tempo:
           # Gives traces_spanmetrics_calls_total an http_response_status_code label for 5xx alerts
           span_metrics:
             dimensions: [http.response.status_code, http.request.method, http.route]
+            # Tenant rulers enforce namespace, which separates dev from prod for one service.
+            dimension_mappings: [{ name: namespace, source_labels: [k8s.namespace.name] }]
             # Health checks, metrics scrapes and CORS preflights stay in traces but out of RED: they inflate the
             # request rate and pull p95 down. A span is counted only if it passes every policy
             filter_policies:

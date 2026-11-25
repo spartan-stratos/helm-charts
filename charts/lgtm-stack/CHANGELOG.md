@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.16.0 (2026-11-25)
+
+### Features
+
+* Add `tenant` from the Tempo org id and `namespace` from `k8s.namespace.name` to span metrics so tenant rulers can query them. Series grow to one series set per namespace. Tempo restarts once on upgrade.
+
 ## 0.15.0 (2026-11-25)
 
 ### Features
