@@ -92,7 +92,7 @@ tests:
           value: [{ name: rules-1, mountPath: /rules/b }]
       - equal:
           path: spec.source.helm.valuesObject.singleBinary.extraVolumes
-          value: [{ name: rules-platform, configMap: { name: loki-rules-platform } }, { name: rules-0, emptyDir: {} }, { name: rules-1, emptyDir: {} }]
+          value: [{ name: rules-platform, configMap: { name: loki-rules-platform, optional: true } }, { name: rules-0, emptyDir: {} }, { name: rules-1, emptyDir: {} }]
       - equal:
           path: spec.source.helm.valuesObject.singleBinary.extraVolumeMounts
           value: [{ name: rules-platform, mountPath: /rules/platform, readOnly: true }, { name: rules-0, mountPath: /rules/a, readOnly: true }, { name: rules-1, mountPath: /rules/b, readOnly: true }]
@@ -154,7 +154,7 @@ tests:
           value: [{ name: http-rules-1, containerPort: 8081 }]
       - equal:
           path: spec.source.helm.valuesObject.singleBinary.extraVolumes
-          value: [{ name: rules-platform, configMap: { name: loki-rules-platform } }, { name: rules-0, emptyDir: {} }, { name: rules-1, emptyDir: {} }]
+          value: [{ name: rules-platform, configMap: { name: loki-rules-platform, optional: true } }, { name: rules-0, emptyDir: {} }, { name: rules-1, emptyDir: {} }]
       - equal:
           path: spec.source.helm.valuesObject.singleBinary.extraContainers[1].volumeMounts
           value: [{ name: rules-1, mountPath: /rules/b }]
@@ -268,10 +268,9 @@ tests:
             groups:
               - name: lgtm-log-rules-canary
                 rules:
-                  - record: lgtm:log_rules_canary
-                    expr: vector(1)
                   - alert: LokiRuleListFailing
-                    expr: 'sum(count_over_time({namespace="monitoring", container="loki"} |= "unable to list rules" [5m])) > 0'
+                    # Loki logs each ruler query's text, so without the exclusion the alert matches its own query log.
+                    expr: 'sum(count_over_time({namespace="monitoring", container="loki"} |= "unable to list rules" != "count_over_time" [5m])) > 0'
                     for: 5m
                     labels:
                       severity: critical
@@ -279,6 +278,26 @@ tests:
                     annotations:
                       summary: '{{ $value }} rule list failures in 5m; expected 0.'
                       description: 'A malformed tenant log rule ConfigMap stops rule sync for every tenant and none load after a restart. Check the Loki log line for the tenant and file named in it first.'
+  - it: mounts the canary under the configured platform tenant
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-loki }
+    set:
+      platformTenant: ops
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraVolumeMounts[0]
+          value: { name: rules-platform, mountPath: /rules/ops, readOnly: true }
+  - it: checks canary loading for the configured platform tenant
+    template: templates/log-rules.yaml
+    documentSelector: { path: metadata.name, value: lgtm-log-rules }
+    set: { mode: addon, addon: logRules, logRules.enabled: true, platformTenant: ops }
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[2].expr
+          value: 'absent(loki_prometheus_rule_group_rules{user="ops", rule_group=~".*;lgtm-log-rules-canary"})'
   - it: requires Loki enabled
     template: templates/applications.yaml
     set: { logRules.enabled: true, components.loki.enabled: false }

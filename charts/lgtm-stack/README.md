@@ -504,6 +504,13 @@ sync for every tenant; after a restart no groups load. `LokiRuleListFailing` det
 the error log and `LokiLogRulesNotLoaded` detects a missing platform canary. Check
 the Loki log for "unable to list rules" and the tenant and file named there first.
 
+The canary ConfigMap mounts at `/rules/<platformTenant>` (default `/rules/platform`).
+The mount is optional so a missing ConfigMap does not keep the only Loki pod in
+ContainerCreating; `LokiLogRulesNotLoaded` checks the configured `platformTenant`.
+The canary group contains only `LokiRuleListFailing`, with no recording rule because
+no remote write is configured. Its query excludes lines containing `count_over_time`
+because Loki logs each ruler query's text, which would otherwise match itself.
+
 Limits apply per tenant: `logRules.limits.maxRuleGroupsPerTenant` defaults to 10
 groups, and `maxRulesPerRuleGroup` defaults to 10 rules per group. When enabled,
 logRules owns `singleBinary.extraContainers`, `singleBinary.extraVolumes`,

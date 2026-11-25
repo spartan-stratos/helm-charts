@@ -47,10 +47,9 @@ data:
     groups:
       - name: lgtm-log-rules-canary
         rules:
-          - record: lgtm:log_rules_canary
-            expr: vector(1)
           - alert: LokiRuleListFailing
-            expr: 'sum(count_over_time({namespace="{{ .Values.namespace }}", container="loki"} |= "unable to list rules" [5m])) > 0'
+            # Loki logs each ruler query's text, so without the exclusion the alert matches its own query log.
+            expr: 'sum(count_over_time({namespace="{{ .Values.namespace }}", container="loki"} |= "unable to list rules" != "count_over_time" [5m])) > 0'
             for: 5m
             labels:
               severity: critical
@@ -88,7 +87,7 @@ spec:
             summary: '{{ $o }} $value {{ $c }} log alert send failures in 10m; expected 0.'
             description: 'Tenant log alerts may be silenced. Check the Loki pod and Alertmanager connectivity first.'
         - alert: LokiLogRulesNotLoaded
-          expr: absent(loki_prometheus_rule_group_rules{user="platform", rule_group=~".*;lgtm-log-rules-canary"})
+          expr: absent(loki_prometheus_rule_group_rules{user="{{ .Values.platformTenant }}", rule_group=~".*;lgtm-log-rules-canary"})
           for: 10m
           labels:
             severity: critical

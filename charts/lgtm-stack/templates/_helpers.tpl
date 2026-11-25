@@ -251,8 +251,9 @@ instrumentation:
 {{- $mapping := include "lgtm-stack.orgMapping" $ -}}
 {{- if and (eq $key "loki") $v.logRules.enabled }}
 {{- $containers := list }}
-{{- $volumes := list (dict "name" "rules-platform" "configMap" (dict "name" "loki-rules-platform")) }}
-{{- $mounts := list (dict "name" "rules-platform" "mountPath" "/rules/platform" "readOnly" true) }}
+{{- /* A missing canary ConfigMap must not keep the only Loki pod in ContainerCreating; LokiLogRulesNotLoaded covers it. */}}
+{{- $volumes := list (dict "name" "rules-platform" "configMap" (dict "name" "loki-rules-platform" "optional" true)) }}
+{{- $mounts := list (dict "name" "rules-platform" "mountPath" (printf "/rules/%s" $v.platformTenant) "readOnly" true) }}
 {{- $overrides := dict }}
 {{- $alertmanager := "http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093" }}
 {{- $index := 0 }}
