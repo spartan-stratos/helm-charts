@@ -210,6 +210,8 @@ a missing webhook Secret also prevents reconciliation. Create the Secret before 
 
 ### Tenant isolation
 
+Namespace-scoped kube-state-metrics and kubelet series gain `tenant=<id>` so tenant rulers using prom-label-proxy can query their pods and containers; tenant relabel rules precede preserved consumer lists.
+
 Tenant ids must match `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and contain at most 30 characters.
 They use lowercase letters, digits and internal hyphens, starting and ending with a letter or digit.
 The configured `platformTenant` (default `platform`) `fake` (Loki) and `single-tenant` (Tempo) are reserved tenant ids.

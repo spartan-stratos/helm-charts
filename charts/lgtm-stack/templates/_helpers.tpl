@@ -459,6 +459,27 @@ service:
 {{- end -}}
 {{- include "lgtm-stack.merge" (list $out (fromYaml (include "lgtm-stack.generated" (list $ $key)) | default dict)) -}}
 {{- include "lgtm-stack.merge" (list $out (index $.Values.components $key).values) -}}
+{{- if eq $key "kubePrometheusStack" -}}
+{{- $tenantRules := list -}}
+{{- range $.Values.tenants -}}
+{{- if .namespaces -}}
+{{- $tenantRules = append $tenantRules (dict "action" "replace" "sourceLabels" (list "namespace") "regex" (printf "^(%s)$" (join "|" .namespaces)) "targetLabel" "tenant" "replacement" .id) -}}
+{{- end -}}
+{{- end -}}
+{{- if $tenantRules -}}
+{{/* Tenant rulers need namespace series stamped before consumer filters, without losing consumer relabel lists to merge replacement. */}}
+{{- range $path := list "kube-state-metrics.prometheus.monitor.metricRelabelings" "kubelet.serviceMonitor.metricRelabelings" "kubelet.serviceMonitor.cAdvisorMetricRelabelings" -}}
+{{- $parent := $out -}}
+{{- $parts := splitList "." $path -}}
+{{- range initial $parts -}}
+{{- if not (index $parent .) -}}{{- $_ := set $parent . (dict) -}}{{- end -}}
+{{- $parent = index $parent . -}}
+{{- end -}}
+{{- $leaf := last $parts -}}
+{{- $_ := set $parent $leaf (concat $tenantRules (index $parent $leaf | default list)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- toYaml $out -}}
 {{- end -}}
 

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.17.0 (2026-11-25)
+
+### Features
+
+* Stamp `tenant=<id>` on kube-state-metrics and kubelet series for tenant namespaces. Tenant rules are prepended while keeping consumer relabel lists. KSM and kubelet series gain one label.
+* Carry the upstream kubelet drop rules in the preset so they survive the tenant stamp.
+
 ## 0.16.0 (2026-11-25)
 
 ### Features
