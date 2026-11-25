@@ -5,13 +5,14 @@ namespace=''
 release=alerts
 tests=''
 values=()
+value_files=()
 services=()
 negative_controls=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --chart-dir) chart=$2; shift 2 ;;
-    --values-file) values+=(-f "$2"); shift 2 ;;
-    --values-files) while IFS= read -r value; do [[ -z "$value" ]] || values+=(-f "$value"); done <<< "$2"; shift 2 ;;
+    --values-file) values+=(-f "$2"); value_files+=("$2"); shift 2 ;;
+    --values-files) while IFS= read -r value; do [[ -z "$value" ]] || { values+=(-f "$value"); value_files+=("$value"); }; done <<< "$2"; shift 2 ;;
     --namespace) namespace=$2; shift 2 ;;
     --release-name) release=$2; shift 2 ;;
     --service-name) services+=(--service-name "$2"); shift 2 ;;
@@ -52,6 +53,16 @@ PY
   exit 0
 fi
 helm template "$release" "$chart" --namespace "$namespace" "${values[@]}" > "$tmp/rendered.yaml"
+# Merge in Helm values-file order, including defaults, before deriving release pins.
+yq eval-all '. as $item ireduce ({}; . * $item)' "$chart/values.yaml" "${value_files[@]}" > "$tmp/values.yaml"
+while IFS= read -r service; do
+  [[ -n "$service" ]] || continue
+  present=false
+  for existing in "${services[@]}"; do
+    [[ "$existing" != "$service" ]] || present=true
+  done
+  [[ "$present" == true ]] || services+=(--service-name "$service")
+done < <(yq -r '[.service.name, .catalogue.serviceName] | .[] | select(. != null and . != "")' "$tmp/values.yaml")
 python3 "$here/check-rendered.py" --namespace "$namespace" "${services[@]}" "$tmp/rendered.yaml"
 # All documents contribute groups so a second PrometheusRule cannot escape promtool.
 yq ea '[select(.kind == "PrometheusRule") | .spec.groups[]] | {"groups": .}' "$tmp/rendered.yaml" > "$tmp/catalogue-rules.yaml"

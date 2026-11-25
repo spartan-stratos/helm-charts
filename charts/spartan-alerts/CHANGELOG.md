@@ -4,6 +4,10 @@ All notable changes to this chart will be documented in this file.
 
 ## 0.4.0 (2026-11-25)
 
+### Fixes
+
+* Catalogue HTTP rules now also select on namespace, so a same-named service in another namespace no longer leaks into them.
+
 ### Features
 
 * Add workload-specific catalogue rules and optional durable, JVM heap, database pool, and migration alerts.

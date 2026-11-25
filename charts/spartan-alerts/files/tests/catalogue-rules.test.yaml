@@ -262,11 +262,11 @@ tests:
 - name: HttpP95Slow fires just beyond threshold
   interval: 1m
   input_series:
-  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="1"}
+  - series: http_server_request_duration_seconds_bucket{namespace="default",service_name="catalogue-test",le="1"}
     values: 0+1x30
-  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="2"}
+  - series: http_server_request_duration_seconds_bucket{namespace="default",service_name="catalogue-test",le="2"}
     values: 0+100x30
-  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="+Inf"}
+  - series: http_server_request_duration_seconds_bucket{namespace="default",service_name="catalogue-test",le="+Inf"}
     values: 0+100x30
   alert_rule_test:
   - eval_time: 20m
@@ -284,11 +284,11 @@ tests:
 - name: HttpP95Slow silent at threshold
   interval: 1m
   input_series:
-  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="1"}
+  - series: http_server_request_duration_seconds_bucket{namespace="default",service_name="catalogue-test",le="1"}
     values: 0+100x30
-  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="2"}
+  - series: http_server_request_duration_seconds_bucket{namespace="default",service_name="catalogue-test",le="2"}
     values: 0+100x30
-  - series: http_server_request_duration_seconds_bucket{service_name="catalogue-test",le="+Inf"}
+  - series: http_server_request_duration_seconds_bucket{namespace="default",service_name="catalogue-test",le="+Inf"}
     values: 0+100x30
   alert_rule_test:
   - eval_time: 20m
@@ -297,9 +297,9 @@ tests:
 - name: Http5xx fires just beyond threshold
   interval: 1m
   input_series:
-  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+  - series: http_server_request_duration_seconds_count{namespace="default",service_name="catalogue-test",http_response_status_code="500"}
     values: 0+6x30
-  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="200"}
+  - series: http_server_request_duration_seconds_count{namespace="default",service_name="catalogue-test",http_response_status_code="200"}
     values: 0+94x30
   alert_rule_test:
   - eval_time: 20m
@@ -317,9 +317,9 @@ tests:
 - name: Http5xx silent at threshold
   interval: 1m
   input_series:
-  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+  - series: http_server_request_duration_seconds_count{namespace="default",service_name="catalogue-test",http_response_status_code="500"}
     values: 0+5x30
-  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="200"}
+  - series: http_server_request_duration_seconds_count{namespace="default",service_name="catalogue-test",http_response_status_code="200"}
     values: 0+95x30
   alert_rule_test:
   - eval_time: 20m
@@ -638,7 +638,7 @@ tests:
 - name: HTTP zero traffic
   interval: 1m
   input_series:
-  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+  - series: http_server_request_duration_seconds_count{namespace="default",service_name="catalogue-test",http_response_status_code="500"}
     values: '0x30'
   alert_rule_test:
   - eval_time: 20m
@@ -647,7 +647,7 @@ tests:
 - name: HTTP single error
   interval: 1m
   input_series:
-  - series: http_server_request_duration_seconds_count{service_name="catalogue-test",http_response_status_code="500"}
+  - series: http_server_request_duration_seconds_count{namespace="default",service_name="catalogue-test",http_response_status_code="500"}
     values: 0x18 1x12
   alert_rule_test:
   - eval_time: 20m

@@ -76,7 +76,7 @@
 {{- $_ := set $pairs $pair true -}}
 {{- $formatted := printf "%.10f" $number | trimSuffix "0000000000" | trimSuffix "." -}}
 {{- if contains "." $formatted -}}{{- $formatted = regexReplaceAll "0+$" $formatted "" -}}{{- end -}}
-{{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $target.container "${POD_SELECTOR}" (printf "pod=~%s" ($target.podRegex | quote)) "${WORKLOAD}" $target.name "${HTTP_SELECTOR}" (default (printf "service_name=%s" ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" $.Values.service.short -}}
+{{- $tokens := dict "${NAMESPACE}" $.Release.Namespace "${THRESHOLD}" $formatted "${CONTAINER}" $target.container "${POD_SELECTOR}" (printf "pod=~%s" ($target.podRegex | quote)) "${WORKLOAD}" $target.name "${HTTP_SELECTOR}" (default (printf "namespace=%s,service_name=%s" ($.Release.Namespace | quote) ($.Values.service.name | quote)) $cfg.httpSelector) "${TAG_PROJECT}" (default $.Values.service.name $cfg.tagProject) "${SERVICE_SHORT}" $.Values.service.short -}}
 {{- $texts := dict "expr" $entry.expr "summary" $entry.summary "description" $entry.description -}}
 {{- $_ := set $tokens "${SERVICE_NAME}" (default $.Values.service.name $cfg.serviceName) -}}
 {{- $_ := set $tokens "${JOB_REGEX}" $cfg.migration.jobRegex -}}

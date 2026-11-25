@@ -81,6 +81,10 @@ jobs:
         if: matrix.chart == 'spartan-alerts'
         run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --values-file charts/spartan-alerts/files/tests/catalogue-values.yaml --namespace default --service-name catalogue-test
 
+      - name: Check reusable workflow invocation
+        if: matrix.chart == 'spartan-alerts'
+        run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --values-files charts/spartan-alerts/files/tests/catalogue-values.yaml --namespace default --release-name alerts --service-names '' --tests-file ''
+
       - name: Check workloads catalogue
         if: matrix.chart == 'spartan-alerts'
         run: bash .github/scripts/spartan-alerts/check.sh --chart-dir charts/spartan-alerts --values-file charts/spartan-alerts/files/tests/catalogue-workloads-values.yaml --namespace default --service-name catalogue-test

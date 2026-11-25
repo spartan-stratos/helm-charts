@@ -9,6 +9,14 @@ set:
   catalogue.container: app
   catalogue.podRegex: app-.+
 tests:
+- it: pins default HTTP selectors to the release namespace and service
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[8].expr
+      pattern: 'namespace="alerts-test",service_name="svc"'
+  - matchRegex:
+      path: spec.groups[0].rules[9].expr
+      pattern: 'namespace="alerts-test",service_name="svc"'
 - it: rejects workload overrides for shared alerts even when their source is disabled
   set:
     catalogue.container: ''
@@ -395,7 +403,7 @@ tests:
       value: alerts-test
   - matchRegex:
       path: spec.groups[0].rules[8].expr
-      pattern: service_name="svc"
+      pattern: namespace="alerts-test",service_name="svc"
   - matchRegex:
       path: spec.groups[0].rules[2].expr
       pattern: unless on\(pod\) kube_pod_status_reason
@@ -414,6 +422,9 @@ tests:
   - matchRegex:
       path: spec.groups[0].rules[8].expr
       pattern: namespace="custom"
+  - notMatchRegex:
+      path: spec.groups[0].rules[8].expr
+      pattern: 'namespace="alerts-test"|service_name="svc"'
   - matchRegex:
       path: spec.groups[0].rules[11].expr
       pattern: tag_Project="project"
