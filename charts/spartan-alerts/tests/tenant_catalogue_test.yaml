@@ -2,7 +2,7 @@ suite: tenant catalogue derivation
 templates:
 - templates/catalogue-rules.yaml
 set:
-  service.name: service-screenfit
+  service.name: service-example
   catalogue.enabled: true
   catalogue.container: app
   catalogue.podRegex: app-.+
@@ -11,7 +11,7 @@ tests:
   asserts:
   - equal:
       path: spec.groups[0].rules[0].annotations.summary
-      value: screenfit pod {{ $labels.pod }} restarted
+      value: example pod {{ $labels.pod }} restarted
 - it: preserves an explicit short name
   set:
     service.short: explicit

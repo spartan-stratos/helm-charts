@@ -4,7 +4,7 @@ templates:
 - templates/externalsecret.yaml
 - templates/secretstore.yaml
 set:
-  service.name: service-screenfit
+  service.name: service-example
   slack.secretName: tenant-webhook
   grafanaUrl: https://grafana.example.test
   externalSecrets.enabled: true
@@ -17,11 +17,11 @@ tests:
   asserts:
   - equal:
       path: metadata.name
-      value: screenfit-namespace
+      value: example-namespace
     documentIndex: 0
   - equal:
       path: metadata.name
-      value: screenfit-service
+      value: example-service
     documentIndex: 1
   - equal:
       path: spec.receivers[0].slackConfigs[0].apiURL.name

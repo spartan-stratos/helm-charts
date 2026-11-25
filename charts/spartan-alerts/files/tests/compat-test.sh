@@ -17,8 +17,8 @@ project() {
 }
 
 render_pair() {
-  helm template compatibility "$base" --namespace screenfit-dev -f "$1" > "$tmp/base.yaml"
-  helm template compatibility "$chart" --namespace screenfit-dev -f "$2" "${@:3}" > "$tmp/current.yaml"
+  helm template compatibility "$base" --namespace example-dev -f "$1" > "$tmp/base.yaml"
+  helm template compatibility "$chart" --namespace example-dev -f "$2" "${@:3}" > "$tmp/current.yaml"
   project "$tmp/base.yaml" > "$tmp/base.json"
   project "$tmp/current.yaml" > "$tmp/current.json"
 }
@@ -33,10 +33,10 @@ for fixture in "$base"/files/tests/*values*.yaml; do
   count=$((count + 1))
 done
 [ "$count" -gt 0 ] || { echo 'No base fixtures inspected' >&2; exit 1; }
-render_pair "$chart/files/tests/screenfit-envsubst-values.yaml" "$chart/files/tests/screenfit-platform-values.yaml"
+render_pair "$chart/files/tests/tenant-envsubst-values.yaml" "$chart/files/tests/tenant-platform-values.yaml"
 diff -u "$tmp/base.json" "$tmp/current.json"
-echo 'PASS screenfit envsubst vs platform'
-render_pair "$chart/files/tests/screenfit-envsubst-values.yaml" "$chart/files/tests/screenfit-platform-values.yaml" --set service.name=service-renamed
+echo 'PASS tenant envsubst vs platform'
+render_pair "$chart/files/tests/tenant-envsubst-values.yaml" "$chart/files/tests/tenant-platform-values.yaml" --set service.name=service-renamed
 if diff -u "$tmp/base.json" "$tmp/current.json" > "$tmp/rename.diff"; then
   echo 'FAIL rename negative control did not detect a difference' >&2
   exit 1

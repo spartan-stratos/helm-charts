@@ -422,6 +422,8 @@ helm upgrade alerts ./charts/spartan-alerts -n notifications -f values.yaml
 Keep explicit `service.short` when its old value differs from the derived name to preserve routing object names.
 Keep the same platform-passed `service.name`, `slack.secretName` and `grafanaUrl` when removing external token substitution.
 Consumer groups can now retain supported tokens directly.
+The compatibility fixtures compare a tenant that renders values with envsubst today against platform values with chart-expanded tokens.
+See `files/tests/tenant-envsubst-values.yaml` and `files/tests/tenant-platform-values.yaml`.
 `catalogue.workloads[].enabled` defaults to true. Set false to omit that workload's perWorkload rules.
 Validation still checks disabled entries. Disabling every workload omits all perWorkload rules without scalar fallback.
 Lists do not merge across values files; a per-environment change must restate the whole workload list.

@@ -4,7 +4,7 @@ templates:
 release:
   namespace: tenant-dev
 set:
-  service.name: service-screenfit
+  service.name: service-example
   env: dev
   workloadCluster: cluster-test
   grafanaUrl: https://grafana.example.test
@@ -29,13 +29,13 @@ tests:
   asserts:
   - equal:
       path: spec.groups[0].name
-      value: service-screenfit
+      value: service-example
   - equal:
       path: spec.groups[0].rules[0].expr
-      value: 'up{namespace="tenant-dev",service="service-screenfit",cluster="cluster-test"} == 0'
+      value: 'up{namespace="tenant-dev",service="service-example",cluster="cluster-test"} == 0'
   - equal:
       path: spec.groups[0].rules[0].labels
-      value: {short: screenfit, env: dev, secret: webhook-test, channel: alerts-test, namespace: tenant-dev}
+      value: {short: example, env: dev, secret: webhook-test, channel: alerts-test, namespace: tenant-dev}
   - equal:
       path: spec.groups[0].rules[0].annotations
       value: {dashboard: 'https://grafana.example.test/d/test', summary: '{{ $labels.pod }}'}

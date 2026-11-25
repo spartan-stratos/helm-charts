@@ -1,10 +1,10 @@
 env: dev
 workloadCluster: stratos-eks-dev
 service:
-  name: service-screenfit
+  name: service-example
 grafanaUrl: https://grafana.example.test
 slack:
-  secretName: alert-slack-screenfit-dev
+  secretName: alert-slack-example-dev
   channel: alerts-test
 externalSecrets:
   enabled: true
