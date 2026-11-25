@@ -394,7 +394,7 @@ tests:
       pattern: container="app",pod=~"app-.+"
   - equal:
       path: spec.groups[0].rules[0].annotations.summary
-      value: service pod {{ $labels.pod }} restarted
+      value: svc pod {{ $labels.pod }} restarted
   - equal:
       path: spec.groups[0].rules[0].labels.catalogue_id
       value: container-restarting

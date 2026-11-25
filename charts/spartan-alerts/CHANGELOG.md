@@ -2,6 +2,14 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.5.0 (2026-11-25)
+
+### Features
+
+* Derive service short names and expand tenant tokens in consumer groups.
+* Add optional workload disabling, P1-P3 tier overrides and RDS storage percentages.
+* Preserve existing resource names and labels for explicit consumer values.
+
 ## 0.4.1 (2026-11-25)
 
 ### Features

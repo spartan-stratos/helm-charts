@@ -1,0 +1,62 @@
+suite: tenant group tokens
+templates:
+- templates/rules.yaml
+release:
+  namespace: tenant-dev
+set:
+  service.name: service-screenfit
+  env: dev
+  workloadCluster: cluster-test
+  grafanaUrl: https://grafana.example.test
+  slack.secretName: webhook-test
+  slack.channel: alerts-test
+tests:
+- it: expands all group tokens without evaluating Prometheus templates
+  set:
+    groups:
+    - name: '${SERVICE_NAME}'
+      rules:
+      - alert: Down
+        expr: 'up{namespace="${NAMESPACE}",service="${SERVICE_NAME}",cluster="${CLUSTER_NAME}"} == 0'
+        labels:
+          short: '${SERVICE_SHORT}'
+          env: '${ENV}'
+          secret: '${ALERT_SLACK_SECRET}'
+          channel: '${ALERT_SLACK_CHANNEL}'
+        annotations:
+          dashboard: '${GRAFANA_URL}/d/test'
+          summary: '{{ $labels.pod }}'
+  asserts:
+  - equal:
+      path: spec.groups[0].name
+      value: service-screenfit
+  - equal:
+      path: spec.groups[0].rules[0].expr
+      value: 'up{namespace="tenant-dev",service="service-screenfit",cluster="cluster-test"} == 0'
+  - equal:
+      path: spec.groups[0].rules[0].labels
+      value: {short: screenfit, env: dev, secret: webhook-test, channel: alerts-test, namespace: tenant-dev}
+  - equal:
+      path: spec.groups[0].rules[0].annotations
+      value: {dashboard: 'https://grafana.example.test/d/test', summary: '{{ $labels.pod }}'}
+- it: rejects an unknown token
+  values:
+  - ../files/tests/unknown-token-values.yaml
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown group token: ${FOO}'
+- it: rejects an empty token
+  values:
+  - ../files/tests/empty-token-values.yaml
+  set:
+    grafanaUrl: ''
+  asserts:
+  - failedTemplate:
+      errorMessage: 'empty group token: ${GRAFANA_URL}'
+- it: leaves numeric label_replace captures literal
+  values:
+  - ../files/tests/numeric-token-values.yaml
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[0].expr
+      value: 'label_replace(up, "target", "${1}", "source", "(.*)")'

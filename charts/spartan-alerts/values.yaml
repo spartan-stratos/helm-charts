@@ -1,6 +1,6 @@
 service:
   name: service
-  short: service
+  short: ""
 env: ""
 workloadCluster: ""
 grafanaUrl: ""
@@ -28,6 +28,6 @@ catalogue:
   migration: {jobRegex: ".*migrat.*"}
   runbookUrl: ""
   sources: {kubeState: true, cadvisor: true, http: true, probe: true, rds: false, elasticache: false, durable: false, otelJvm: false, otelDbPool: false, migration: false}
-  rds: {storageWarningBytes: 0, storageCriticalBytes: 0}
+  rds: {storageWarningBytes: 0, storageCriticalBytes: 0, diskSizeGiB: 0, warningPercent: 30, criticalPercent: 20}
   inhibit: true
   overrides: {}

@@ -1,0 +1,64 @@
+suite: tenant name consistency
+templates:
+- templates/alertmanager.yaml
+- templates/externalsecret.yaml
+- templates/secretstore.yaml
+set:
+  service.name: service-screenfit
+  slack.secretName: tenant-webhook
+  grafanaUrl: https://grafana.example.test
+  externalSecrets.enabled: true
+  externalSecrets.region: us-west-2
+  externalSecrets.secretArn: arn:aws:secretsmanager:us-west-2:123456789012:secret:dummy
+  externalSecrets.roleArn: arn:aws:iam::123456789012:role/dummy
+tests:
+- it: derives both routing object names and uses the platform secret
+  template: templates/alertmanager.yaml
+  asserts:
+  - equal:
+      path: metadata.name
+      value: screenfit-namespace
+    documentIndex: 0
+  - equal:
+      path: metadata.name
+      value: screenfit-service
+    documentIndex: 1
+  - equal:
+      path: spec.receivers[0].slackConfigs[0].apiURL.name
+      value: tenant-webhook
+    documentIndex: 0
+  - equal:
+      path: spec.receivers[0].slackConfigs[0].apiURL.name
+      value: tenant-webhook
+    documentIndex: 1
+  - matchRegex:
+      path: spec.receivers[0].slackConfigs[0].titleLink
+      pattern: '^https://grafana.example.test/alerting/list'
+    documentIndex: 0
+- it: keeps explicit short names
+  template: templates/alertmanager.yaml
+  set:
+    service.short: explicit
+  asserts:
+  - equal:
+      path: metadata.name
+      value: explicit-namespace
+    documentIndex: 0
+- it: uses the same secret for store reference and target
+  template: templates/externalsecret.yaml
+  asserts:
+  - equal:
+      path: metadata.name
+      value: tenant-webhook
+  - equal:
+      path: spec.secretStoreRef.name
+      value: tenant-webhook
+  - equal:
+      path: spec.target.name
+      value: tenant-webhook
+- it: names the SecretStore with the same secret value
+  template: templates/secretstore.yaml
+  asserts:
+  - equal:
+      path: metadata.name
+      value: tenant-webhook

@@ -1,0 +1,141 @@
+suite: tenant catalogue derivation
+templates:
+- templates/catalogue-rules.yaml
+set:
+  service.name: service-screenfit
+  catalogue.enabled: true
+  catalogue.container: app
+  catalogue.podRegex: app-.+
+tests:
+- it: derives short name for catalogue summaries
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[0].annotations.summary
+      value: screenfit pod {{ $labels.pod }} restarted
+- it: preserves an explicit short name
+  set:
+    service.short: explicit
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[0].annotations.summary
+      value: explicit pod {{ $labels.pod }} restarted
+- it: derives RDS bytes from 20 GiB
+  set:
+    catalogue.sources.rds: true
+    catalogue.rds.diskSizeGiB: 20
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[13].expr
+      pattern: '< 6442450944$'
+  - matchRegex:
+      path: spec.groups[0].rules[14].expr
+      pattern: '< 4294967296$'
+- it: explicit bytes beat disk size
+  set:
+    catalogue.sources.rds: true
+    catalogue.rds.diskSizeGiB: 20
+    catalogue.rds.storageWarningBytes: 1000
+    catalogue.rds.storageCriticalBytes: 500
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[13].expr
+      pattern: '< 1000$'
+  - matchRegex:
+      path: spec.groups[0].rules[14].expr
+      pattern: '< 500$'
+- it: uses custom RDS percentages
+  set:
+    catalogue.sources.rds: true
+    catalogue.rds.diskSizeGiB: 20
+    catalogue.rds.warningPercent: 10
+    catalogue.rds.criticalPercent: 5
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[13].expr
+      pattern: '< 2147483648$'
+  - matchRegex:
+      path: spec.groups[0].rules[14].expr
+      pattern: '< 1073741824$'
+- it: P1 forces critical despite a warning override
+  set:
+    catalogue.overrides.MemoryNearLimit: {tier: P1, severity: warning}
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[4].labels.tier
+      value: P1
+  - equal:
+      path: spec.groups[0].rules[4].labels.severity
+      value: critical
+- it: rejects P4 at catalogue level
+  set:
+    catalogue.overrides.MemoryNearLimit.tier: P4
+  asserts:
+  - failedTemplate:
+      errorMessage: bad tier for MemoryNearLimit
+- it: supports workload tier overrides
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.workloads: [{name: api, container: app, podRegex: 'app-.+', overrides: {MemoryNearLimit: {tier: P1}}}]
+  asserts:
+  - equal:
+      path: spec.groups[0].rules[4].labels.tier
+      value: P1
+  - equal:
+      path: spec.groups[0].rules[4].labels.severity
+      value: critical
+- it: rejects P4 even on disabled workloads
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.workloads: [{name: api, container: app, podRegex: 'app-.+', enabled: false, overrides: {MemoryNearLimit: {tier: P4}}}]
+  asserts:
+  - failedTemplate:
+      errorMessage: bad tier for MemoryNearLimit
+- it: validates unknown fields even on disabled workloads
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.workloads: [{name: api, container: app, podRegex: 'app-.+', enabled: false, unknown: true}]
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown workload field: unknown'
+- it: omits one disabled workload
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.workloads: [{name: api, container: app, podRegex: 'app-.+', enabled: false}, {name: worker, container: worker, podRegex: 'worker-.+'}]
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 11
+  - equal:
+      path: spec.groups[0].rules[0].labels.workload
+      value: worker
+- it: all disabled omit every perWorkload rule without scalar fallback
+  set:
+    catalogue.container: ''
+    catalogue.podRegex: ''
+    catalogue.workloads: [{name: api, container: app, podRegex: 'app-.+', enabled: false}]
+  asserts:
+  - lengthEqual:
+      path: spec.groups[0].rules
+      count: 3
+  - equal:
+      path: spec.groups[0].rules[0].alert
+      value: HttpP95Slow
+  - equal:
+      path: spec.groups[0].rules[1].alert
+      value: Http5xx
+  - equal:
+      path: spec.groups[0].rules[2].alert
+      value: UptimeProbeFailed
+  - notMatchRegex:
+      path: spec.groups[0].rules[0].expr
+      pattern: 'pod=~""'
+  - notMatchRegex:
+      path: spec.groups[0].rules[1].expr
+      pattern: 'pod=~""'
+  - notMatchRegex:
+      path: spec.groups[0].rules[2].expr
+      pattern: 'pod=~""'

@@ -1,0 +1,55 @@
+env: dev
+workloadCluster: stratos-eks-dev
+service:
+  name: service-screenfit
+  short: screenfit
+grafanaUrl: https://grafana.example.test
+slack:
+  secretName: alert-slack-screenfit-dev
+  channel: alerts-test
+externalSecrets:
+  enabled: true
+  secretArn: arn:aws:secretsmanager:us-west-2:123456789012:secret:dummy
+  roleArn: arn:aws:iam::123456789012:role/dummy
+  region: us-west-2
+  serviceAccount: alert-secrets
+groups:
+- name: service-screenfit
+  rules:
+    - alert: MigrationJobFailed
+      expr: max by (job_name) (kube_job_failed{namespace="screenfit-dev",condition="true"}) > 0
+      for: 5m
+      labels:
+        namespace: screenfit-dev
+        severity: critical
+      annotations:
+        summary: "screenfit migration job {{ $labels.job_name }} failed"
+        description: >-
+          The Flyway pre-upgrade hook failed, so the release is blocked and the running image may not match the
+          schema. Read the hook pod's logs with kubectl -n screenfit-dev logs job/{{ $labels.job_name }},
+          then check flyway_schema_history for a partially applied version before redeploying.
+
+    - alert: DurableQueueNotDraining
+      expr: durable_queue_depth{service_name="service-screenfit"} > 0
+      for: 30m
+      labels:
+        namespace: screenfit-dev
+        severity: warning
+      annotations:
+        summary: "screenfit durable queue {{ $labels.queue_name }} has not drained in 30 minutes"
+        description: >-
+          The queue never reached empty across the window, so jobs are accumulating rather than flowing. Check
+          the activity errors in Loki with
+          namespace="screenfit-dev" filtered on level ERROR.
+
+    - alert: DurableActivitiesNotRegistered
+      expr: durable_runtime_registered_activities{service_name="service-screenfit"} == 0
+      for: 10m
+      labels:
+        namespace: screenfit-dev
+        severity: critical
+      annotations:
+        summary: "screenfit registered zero durable activities"
+        description: >-
+          The durable runtime is up but registered no activities, so every durable job will fail to dispatch.
+          Check the startup logs in Loki with namespace="screenfit-dev" for registration errors.

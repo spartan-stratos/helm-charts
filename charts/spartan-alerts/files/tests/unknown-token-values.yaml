@@ -1,0 +1,5 @@
+groups:
+- name: tokens
+  rules:
+  - alert: UnknownToken
+    expr: 'up{service="${FOO}"} == 0'
