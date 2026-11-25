@@ -256,7 +256,7 @@ The tenant-level namespace union still controls rulers, the label proxy and Graf
 
 | Receiver key | Meaning |
 |---|---|
-| `stampNamespace` (optional string) | After the receiver's filter, overwrite `k8s.namespace.name` (and the metric datapoint `namespace`) with this value on every signal. The filter still checks the sender's original namespace against `namespaces`. Requires non-empty `namespaces`. Use it so a dev receiver on a shared tenant writes `<ns>-dev` and can never write the prod namespace. Unset renders unchanged. |
+| `stampNamespace` (optional string) | After the receiver's filter, overwrite `k8s.namespace.name` (and the metric datapoint `namespace`, and a log or span `namespace` attribute where the sender set one) with this value on every signal. The filter still checks the sender's original namespace against `namespaces`. Requires non-empty `namespaces`. Use it so a dev receiver on a shared tenant writes `<ns>-dev` and can never write the prod namespace. Unset renders unchanged. |
 
 Receiver paths default to `/<id>/<name>`; `ingress` defaults to true. Paths must be unique across all lanes,
 and ingress paths cannot contain another ingress path at a `/` boundary. With `ingress: false`, send directly to

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.19.1 (2026-11-26)
+
+### Bug Fixes
+
+* `stampNamespace` also overwrites a record-level `namespace` attribute on log records and spans, only where the sender set one. Before, it survived as Loki structured metadata with the sent value. Unset renders unchanged.
+
 ## 0.19.0 (2026-11-26)
 
 ### Features
