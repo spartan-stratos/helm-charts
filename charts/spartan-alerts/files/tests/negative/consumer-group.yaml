@@ -1,0 +1,5 @@
+groups:
+- name: consumer
+  rules:
+  - alert: ConsumerLag
+    expr: consumer_group_lag{group="jobs"} > 0
