@@ -10,6 +10,141 @@ set:
   cluster.name: example-cluster
 
 tests:
+  - it: stamps all namespace scrape lists for a tenant with two namespaces
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    set:
+      tenants: [{ id: example, namespaces: [example-dev, example-prod], port: 4320, htpasswdSecret: { name: example-auth, key: htpasswd } }]
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.kube-state-metrics.prometheus.monitor.metricRelabelings[0]
+          value: { action: replace, sourceLabels: [namespace], regex: '^(example-dev|example-prod)$', targetLabel: tenant, replacement: example }
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.metricRelabelings[0]
+          value: { action: replace, sourceLabels: [namespace], regex: '^(example-dev|example-prod)$', targetLabel: tenant, replacement: example }
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings[0]
+          value: { action: replace, sourceLabels: [namespace], regex: '^(example-dev|example-prod)$', targetLabel: tenant, replacement: example }
+      - lengthEqual:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings
+          count: 9
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings[1]
+          value: { sourceLabels: [__name__], action: drop, regex: 'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)' }
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings[8]
+          value: { sourceLabels: [id, pod], action: drop, regex: '.+;' }
+      - lengthEqual:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.metricRelabelings
+          count: 2
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.metricRelabelings[1]
+          value: { action: drop, sourceLabels: [__name__, le], regex: '(csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\.0)?' }
+  - it: prepends tenant rules while preserving consumer cAdvisor rules
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    set:
+      tenants: [{ id: example, namespaces: [example], port: 4320, htpasswdSecret: { name: example-auth, key: htpasswd } }]
+      components.kubePrometheusStack.values.kubelet.serviceMonitor.cAdvisorMetricRelabelings:
+        - { action: labeldrop, regex: noisy }
+        - { action: keep, sourceLabels: [__name__], regex: 'container_.*' }
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings
+          value:
+            - { action: replace, sourceLabels: [namespace], regex: '^(example)$', targetLabel: tenant, replacement: example }
+            - { action: labeldrop, regex: noisy }
+            - { action: keep, sourceLabels: [__name__], regex: 'container_.*' }
+  - it: keeps tenant rules in configured order across all scrape lists
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    set:
+      tenants:
+        - { id: zulu, namespaces: [zulu-dev], port: 4320, htpasswdSecret: { name: zulu-auth, key: htpasswd } }
+        - { id: alpha, namespaces: [alpha-dev], port: 4321, htpasswdSecret: { name: alpha-auth, key: htpasswd } }
+      components.kubePrometheusStack.values.kubelet.serviceMonitor.metricRelabelings: []
+      components.kubePrometheusStack.values.kubelet.serviceMonitor.cAdvisorMetricRelabelings: []
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.kube-state-metrics.prometheus.monitor.metricRelabelings
+          value:
+            - { action: replace, sourceLabels: [namespace], regex: '^(zulu-dev)$', targetLabel: tenant, replacement: zulu }
+            - { action: replace, sourceLabels: [namespace], regex: '^(alpha-dev)$', targetLabel: tenant, replacement: alpha }
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.metricRelabelings
+          value:
+            - { action: replace, sourceLabels: [namespace], regex: '^(zulu-dev)$', targetLabel: tenant, replacement: zulu }
+            - { action: replace, sourceLabels: [namespace], regex: '^(alpha-dev)$', targetLabel: tenant, replacement: alpha }
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings
+          value:
+            - { action: replace, sourceLabels: [namespace], regex: '^(zulu-dev)$', targetLabel: tenant, replacement: zulu }
+            - { action: replace, sourceLabels: [namespace], regex: '^(alpha-dev)$', targetLabel: tenant, replacement: alpha }
+  - it: keeps upstream kubelet defaults and no KSM relabel key with no tenants
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    set:
+      tenants: []
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject.kube-state-metrics.prometheus.monitor.metricRelabelings
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.metricRelabelings
+          value: &kubeletMetricDefaults
+            - action: drop
+              sourceLabels: [__name__, le]
+              regex: (csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\.0)?
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings
+          value: &kubeletCadvisorDefaults
+            - sourceLabels: [__name__]
+              action: drop
+              regex: container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)
+            - sourceLabels: [__name__]
+              action: drop
+              regex: container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)
+            - sourceLabels: [__name__]
+              action: drop
+              regex: container_memory_(mapped_file|swap)
+            - sourceLabels: [__name__]
+              action: drop
+              regex: container_(file_descriptors|tasks_state|threads_max)
+            - sourceLabels: [__name__, scope]
+              action: drop
+              regex: container_memory_failures_total;hierarchy
+            - sourceLabels: [__name__, interface]
+              action: drop
+              regex: container_network_.*;(cali|cilium|cni|lxc|nodelocaldns|tunl).*
+            - sourceLabels: [__name__]
+              action: drop
+              regex: container_spec.*
+            - sourceLabels: [id, pod]
+              action: drop
+              regex: .+;
+  - it: keeps upstream kubelet defaults and no KSM relabel key with tenants without namespaces
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    set:
+      tenants: [{ id: example, port: 4320, htpasswdSecret: { name: example-auth, key: htpasswd } }]
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject.kube-state-metrics.prometheus.monitor.metricRelabelings
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.metricRelabelings
+          value: *kubeletMetricDefaults
+      - equal:
+          path: spec.source.helm.valuesObject.kubelet.serviceMonitor.cAdvisorMetricRelabelings
+          value: *kubeletCadvisorDefaults
   - it: rejects an empty receivers tenant
     template: templates/applications.yaml
     set:
@@ -131,7 +266,7 @@ tests:
           value: lgtm-cluster-info
       - equal:
           path: spec.source.targetRevision
-          value: 0.16.0
+          value: 0.17.0
         documentSelector:
           path: metadata.name
           value: lgtm-cluster-info
