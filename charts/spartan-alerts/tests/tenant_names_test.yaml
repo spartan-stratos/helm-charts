@@ -44,6 +44,37 @@ tests:
       path: metadata.name
       value: explicit-namespace
     documentIndex: 0
+- it: preserves legacy routing names with an explicit service short name
+  template: templates/alertmanager.yaml
+  set:
+    service.name: service-foo
+    service.short: service
+    env: dev
+  asserts:
+  - equal:
+      path: metadata.name
+      value: service-namespace
+    documentIndex: 0
+  - equal:
+      path: metadata.name
+      value: service-service
+    documentIndex: 1
+  - equal:
+      path: spec.receivers[0].name
+      value: slack-service-dev
+    documentIndex: 0
+  - equal:
+      path: spec.receivers[0].name
+      value: slack-service-dev
+    documentIndex: 1
+  - equal:
+      path: spec.route.receiver
+      value: slack-service-dev
+    documentIndex: 0
+  - equal:
+      path: spec.route.receiver
+      value: slack-service-dev
+    documentIndex: 1
 - it: uses the same secret for store reference and target
   template: templates/externalsecret.yaml
   asserts:

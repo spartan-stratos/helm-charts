@@ -8,7 +8,7 @@
 
 {{- define "spartan-alerts.expand" -}}
 {{- $text := .text | toString -}}
-{{- range $token := regexFindAll `\$\{[A-Z_]+\}` $text -1 | uniq -}}
+{{- range $token := regexFindAll `\$\{[A-Z][A-Z0-9_]*\}` $text -1 | uniq -}}
 {{- if not (hasKey $.tokens $token) -}}{{- fail (printf "unknown group token: %s" $token) -}}{{- end -}}
 {{- $value := index $.tokens $token -}}
 {{- if empty $value -}}{{- fail (printf "empty group token: %s" $token) -}}{{- end -}}

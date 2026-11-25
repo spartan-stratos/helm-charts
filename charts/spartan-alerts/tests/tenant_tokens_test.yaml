@@ -41,13 +41,23 @@ tests:
       value: {dashboard: 'https://grafana.example.test/d/test', summary: '{{ $labels.pod }}'}
 - it: rejects an unknown token
   values:
-  - ../files/tests/unknown-token-values.yaml
+  - ../files/tests/unknown-token-invalid.yaml
   asserts:
   - failedTemplate:
       errorMessage: 'unknown group token: ${FOO}'
+- it: rejects an unknown token containing a digit
+  set:
+    groups:
+    - name: tokens
+      rules:
+      - alert: UnknownToken
+        expr: 'up{bucket="${S3_BUCKET}"} == 0'
+  asserts:
+  - failedTemplate:
+      errorMessage: 'unknown group token: ${S3_BUCKET}'
 - it: rejects an empty token
   values:
-  - ../files/tests/empty-token-values.yaml
+  - ../files/tests/empty-token-invalid.yaml
   set:
     grafanaUrl: ''
   asserts:

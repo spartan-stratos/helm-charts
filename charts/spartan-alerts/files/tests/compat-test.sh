@@ -24,6 +24,7 @@ render_pair() {
 }
 
 count=0
+# Fixtures that must fail rendering are named *-invalid.yaml so this loop skips them.
 for fixture in "$base"/files/tests/*values*.yaml; do
   [ -f "$fixture" ] || continue
   name=$(basename "$fixture")

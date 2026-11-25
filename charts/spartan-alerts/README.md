@@ -60,7 +60,7 @@ Group names, rule expressions, label values and annotation values support these 
 `${SERVICE_NAME}`, `${SERVICE_SHORT}`, `${ENV}`, `${NAMESPACE}`, `${CLUSTER_NAME}`,
 `${GRAFANA_URL}`, `${ALERT_SLACK_SECRET}` and `${ALERT_SLACK_CHANNEL}`.
 Unknown uppercase tokens and used tokens with empty values fail rendering.
-Only `${[A-Z_]+}` is a token; `${1}` in `label_replace` stays literal.
+Only `${[A-Z][A-Z0-9_]*}` is a token; `${1}` in `label_replace` stays literal.
 
 ### Minimal Example
 
@@ -419,6 +419,9 @@ helm upgrade alerts ./charts/spartan-alerts -n notifications -f values.yaml
 
 ### Migrating to 0.5.0
 
+`service.short` now defaults to `service.name` with a leading `service-` removed.
+In 0.4.1, a consumer with a `service-` prefixed `service.name` and unset `service.short` got short name `service`.
+Set `service.short: service` explicitly to keep its Alertmanager receiver and route names, including AlertmanagerConfig names.
 Keep explicit `service.short` when its old value differs from the derived name to preserve routing object names.
 Keep the same platform-passed `service.name`, `slack.secretName` and `grafanaUrl` when removing external token substitution.
 Consumer groups can now retain supported tokens directly.
