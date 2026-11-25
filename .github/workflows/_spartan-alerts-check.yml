@@ -30,16 +30,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        if: inputs.values-artifact != ''
-        with:
-          name: ${{ inputs.values-artifact }}
-          path: .
       - uses: actions/checkout@v4
         with:
           repository: spartan-stratos/helm-charts
           ref: ${{ inputs.helm-charts-ref || 'refs/invalid/required-helm-charts-ref' }}
           path: .spartan-alerts-ci
+      - uses: actions/download-artifact@v4
+        if: inputs.values-artifact != ''
+        with:
+          name: ${{ inputs.values-artifact }}
+          path: .
       - run: bash .spartan-alerts-ci/.github/scripts/spartan-alerts/install-tools.sh
       - run: bash .spartan-alerts-ci/.github/scripts/spartan-alerts/check.sh --chart-dir .spartan-alerts-ci/charts/spartan-alerts --values-files "$VALUES_FILES" --namespace "$NAMESPACE" --release-name "$RELEASE_NAME" --service-names "$SERVICE_NAMES" --tests-file "$TESTS_FILE"
         env:
