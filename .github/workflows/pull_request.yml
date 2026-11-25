@@ -3,6 +3,36 @@ name: Helm Check
 on: pull_request
 
 jobs:
+  spartan-alerts-artifact-producer:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: bash .github/scripts/spartan-alerts/generate-test-values.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spartan-alerts-generated-values
+          # A second root keeps generated/ in the artifact's relative paths.
+          path: |
+            generated/alerts-values.yaml
+            .github/scripts/spartan-alerts/generate-test-values.sh
+          include-hidden-files: true
+          if-no-files-found: error
+
+  spartan-alerts-artifact-consumer:
+    needs: spartan-alerts-artifact-producer
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_spartan-alerts-check.yml
+    with:
+      helm-charts-ref: ${{ github.event.pull_request.head.sha }}
+      values-artifact: spartan-alerts-generated-values
+      values-files: generated/alerts-values.yaml
+      namespace: default
+
   helm-check:
     strategy:
       matrix:

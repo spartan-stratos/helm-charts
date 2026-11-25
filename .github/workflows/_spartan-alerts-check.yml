@@ -8,6 +8,9 @@ on:
       values-files:
         required: true
         type: string
+      values-artifact:
+        default: ''
+        type: string
       namespace:
         required: true
         type: string
@@ -27,6 +30,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: inputs.values-artifact != ''
+        with:
+          name: ${{ inputs.values-artifact }}
+          path: .
       - uses: actions/checkout@v4
         with:
           repository: spartan-stratos/helm-charts
