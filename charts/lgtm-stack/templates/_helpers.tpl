@@ -67,7 +67,7 @@ A null reaches the upstream chart as null, so it still deletes that chart's defa
 {{- range .receivers -}}
 {{- $ingress := true -}}
 {{- if hasKey . "ingress" -}}{{- $ingress = .ingress -}}{{- end -}}
-{{- $lanes = append $lanes (dict "id" $tenant.id "name" .name "port" .port "path" (.path | default (printf "/%s/%s" $tenant.id .name)) "ingress" $ingress "namespaces" .namespaces "htpasswdSecret" (.htpasswdSecret | default dict)) -}}
+{{- $lanes = append $lanes (dict "id" $tenant.id "name" .name "port" .port "path" (.path | default (printf "/%s/%s" $tenant.id .name)) "ingress" $ingress "namespaces" .namespaces "stampNamespace" (.stampNamespace | default "") "htpasswdSecret" (.htpasswdSecret | default dict)) -}}
 {{- end -}}
 {{- else -}}
 {{- $lanes = append $lanes (dict "id" .id "name" .id "port" .port "path" (printf "/%s" .id) "ingress" true "namespaces" .namespaces "htpasswdSecret" (.htpasswdSecret | default dict)) -}}

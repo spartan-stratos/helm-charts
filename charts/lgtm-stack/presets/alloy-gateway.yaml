@@ -99,6 +99,29 @@ alloy:
       }
       // Prometheus promotes resource attributes, so stamp the resource too.
       otelcol.processor.transform "tenant_{{ $index }}" {
+{{- if $tenant.stampNamespace }}
+        // Overwrite after the filter, which already checked the original namespace: a sender cannot pick the stored one.
+{{- if $.Values.tenantIsolation.enabled }}
+        log_statements {
+          context = "resource"
+          statements = [{{ printf "set(attributes[\"k8s.namespace.name\"], %s)" ($tenant.stampNamespace | toJson) | quote }}]
+        }
+{{- end }}
+        metric_statements {
+          context = "resource"
+          statements = [{{ printf "set(attributes[\"k8s.namespace.name\"], %s)" ($tenant.stampNamespace | toJson) | quote }}]
+        }
+        metric_statements {
+          context = "datapoint"
+          statements = [{{ printf "set(attributes[\"namespace\"], %s)" ($tenant.stampNamespace | toJson) | quote }}]
+        }
+{{- if $.Values.tenantIsolation.enabled }}
+        trace_statements {
+          context = "resource"
+          statements = [{{ printf "set(attributes[\"k8s.namespace.name\"], %s)" ($tenant.stampNamespace | toJson) | quote }}]
+        }
+{{- end }}
+{{- end }}
 {{- if $.Values.tenantIsolation.enabled }}
         log_statements {
           context = "resource"

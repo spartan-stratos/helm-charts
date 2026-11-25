@@ -319,6 +319,49 @@ tests:
       - matchRegex:
           path: spec.source.helm.valuesObject.alloy.configMap.content
           pattern: '(?s)"prometheus_0".*"X-Scope-OrgID" = "example".*"prometheus_1".*"X-Scope-OrgID" = "example"'
+  - it: stamps the namespace after the filter in the receiver that sets stampNamespace only
+    template: templates/applications.yaml
+    set:
+      tenantIsolation.enabled: true
+      tenants:
+        - id: example
+          namespaces: [ns-dev, ns-prod]
+          receivers:
+            - { name: dev, port: 4320, path: /example, namespaces: [ns-dev], stampNamespace: ns-dev-x, htpasswdSecret: { name: dev-otlp, key: dev } }
+            - { name: prod, port: 4321, ingress: false, namespaces: [ns-prod], htpasswdSecret: { name: prod-otlp, key: prod } }
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)processor.filter "tenant_0".*processor.transform "tenant_0".*?metric_statements \{\s*context = "resource"\s*statements = \["set\(attributes\[\\"k8s.namespace.name\\"\], \\"ns-dev-x\\"\)"\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)processor.transform "tenant_0".*?context = "datapoint"\s*statements = \["set\(attributes\[\\"namespace\\"\], \\"ns-dev-x\\"\)"\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)processor.transform "tenant_0".*?log_statements \{\s*context = "resource"\s*statements = \["set\(attributes\[\\"k8s.namespace.name\\"\], \\"ns-dev-x\\"\)"\]'
+      - matchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)processor.transform "tenant_0".*?trace_statements \{\s*context = "resource"\s*statements = \["set\(attributes\[\\"k8s.namespace.name\\"\], \\"ns-dev-x\\"\)"\]'
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)processor.transform "tenant_1".*ns-dev-x'
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.alloy.configMap.content
+          pattern: '(?s)processor.transform "tenant_1".*set\(attributes\[\\"k8s.namespace.name\\"\]'
+  - it: rejects stampNamespace with empty namespaces
+    template: templates/applications.yaml
+    set:
+      tenants:
+        - id: example
+          namespaces: [ns-dev]
+          receivers:
+            - { name: dev, port: 4320, namespaces: [], stampNamespace: ns-dev-x, htpasswdSecret: { name: dev-otlp, key: dev } }
+    asserts:
+      - failedTemplate:
+          errorPattern: 'receiver namespaces must be non-empty'
   - it: exposes only ingress enabled receivers
     template: templates/gateway.yaml
     set:

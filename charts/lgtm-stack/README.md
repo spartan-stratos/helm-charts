@@ -253,6 +253,11 @@ Each receiver has its own port, auth file and namespace filter, while all receiv
 Receiver names must be unique within a tenant and DNS-1123 labels of at most 63 characters.
 Each receiver requires a non-empty namespace list drawn from the tenant's namespaces.
 The tenant-level namespace union still controls rulers, the label proxy and Grafana organizations.
+
+| Receiver key | Meaning |
+|---|---|
+| `stampNamespace` (optional string) | After the receiver's filter, overwrite `k8s.namespace.name` (and the metric datapoint `namespace`) with this value on every signal. The filter still checks the sender's original namespace against `namespaces`. Requires non-empty `namespaces`. Use it so a dev receiver on a shared tenant writes `<ns>-dev` and can never write the prod namespace. Unset renders unchanged. |
+
 Receiver paths default to `/<id>/<name>`; `ingress` defaults to true. Paths must be unique across all lanes,
 and ingress paths cannot contain another ingress path at a `/` boundary. With `ingress: false`, send directly to
 `http://alloy-gateway.monitoring.svc.cluster.local:<port>/<id>/<name>/v1/{metrics,logs,traces}`
