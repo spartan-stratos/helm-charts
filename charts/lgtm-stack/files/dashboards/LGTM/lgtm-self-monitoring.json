@@ -50,7 +50,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count(ALERTS{alertstate=\"firing\",namespace=\"monitoring\"} or ALERTS{alertstate=\"firing\",alertname=~\"Lgtm.*\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\",namespace=\"monitoring\",alertname!~\"Watchdog|InfoInhibitor\"} or ALERTS{alertstate=\"firing\",alertname=~\"Lgtm.*\",alertname!~\"Watchdog|InfoInhibitor\"}) or vector(0)",
           "legendFormat": "alerts",
           "refId": "A",
           "instant": true,
@@ -550,7 +550,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(max by (namespace,persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"monitoring\",persistentvolumeclaim=~\".*prometheus.*\"})) or vector(0)",
+          "expr": "sum(max by (namespace,persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"monitoring\",persistentvolumeclaim=~\"prometheus-.*\"})) or vector(0)",
           "legendFormat": "prometheus",
           "refId": "C",
           "instant": true,

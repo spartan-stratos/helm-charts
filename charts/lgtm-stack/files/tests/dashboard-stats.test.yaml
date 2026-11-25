@@ -145,6 +145,21 @@ tests:
     promql_expr_test:
       - {expr: dashboard_stat_24_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_24_A', value: 1}]}
 
+  - name: firing alerts exclude InfoInhibitor in monitoring
+    interval: 1m
+    input_series:
+      - {series: 'ALERTS{alertstate="firing",namespace="monitoring",alertname="InfoInhibitor"}', values: '1x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_24_A, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_24_A', value: 0}]}
+
+  - name: prometheus stored size excludes alertmanager PVC
+    interval: 1m
+    input_series:
+      - {series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="prometheus-db-0"}', values: '300x70'}
+      - {series: 'kubelet_volume_stats_used_bytes{namespace="monitoring",persistentvolumeclaim="alertmanager-kube-prometheus-stack-db-x"}', values: '500x70'}
+    promql_expr_test:
+      - {expr: dashboard_stat_31_C, eval_time: 60m, exp_samples: [{labels: 'dashboard_stat_31_C', value: 300}]}
+
   # Two kube_pod_info series for loki-0 with different uids (a restarted pod object) must not break the node join.
   - name: node join with duplicate pod uids
     interval: 1m
