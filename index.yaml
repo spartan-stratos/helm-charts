@@ -39,6 +39,16 @@ entries:
     version: 0.1.0
   lgtm-stack:
   - apiVersion: v2
+    created: "2026-11-25T14:44:46.097867674Z"
+    description: LGTM Lite (Prometheus, Alertmanager, Grafana, Loki, Alloy, Tempo,
+      OTel Operator) as ArgoCD Applications
+    digest: 26982058d9e04cc648436487a6779c413414907b7879cc14d1d5fb46d0904edb
+    name: lgtm-stack
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/lgtm-stack-0.18.0/lgtm-stack-0.18.0.tgz
+    version: 0.18.0
+  - apiVersion: v2
     created: "2026-11-25T12:48:39.738382987Z"
     description: LGTM Lite (Prometheus, Alertmanager, Grafana, Loki, Alloy, Tempo,
       OTel Operator) as ArgoCD Applications
@@ -1033,4 +1043,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-11-25T12:48:39.739176519Z"
+generated: "2026-11-25T14:44:46.098246973Z"
