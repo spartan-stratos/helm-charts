@@ -333,7 +333,7 @@ jobs:
   alerts:
     permissions:
       contents: read
-    uses: spartan-stratos/helm-charts/.github/workflows/_spartan-alerts-check.yml@<40-char sha> # spartan-alerts-0.4.0
+    uses: spartan-stratos/helm-charts/.github/workflows/_spartan-alerts-check.yml@<40-char sha> # spartan-alerts-0.4.1
     with:
       helm-charts-ref: <40-char sha>
       values-files: deploy/alerts.yaml
@@ -349,6 +349,47 @@ Paths are relative to the caller checkout. `values-files` and `service-names` ac
 `helm-charts-ref`, `values-files`, and `namespace` are required. `release-name` defaults to `alerts`.
 `service-names` and `tests-file` are optional. Omit `tests-file` if no consumer promtool tests exist.
 The caller org's Actions policy must allow this workflow.
+For generated values, generate and upload a separate artifact per environment in your own job:
+
+```yaml
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        env: [dev, prod]
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/generate-alert-values.sh
+        env:
+          ENVIRONMENT: ${{ matrix.env }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alerts-values-${{ matrix.env }}
+          path: generated
+          if-no-files-found: error
+  alerts:
+    needs: generate
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        env: [dev, prod]
+    uses: spartan-stratos/helm-charts/.github/workflows/_spartan-alerts-check.yml@<sha> # spartan-alerts-0.4.1
+    with:
+      helm-charts-ref: <sha>
+      values-artifact: alerts-values-${{ matrix.env }}
+      values-files: alerts-values.yaml
+      namespace: ${{ matrix.env }}
+```
+
+Replace both `<sha>` placeholders with the same full release commit SHA and provide `scripts/generate-alert-values.sh` in the caller repository to write `generated/alerts-values.yaml` using `ENVIRONMENT`.
+`values-artifact` defaults to empty; when set, its contents download into the caller checkout root before checks, so `values-files` and `tests-file` resolve there.
+Upload a directory containing `generated/` if your input paths include that prefix; uploading `generated` itself places its contents at the checkout root.
+There is no `prepare-command` because executing caller-provided shell inside the shared workflow creates a script-injection surface; callers generate files in their own job.
+
 The checks catch unpinned selectors, missing namespace labels, and promtool failures.
 They render the chart from the pinned checkout, validate scope, and run promtool rule checks and optional rule tests.
 

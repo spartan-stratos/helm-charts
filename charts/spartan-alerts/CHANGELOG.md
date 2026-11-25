@@ -2,6 +2,12 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.4.1 (2026-11-25)
+
+### Features
+
+* Add optional `values-artifact` input to the reusable consumer CI check for caller-generated values and tests.
+
 ## 0.4.0 (2026-11-25)
 
 ### Fixes
