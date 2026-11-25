@@ -2,6 +2,14 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.4.0 (2026-11-25)
+
+### Features
+
+* Add workload-specific catalogue rules and optional durable, JVM heap, database pool, and migration alerts.
+* Add reusable consumer CI checks for rendered rules and selector scope.
+* Change AlertmanagerConfig grouping, inhibition, and Slack workload text only when `catalogue.workloads` is set to a non-empty list.
+
 ## 0.3.0 (2026-11-25)
 
 ### Features

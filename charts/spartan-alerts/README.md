@@ -156,16 +156,55 @@ Consumer `groups` remain independent.
 | --- | --- | --- |
 | `enabled` | `false` | Render catalogue rules. |
 | `alertPrefix` | `""` | Prepend to prefixable alert names only. |
-| `container` | `""` | Required container name when kubeState or cadvisor is enabled. |
-| `podRegex` | `""` | Required pod name regex when kubeState or cadvisor is enabled. |
+| `container` | `""` | Required container name when kubeState or cadvisor is enabled and workloads is empty. |
+| `podRegex` | `""` | Required pod name regex when kubeState or cadvisor is enabled and workloads is empty. |
+| `workloads` | `[]` | List of `{name, container, podRegex, alertPrefix, overrides}`. See below. |
+| `serviceName` | `""` | Durable metric `service_name` selector. Empty uses `service.name`. |
+| `migration.jobRegex` | `.*migrat.*` | Migration Job name regex. |
 | `httpSelector` | `""` | Raw PromQL label matchers. Empty uses `service_name="<service.name>"`. |
 | `tagProject` | `""` | RDS and ElastiCache `tag_Project` selector. Empty uses `service.name`. |
 | `runbookUrl` | `""` | Optional `runbook_url` annotation on every catalogue rule. |
-| `sources` | `{kubeState: true, cadvisor: true, http: true, probe: true, rds: false, elasticache: false}` | Render a rule only when all its sources are enabled. |
+| `sources` | `{kubeState: true, cadvisor: true, http: true, probe: true, rds: false, elasticache: false, durable: false, otelJvm: false, otelDbPool: false, migration: false}` | Render a rule only when all its sources are enabled. |
 | `rds.storageWarningBytes` | `0` | Free storage warning threshold in bytes. Zero omits the rule. |
 | `rds.storageCriticalBytes` | `0` | Free storage critical threshold in bytes. Zero omits the rule. |
 | `inhibit` | `true` | Add critical-to-warning inhibition when the catalogue is enabled. |
 | `overrides` | `{}` | Map base alert names to `threshold`, `for`, `severity`, or `enabled`. |
+
+### catalogue.workloads
+
+Use a workload list for separate container and pod selectors:
+
+```yaml
+catalogue:
+  enabled: true
+  workloads:
+    - name: api
+      container: api
+      podRegex: 'api-[a-z0-9]{9,10}-[a-z0-9]{5}'
+    - name: worker-general
+      container: worker-general
+      podRegex: 'worker-general-[a-z0-9]{9,10}-[a-z0-9]{5}'
+    - name: worker-media
+      container: worker-media
+      podRegex: 'worker-media-[a-z0-9]{9,10}-[a-z0-9]{5}'
+    - name: worker-voice
+      container: worker-voice
+      podRegex: 'worker-voice-[a-z0-9]{9,10}-[a-z0-9]{5}'
+    - name: worker-bench
+      container: worker-bench
+      podRegex: 'worker-bench-[a-z0-9]{9,10}-[a-z0-9]{5}'
+```
+
+Each entry requires a unique name, container, and podRegex. Do not set scalar `container` or `podRegex` with this list.
+The podRegex values must not overlap. They must exclude hook and Job pods, including migration Jobs.
+The example matches Deployment pod names. Adapt it to your controller's naming pattern and check actual pod names.
+Only the eight kubeState and cadvisor workload rules render per workload and gain a `workload` label. Other rules render once.
+An optional workload `alertPrefix` replaces the catalogue prefix. Non-empty workload prefixes must be unique.
+Workload `overrides` use the same fields as catalogue overrides and take precedence over them.
+The same-severity guard applies within each workload and catalogue ID.
+
+With a non-empty list, AlertmanagerConfig grouping and inhibition include `workload`, and Slack displays it when present.
+With an empty list, scalar selectors and AlertmanagerConfig output retain 0.3.0 behavior.
 
 ### Catalogue Rules
 
@@ -174,6 +213,11 @@ The tier follows the final severity: critical is P2 and warning is P3.
 
 | Alert | Prefixable | Sources | Unit | Default threshold | For | Severity | Tier |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| DurableQueueNotDraining | false | durable | count | 0 | 30m | warning | P3 |
+| DurableActivitiesNotRegistered | false | durable | count | 0 | 10m | critical | P2 |
+| JvmHeapHigh | false | otelJvm | ratio | 0.9 | 15m | warning | P3 |
+| DbPoolHigh | false | otelDbPool | ratio | 0.9 | 10m | warning | P3 |
+| MigrationJobFailed | false | kubeState, migration | count | 0 | 5m | critical | P2 |
 | ContainerRestarting | true | kubeState | count | 0 | 1m | critical | P2 |
 | PodStuckWaiting | true | kubeState | count | 1 | 5m | critical | P2 |
 | PodFailed | true | kubeState | count | 0 | 5m | critical | P2 |
@@ -205,12 +249,32 @@ RDS and ElastiCache selectors exclude `name="global"` and match `tag_Project`.
 Use one catalogue per tagProject to avoid duplicate cloud alerts.
 Missing cloud exporter series leave these rules silent; they do not detect exporter absence.
 
+### New Source Prerequisites
+
+All four new sources default to false. Enable them only after confirming the required series.
+Replace `notifications` and `api` below with the release namespace and configured service name.
+Each query must return a positive count for every listed metric. Missing series leave alerts silent.
+
+| Source | Required series and labels | PromQL count query |
+| --- | --- | --- |
+| `durable` | `durable_queue_depth` and `durable_runtime_registered_activities`, with `namespace` and `service_name`; queue depth also uses `queue_name`. | `count by (__name__) ({__name__=~"durable_queue_depth\|durable_runtime_registered_activities",namespace="notifications",service_name="api"})` |
+| `otelJvm` | `jvm_memory_used_bytes` and `jvm_memory_limit_bytes`, with `namespace`, `k8s_pod_name`, and `jvm_memory_type="heap"`. Limits must be positive. | `count by (__name__) ({__name__=~"jvm_memory_used_bytes\|jvm_memory_limit_bytes",namespace="notifications",jvm_memory_type="heap"})` |
+| `otelDbPool` | `db_client_connections_usage` and `db_client_connections_max`, with `namespace`, `k8s_pod_name`, and `pool_name`; usage also needs `state`, including non-idle states. | `count by (__name__) ({__name__=~"db_client_connections_usage\|db_client_connections_max",namespace="notifications"})` |
+| `migration` (also needs `kubeState`) | `kube_job_status_failed` and `kube_job_status_succeeded`, with `namespace` and `job_name` matching `migration.jobRegex`. | `count by (__name__) ({__name__=~"kube_job_status_failed\|kube_job_status_succeeded",namespace="notifications",job_name=~".*migrat.*"})` |
+
+DurableQueueNotDraining requires queue depth above zero for the full 30m window. Touching zero resets it.
+`durable_runtime_workers_*` is not used because worker counts do not establish queue progress or activity registration.
+JvmHeapHigh compares heap used with heap limits per pod and ignores non-positive limits.
+DbPoolHigh selects the worst non-idle usage ratio across pools per pod.
+MigrationJobFailed suppresses failures once the same Job has succeeded. During an in-flight retry, it can still fire until success is observed.
+These new rules are not prefixable and do not repeat per workload.
+
 ### Overrides and Example
 
 Override keys use base alert names, even with a prefix. Unknown names or fields fail rendering.
 Allowed severities are `warning` and `critical`. Ratio thresholds must be in (0, 1]; percent thresholds must be in (0, 100].
 An `enabled: false` override omits a rule. Setting it to true does not bypass source toggles or a zero storage threshold.
-Two rendered rules sharing a catalogue ID cannot have the same final severity.
+Two rendered rules sharing a workload and catalogue ID cannot have the same final severity.
 Overrides replace the threshold, duration, and severity independently. Descriptions keep their catalogue duration text.
 
 ```yaml
@@ -253,11 +317,40 @@ This omits the four kubeState rules and CpuHigh. Enable the source only after it
 With both `catalogue.enabled` and `catalogue.inhibit` true, the namespace AlertmanagerConfig adds an inhibit rule.
 A critical alert with a nonempty `catalogue_id` suppresses warning notifications with equal `namespace`, `catalogue_id`, `pod`, `dimension_DBInstanceIdentifier`, and `dimension_CacheClusterId`.
 Absent labels compare equal. Resource labels keep one database or cache from muting another.
+When workloads are set, `workload` must also match for inhibition.
 The four shared-ID pairs are RDS CPU, RDS storage, ElastiCache CPU, and ElastiCache memory.
 Every catalogue rule carries `namespace`, `severity`, `tier`, and `catalogue_id` labels.
 Consumer rules without `catalogue_id` are not inhibited by this rule.
 One OOM event can still page twice: ContainerRestarting is critical and OomKilled is warning, with different catalogue IDs.
 This double page is accepted. Set `catalogue.inhibit: false` to omit catalogue inhibition.
+
+## Consumer CI check
+
+Call the reusable workflow from a job in your repository:
+
+```yaml
+jobs:
+  alerts:
+    permissions:
+      contents: read
+    uses: spartan-stratos/helm-charts/.github/workflows/_spartan-alerts-check.yml@<40-char sha> # spartan-alerts-0.4.0
+    with:
+      helm-charts-ref: <40-char sha>
+      values-files: deploy/alerts.yaml
+      namespace: notifications
+      release-name: alerts
+      service-names: api
+      tests-file: tests/alerts.test.yaml
+```
+
+Replace both `<40-char sha>` placeholders with the same full commit SHA for the release.
+The placeholder is deliberate: select the release commit after publication rather than a mutable tag.
+Paths are relative to the caller checkout. `values-files` and `service-names` accept newline-separated lists using YAML block scalars.
+`helm-charts-ref`, `values-files`, and `namespace` are required. `release-name` defaults to `alerts`.
+`service-names` and `tests-file` are optional. Omit `tests-file` if no consumer promtool tests exist.
+The caller org's Actions policy must allow this workflow.
+The checks catch unpinned selectors, missing namespace labels, and promtool failures.
+They render the chart from the pinned checkout, validate scope, and run promtool rule checks and optional rule tests.
 
 ## Upgrading the Chart
 
@@ -265,13 +358,21 @@ This double page is accepted. Set `catalogue.inhibit: false` to omit catalogue i
 helm upgrade alerts ./charts/spartan-alerts -n notifications -f values.yaml
 ```
 
+### Migrating to 0.4.0
+
+Existing scalar catalogue values retain their output. New sources are opt-in.
+AlertmanagerConfig changes only when `catalogue.workloads` is non-empty.
+When adopting workloads, remove scalar container and podRegex values and check selector non-overlap.
+Workload labels change alert identity, so existing workload alerts resolve and refire once.
+Remove matching consumer rules when enabling the new sources to avoid duplicate alerts.
+
 ### Migrating to 0.3.0
 
 The catalogue is disabled by default. Existing `groups` and routing stay unchanged when no new values are set.
 When adopting it, remove duplicate rules from `groups` in the same change.
 New catalogue labels change alert identity, so firing alerts resolve and refire once at cutover.
 Match existing alert names with `alertPrefix` where needed, and supply container and pod selectors before enabling workload sources.
-Keep service-specific rules (migration jobs, queues, JVM heap, connection pools) in consumer `groups`; they are outside this catalogue.
+In 0.3.0, keep migration, queue, JVM heap, and connection pool rules in consumer `groups`. Version 0.4.0 adds opt-in sources for these rules.
 
 ## Uninstalling the Chart
 
