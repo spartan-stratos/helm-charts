@@ -187,6 +187,7 @@ spec:
         {{- if eq $key "logRules" }}
         logRules: {{- toYaml $.Values.logRules | nindent 10 }}
         tenants: {{- toYaml $.Values.tenants | nindent 10 }}
+        platformTenant: {{ $.Values.platformTenant | quote }}
         {{- end }}
         {{- if eq $key "stackRules" }}
         {{- $retention := dict "loki" nil "tempo" nil }}

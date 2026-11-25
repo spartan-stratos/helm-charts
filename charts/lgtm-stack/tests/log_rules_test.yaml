@@ -169,6 +169,16 @@ tests:
       - equal: { path: spec.source.helm.valuesObject.addon, value: logRules }
       - equal: { path: spec.source.helm.valuesObject.logRules.enabled, value: true }
       - lengthEqual: { path: spec.source.helm.valuesObject.tenants, count: 3 }
+  - it: forwards the configured platform tenant to the log rules addon
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-log-rules }
+    set:
+      platformTenant: ops
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.platformTenant, value: ops }
   - it: omits addon with no tenant namespaces
     template: templates/applications.yaml
     set:
