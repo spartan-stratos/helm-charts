@@ -2,6 +2,32 @@
 {{- include "lgtm-stack.validateRemovedGrafanaKeys" . }}
 {{- include "lgtm-stack.validateTenantDashboards" . }}
 {{- include "lgtm-stack.validateSettleSeconds" . }}
+{{- if .Values.logRules.enabled }}
+{{- if not (eq .Values.components.loki.enabled true) }}{{ fail "logRules.enabled requires components.loki.enabled true" }}{{ end }}
+{{- /* Lists replace on merge and overrides could drop sidecars or the tenant relabel guard. */}}
+{{- range $key := list "extraContainers" "extraVolumes" "extraVolumeMounts" }}
+{{- if hasKey (dig "singleBinary" dict $.Values.components.loki.values) $key }}{{ fail (printf "logRules owns components.loki.values.singleBinary.%s" $key) }}{{ end }}
+{{- end }}
+{{- range $key := list "rulerConfig" "runtimeConfig" }}
+{{- if hasKey (dig "loki" dict $.Values.components.loki.values) $key }}{{ fail (printf "logRules owns components.loki.values.loki.%s" $key) }}{{ end }}
+{{- end }}
+{{- $namespaces := dict }}
+{{- range $tenant := .Values.tenants }}
+{{- /* k8s-sidecar with an empty NAMESPACE watches its own namespace. */}}
+{{- if and (hasKey $tenant "ruleNamespaces") (empty $tenant.ruleNamespaces) }}{{ fail (printf "tenant %s ruleNamespaces must not be empty; omit it to use namespaces" $tenant.id) }}{{ end }}
+{{- range $namespace := concat ($tenant.namespaces | default list) ($tenant.ruleNamespaces | default list) }}
+{{- if or (not (kindIs "string" $namespace)) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" (toString $namespace))) }}{{ fail (printf "tenant %s namespace %v must be a DNS-1123 label" $tenant.id $namespace) }}{{ end }}
+{{- if eq $namespace $.Values.namespace }}{{ fail (printf "tenant %s namespace %s must not equal the monitoring namespace" $tenant.id $namespace) }}{{ end }}
+{{- if and (hasKey $namespaces $namespace) (ne (index $namespaces $namespace) $tenant.id) }}{{ fail (printf "tenant %s namespace %s appears in another tenant" $tenant.id $namespace) }}{{ end }}
+{{- $_ := set $namespaces $namespace $tenant.id }}
+{{- end }}
+{{- range $tenant.ruleNamespaces }}
+{{- if not (has . ($tenant.namespaces | default list)) }}{{ fail (printf "tenant %s ruleNamespace %s must be in namespaces" $tenant.id .) }}{{ end }}
+{{- end }}
+{{- end }}
+{{- if not (eq .Values.tenantIsolation.enabled true) }}{{ fail "logRules.enabled requires tenantIsolation.enabled true" }}{{ end }}
+{{- if not (eq (dig "loki" "auth_enabled" false .Values.components.loki.values) true) }}{{ fail "logRules.enabled requires components.loki.values.loki.auth_enabled true" }}{{ end }}
+{{- end }}
 {{- $mapping := include "lgtm-stack.orgMapping" . }}
 {{- $_ := required "argocd.project is required" .Values.argocd.project }}
 {{- $_ := required "cluster.name is required" .Values.cluster.name }}
@@ -130,6 +156,8 @@ spec:
 {{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.alloyGateway.enabled (or $.Values.gateway.ingress.enabled $hasExternalSecret) }}
 {{- else if eq $key "tenantRules" }}
 {{- $enabled = and $hasTenantNamespaces $.Values.components.promLabelProxy.enabled }}
+{{- else if eq $key "logRules" }}
+{{- $enabled = and $hasTenantNamespaces $.Values.logRules.enabled }}
 {{- else if eq $key "tenantOrgs" }}
 {{- $enabled = and (not (empty $.Values.tenants)) $.Values.components.grafana.enabled }}
 {{- else if $a.rules }}
@@ -158,6 +186,11 @@ spec:
         mode: addon
         addon: {{ $key }}
         namespace: {{ $.Values.namespace }}
+        {{- if eq $key "logRules" }}
+        logRules: {{- toYaml $.Values.logRules | nindent 10 }}
+        tenants: {{- toYaml $.Values.tenants | nindent 10 }}
+        platformTenant: {{ $.Values.platformTenant | quote }}
+        {{- end }}
         {{- if eq $key "stackRules" }}
         {{- $retention := dict "loki" nil "tempo" nil }}
         {{- if $.Values.components.loki.enabled }}

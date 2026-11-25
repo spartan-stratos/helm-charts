@@ -1,0 +1,417 @@
+suite: Tenant log rules
+templates:
+  - templates/applications.yaml
+  - templates/addon.yaml
+  - templates/log-rules.yaml
+set:
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+  components.alloyGateway.enabled: false
+  tenants:
+    - { id: a, namespaces: [a-dev, a-prod], port: 4320 }
+    - { id: b, namespaces: [b-prod], port: 4321 }
+    - { id: empty, namespaces: [], port: 4322 }
+tests:
+  - it: honors configured limits and resources
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-loki }
+    set:
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      logRules.limits: { maxRuleGroupsPerTenant: 7, maxRulesPerRuleGroup: 9 }
+      logRules.sidecar.resources: { requests: { cpu: 20m, memory: 96Mi }, limits: { memory: 192Mi } }
+      components.loki.values.loki.auth_enabled: true
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.loki.rulerConfig.enable_api, value: true }
+      - equal: { path: spec.source.helm.valuesObject.loki.runtimeConfig.overrides.a.ruler_max_rule_groups_per_tenant, value: 7 }
+      - equal: { path: spec.source.helm.valuesObject.loki.runtimeConfig.overrides.a.ruler_max_rules_per_rule_group, value: 9 }
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].resources
+          value: { requests: { cpu: 20m, memory: 96Mi }, limits: { memory: 192Mi } }
+  - it: leaves Loki ruler values absent by default
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-loki }
+    asserts:
+      - notExists: { path: spec.source.helm.valuesObject.loki.rulerConfig }
+      - notExists: { path: spec.source.helm.valuesObject.loki.runtimeConfig }
+      - notExists: { path: spec.source.helm.valuesObject.singleBinary.extraContainers }
+      - equal: { path: spec.source.helm.valuesObject.sidecar.rules.enabled, value: false }
+  - it: omits log rules Application by default
+    template: templates/applications.yaml
+    asserts:
+      - notEqual: { path: metadata.name, value: lgtm-log-rules }
+  - it: requires tenant isolation
+    template: templates/applications.yaml
+    set: { logRules.enabled: true }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules.enabled requires tenantIsolation.enabled true' }
+  - it: requires explicit Loki authentication
+    template: templates/applications.yaml
+    set: { logRules.enabled: true, tenantIsolation.enabled: true }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules.enabled requires components.loki.values.loki.auth_enabled true' }
+  - it: configures only tenants with namespaces
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-loki }
+    set:
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+    asserts:
+      - lengthEqual: { path: spec.source.helm.valuesObject.singleBinary.extraContainers, count: 2 }
+      - equal: { path: 'spec.source.helm.valuesObject.singleBinary.extraContainers[0].name', value: rules-a }
+      - equal: { path: 'spec.source.helm.valuesObject.singleBinary.extraContainers[1].name', value: rules-b }
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].env
+          value:
+            - { name: FOLDER, value: /rules/a }
+            - { name: HEALTH_PORT, value: '8080' }
+            - { name: LABEL, value: loki_rule }
+            - { name: METHOD, value: WATCH }
+            - { name: NAMESPACE, value: 'a-dev,a-prod' }
+            - { name: RESOURCE, value: configmap }
+            - { name: UNIQUE_FILENAMES, value: 'true' }
+            - { name: WATCH_CLIENT_TIMEOUT, value: '60' }
+            - { name: WATCH_SERVER_TIMEOUT, value: '60' }
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].resources
+          value: { requests: { cpu: 10m, memory: 64Mi }, limits: { memory: 128Mi } }
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].securityContext
+          value:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].volumeMounts
+          value: [{ name: rules-0, mountPath: /rules/a }]
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[1].volumeMounts
+          value: [{ name: rules-1, mountPath: /rules/b }]
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraVolumes
+          value: [{ name: rules-platform, configMap: { name: loki-rules-platform, optional: true } }, { name: rules-0, emptyDir: {} }, { name: rules-1, emptyDir: {} }]
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraVolumeMounts
+          value: [{ name: rules-platform, mountPath: /rules/platform, readOnly: true }, { name: rules-0, mountPath: /rules/a, readOnly: true }, { name: rules-1, mountPath: /rules/b, readOnly: true }]
+      - equal:
+          path: spec.source.helm.valuesObject.loki.rulerConfig
+          value:
+            wal: { dir: /var/loki/ruler-wal }
+            storage: { type: local, local: { directory: /rules } }
+            rule_path: /var/loki/rules-tmp
+            alertmanager_url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+            enable_alertmanager_v2: true
+            enable_api: true
+            ring: { kvstore: { store: inmemory } }
+      - equal:
+          path: spec.source.helm.valuesObject.loki.runtimeConfig.overrides.a
+          value:
+            ruler_max_rule_groups_per_tenant: 10
+            ruler_max_rules_per_rule_group: 10
+            ruler_alertmanager_config:
+              alertmanager_url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+              enable_alertmanager_v2: true
+              alert_relabel_configs:
+                - { action: keep, source_labels: [namespace], regex: '^(a-dev|a-prod)$' }
+                - { action: replace, target_label: tenant, replacement: a }
+      - notExists: { path: spec.source.helm.valuesObject.loki.runtimeConfig.overrides.empty }
+      - equal: { path: spec.source.helm.valuesObject.sidecar.rules.enabled, value: false }
+  - it: assigns consecutive health ports without counting tenants with no namespaces
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-loki }
+    set:
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+      tenants:
+        - { id: a, namespaces: [a-dev], port: 4320 }
+        - { id: empty, namespaces: [], port: 4322 }
+        - { id: b, namespaces: [b-prod], port: 4321 }
+    asserts:
+      - lengthEqual: { path: spec.source.helm.valuesObject.singleBinary.extraContainers, count: 2 }
+      - equal: { path: 'spec.source.helm.valuesObject.singleBinary.extraContainers[0].name', value: rules-a }
+      - equal: { path: 'spec.source.helm.valuesObject.singleBinary.extraContainers[1].name', value: rules-b }
+      - contains:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].env
+          content: { name: HEALTH_PORT, value: '8080' }
+      - contains:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[1].env
+          content: { name: HEALTH_PORT, value: '8081' }
+      - contains:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[1].env
+          content: { name: WATCH_CLIENT_TIMEOUT, value: '60' }
+      - contains:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[1].env
+          content: { name: WATCH_SERVER_TIMEOUT, value: '60' }
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].ports
+          value: [{ name: http-rules-0, containerPort: 8080 }]
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[1].ports
+          value: [{ name: http-rules-1, containerPort: 8081 }]
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraVolumes
+          value: [{ name: rules-platform, configMap: { name: loki-rules-platform, optional: true } }, { name: rules-0, emptyDir: {} }, { name: rules-1, emptyDir: {} }]
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[1].volumeMounts
+          value: [{ name: rules-1, mountPath: /rules/b }]
+  - it: forwards addon configuration
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-log-rules }
+    set:
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.addon, value: logRules }
+      - equal: { path: spec.source.helm.valuesObject.logRules.enabled, value: true }
+      - lengthEqual: { path: spec.source.helm.valuesObject.tenants, count: 3 }
+  - it: forwards the configured platform tenant to the log rules addon
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-log-rules }
+    set:
+      platformTenant: ops
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+    asserts:
+      - equal: { path: spec.source.helm.valuesObject.platformTenant, value: ops }
+  - it: omits addon with no tenant namespaces
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+      tenants: [{ id: empty, namespaces: [], port: 4322 }]
+    asserts:
+      - notEqual: { path: metadata.name, value: lgtm-log-rules }
+  - it: renders nothing when disabled
+    template: templates/log-rules.yaml
+    set: { mode: addon, addon: logRules }
+    asserts:
+      - hasDocuments: { count: 0 }
+  - it: grants only namespace ConfigMap reads
+    template: templates/log-rules.yaml
+    set: { mode: addon, addon: logRules, logRules.enabled: true }
+    asserts:
+      - hasDocuments: { count: 8 }
+      - equal:
+          path: rules
+          value: [{ apiGroups: [''], resources: [configmaps], verbs: [get, list, watch] }]
+        documentIndex: 0
+      - equal:
+          path: rules
+          value: [{ apiGroups: [''], resources: [configmaps], verbs: [get, list, watch] }]
+        documentIndex: 2
+      - equal:
+          path: rules
+          value: [{ apiGroups: [''], resources: [configmaps], verbs: [get, list, watch] }]
+        documentIndex: 4
+      - isKind: { of: Role }
+        documentIndex: 0
+      - isKind: { of: Role }
+        documentIndex: 2
+      - isKind: { of: Role }
+        documentIndex: 4
+      - equal: { path: metadata.namespace, value: a-dev }
+        documentIndex: 0
+      - equal: { path: metadata.namespace, value: a-prod }
+        documentIndex: 2
+      - equal: { path: metadata.namespace, value: b-prod }
+        documentIndex: 4
+      - equal:
+          path: subjects
+          value: [{ kind: ServiceAccount, name: loki, namespace: monitoring }]
+        documentIndex: 1
+      - equal:
+          path: subjects
+          value: [{ kind: ServiceAccount, name: loki, namespace: monitoring }]
+        documentIndex: 3
+      - equal:
+          path: subjects
+          value: [{ kind: ServiceAccount, name: loki, namespace: monitoring }]
+        documentIndex: 5
+      - isKind: { of: PrometheusRule }
+        documentIndex: 7
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: increase(loki_prometheus_rule_evaluation_failures_total[10m]) > 0
+        documentIndex: 7
+      - equal:
+          path: spec.groups[0].rules[1].expr
+          value: increase(loki_prometheus_notifications_errors_total[10m]) > 0
+        documentIndex: 7
+      - equal: { path: metadata.name, value: loki-rules-a }
+        documentIndex: 0
+      - equal: { path: metadata.name, value: loki-rules-a }
+        documentIndex: 2
+      - equal: { path: metadata.name, value: loki-rules-b }
+        documentIndex: 4
+      - equal:
+          path: roleRef
+          value: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: loki-rules-a }
+        documentIndex: 1
+      - equal:
+          path: roleRef
+          value: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: loki-rules-a }
+        documentIndex: 3
+      - equal:
+          path: roleRef
+          value: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: loki-rules-b }
+        documentIndex: 5
+      - equal:
+          path: spec.groups[0].rules[2].expr
+          value: 'absent(loki_prometheus_rule_group_rules{user="platform", rule_group=~".*;lgtm-log-rules-canary"})'
+        documentIndex: 7
+  - it: renders a parseable platform canary
+    template: templates/log-rules.yaml
+    set: { mode: addon, addon: logRules, logRules.enabled: true }
+    documentSelector: { path: metadata.name, value: loki-rules-platform }
+    asserts:
+      - equal: { path: metadata.namespace, value: monitoring }
+      - equal:
+          path: data["canary.yaml"]
+          value: |
+            groups:
+              - name: lgtm-log-rules-canary
+                rules:
+                  - alert: LokiRuleListFailing
+                    # Loki logs each ruler query's text, so match the parsed msg field rather than the raw phrase.
+                    expr: 'sum(count_over_time({namespace="monitoring", container="loki"} |= "unable to list rules" | logfmt | msg = "unable to list rules" [5m])) > 0'
+                    for: 5m
+                    labels:
+                      severity: critical
+                      namespace: monitoring
+                    annotations:
+                      summary: '{{ $value }} rule list failures in 5m; expected 0.'
+                      description: 'A malformed tenant log rule ConfigMap stops rule sync for every tenant and none load after a restart. Check the Loki log line for the tenant and file named in it first.'
+  - it: mounts the canary under the configured platform tenant
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-loki }
+    set:
+      platformTenant: ops
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.singleBinary.extraVolumeMounts[0]
+          value: { name: rules-platform, mountPath: /rules/ops, readOnly: true }
+  - it: checks canary loading for the configured platform tenant
+    template: templates/log-rules.yaml
+    documentSelector: { path: metadata.name, value: lgtm-log-rules }
+    set: { mode: addon, addon: logRules, logRules.enabled: true, platformTenant: ops }
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[2].expr
+          value: 'absent(loki_prometheus_rule_group_rules{user="ops", rule_group=~".*;lgtm-log-rules-canary"})'
+  - it: requires Loki enabled
+    template: templates/applications.yaml
+    set: { logRules.enabled: true, components.loki.enabled: false }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules.enabled requires components.loki.enabled true' }
+  - it: rejects replacement sidecar containers
+    template: templates/applications.yaml
+    set: { logRules.enabled: true, components.loki.values.singleBinary.extraContainers: [] }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules owns components.loki.values.singleBinary.extraContainers' }
+  - it: rejects replacement volumes
+    template: templates/applications.yaml
+    set: { logRules.enabled: true, components.loki.values.singleBinary.extraVolumes: [] }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules owns components.loki.values.singleBinary.extraVolumes' }
+  - it: rejects replacement mounts
+    template: templates/applications.yaml
+    set: { logRules.enabled: true, components.loki.values.singleBinary.extraVolumeMounts: [] }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules owns components.loki.values.singleBinary.extraVolumeMounts' }
+  - it: rejects replacement ruler config
+    template: templates/applications.yaml
+    set: { logRules.enabled: true, components.loki.values.loki.rulerConfig: {} }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules owns components.loki.values.loki.rulerConfig' }
+  - it: rejects replacement runtime config
+    template: templates/applications.yaml
+    set: { logRules.enabled: true, components.loki.values.loki.runtimeConfig: {} }
+    asserts:
+      - failedTemplate: { errorMessage: 'logRules owns components.loki.values.loki.runtimeConfig' }
+  - it: rejects invalid namespace syntax
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [Bad], port: 4320 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant a namespace Bad must be a DNS-1123 label' }
+  - it: rejects the monitoring namespace
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [monitoring], port: 4320 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant a namespace monitoring must not equal the monitoring namespace' }
+  - it: rejects namespace sharing across tenants
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [shared], port: 4320 }, { id: b, namespaces: [shared], port: 4321 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant b namespace shared appears in another tenant' }
+  - it: rejects empty rule namespaces
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [a-dev], ruleNamespaces: [], port: 4320 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant a ruleNamespaces must not be empty; omit it to use namespaces' }
+  - it: rejects rule namespaces outside the tenant
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [a-dev], ruleNamespaces: [other], port: 4320 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant a ruleNamespace other must be in namespaces' }
+  - it: rejects invalid rule namespace syntax
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [a-dev], ruleNamespaces: [Bad], port: 4320 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant a namespace Bad must be a DNS-1123 label' }
+  - it: rejects monitoring as a rule namespace
+    template: templates/applications.yaml
+    set:
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [a-dev], ruleNamespaces: [monitoring], port: 4320 }]
+    asserts:
+      - failedTemplate: { errorMessage: 'tenant a namespace monitoring must not equal the monitoring namespace' }
+  - it: watches only local rule namespaces while keeping every alert namespace
+    template: templates/applications.yaml
+    documentSelector: { path: metadata.name, value: lgtm-loki }
+    set:
+      logRules.enabled: true
+      tenantIsolation.enabled: true
+      components.loki.values.loki.auth_enabled: true
+      tenants: [{ id: a, namespaces: [a-dev, a-prod], ruleNamespaces: [a-prod], port: 4320 }]
+    asserts:
+      - contains:
+          path: spec.source.helm.valuesObject.singleBinary.extraContainers[0].env
+          content: { name: NAMESPACE, value: a-prod }
+      - equal:
+          path: spec.source.helm.valuesObject.loki.runtimeConfig.overrides.a.ruler_alertmanager_config.alert_relabel_configs[0].regex
+          value: '^(a-dev|a-prod)$'
+  - it: grants roles only in local rule namespaces
+    template: templates/log-rules.yaml
+    set:
+      mode: addon
+      addon: logRules
+      logRules.enabled: true
+      tenants: [{ id: a, namespaces: [a-dev, a-prod], ruleNamespaces: [a-prod], port: 4320 }, { id: empty, namespaces: [], port: 4321 }]
+    asserts:
+      - hasDocuments: { count: 4 }
+      - equal: { path: metadata.namespace, value: a-prod }
+        documentIndex: 0
+      - equal: { path: metadata.namespace, value: a-prod }
+        documentIndex: 1

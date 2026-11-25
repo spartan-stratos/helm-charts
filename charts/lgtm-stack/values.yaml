@@ -46,6 +46,17 @@ networkPolicy:
   allowFromNamespaces: []
 
 platformTenant: platform
+# Keep log alert evaluation opt-in because it requires tenant authentication.
+logRules:
+  enabled: false
+  sidecar:
+    image: docker.io/kiwigrid/k8s-sidecar:2.11.2
+    resources:
+      requests: { cpu: 10m, memory: 64Mi }
+      limits: { memory: 128Mi }
+  limits:
+    maxRuleGroupsPerTenant: 10
+    maxRulesPerRuleGroup: 10
 # See README.md Tenant gateway receivers for credential and namespace isolation configuration.
 # Tenants may set grafana: { viewers: [<group>], editors: [<group>] } for optional Keycloak org mapping.
 # Adding viewers or editors groups enables mapping and folders; set orgId after the job creates them.
