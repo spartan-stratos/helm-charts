@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.19.0 (2026-11-26)
+
+### Features
+
+* Add optional per-receiver `stampNamespace`. The gateway overwrites `k8s.namespace.name` (and the datapoint `namespace`) with it after the receiver's namespace filter, so a dev receiver on a shared tenant cannot write the prod namespace. Setting it with empty `namespaces` fails rendering. Unset renders unchanged.
+
 ## 0.18.0 (2026-11-25)
 
 ### Features
