@@ -21,7 +21,7 @@ The default refresh is `1h`. Apply a rotated value now with
 
 ## Values
 
-All defaults are empty strings except `javaImage`. Every required value fails rendering with `<key> is required` when empty or missing.
+All defaults are empty strings except `javaImage` and `headersSecretOptional`. Every required value fails rendering with `<key> is required` when empty or missing.
 
 | Key | Required | Meaning |
 | --- | --- | --- |
@@ -32,6 +32,7 @@ All defaults are empty strings except `javaImage`. Every required value fails re
 | `secretName` | Yes | Secrets Manager entry containing `username` and `password`. |
 | `receiverUrl` | Yes | OTLP HTTP receiver base URL, including its configured receiver path. |
 | `instrumentationName` | No | Instrumentation name; defaults to the value of `tenant`. |
+| `headersSecretOptional` | No | Defaults to `true`: the credential Secret reference is optional, so pods start before the ExternalSecret has created it. Exports return an auth error until the Secret exists. Set `false` to require it. |
 | `javaImage` | No | Java auto-instrumentation agent image, pinned by default. Set to an empty string to use the operator default. |
 
 Dev uses in-cluster port `4320` and path `/<tenant>`. Prod uses its own port and path

@@ -13,6 +13,9 @@ spec:
         secretKeyRef:
           name: otlp-basic-auth
           key: otlp-headers
+{{- if .Values.headersSecretOptional }}
+          optional: true
+{{- end }}
 {{- with .Values.javaImage }}
   java:
     image: {{ . | quote }}

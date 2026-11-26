@@ -8,3 +8,5 @@ receiverUrl: ""
 instrumentationName: ""
 # Java auto-instrumentation agent image; the platform's own Instrumentations pin this version. Set to "" to use the operator default.
 javaImage: "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.31.1"
+# Let pods start before the otlp-basic-auth Secret exists; exports fail auth until it does. Set false to require the Secret.
+headersSecretOptional: true
