@@ -71,9 +71,38 @@ tests:
           value:
             severity: warning
             namespace: alerts-test
+            tier: P3
       - equal:
           path: spec.groups[0].rules[1].labels.namespace
           value: alerts-test
+  - it: "should derive tier from severity and keep an explicit tier"
+    set:
+      groups:
+        - name: g
+          rules:
+            - alert: Crit
+              expr: up == 0
+              labels: {severity: critical}
+            - alert: Warn
+              expr: up == 0
+              labels: {severity: warning}
+            - alert: Explicit
+              expr: up == 0
+              labels: {severity: warning, tier: P1}
+            - alert: NoSeverity
+              expr: up == 0
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].labels.tier
+          value: P2
+      - equal:
+          path: spec.groups[0].rules[1].labels.tier
+          value: P3
+      - equal:
+          path: spec.groups[0].rules[2].labels.tier
+          value: P1
+      - notExists:
+          path: spec.groups[0].rules[3].labels.tier
   - it: "should preserve an explicit namespace label"
     set:
       groups:

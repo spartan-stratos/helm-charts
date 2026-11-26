@@ -10,6 +10,15 @@
 {{- $matchers = printf "%s        matchType: %s\n" $matchers (.matchType | quote) -}}
 {{- end -}}
 {{- end -}}
+{{- $short := include "spartan-alerts.short" . -}}
+{{- $tierRoutes := "" -}}
+{{- range $tier, $cfg := .Values.alerting.tierRoutes -}}
+{{- if not (has $tier (list "P1" "P2" "P3")) -}}{{- fail (printf "alerting.tierRoutes: unknown tier %q, use P1, P2 or P3" $tier) -}}{{- end -}}
+{{- $interval := default "" $cfg.repeatInterval -}}
+{{- if not (regexMatch "^[0-9]+(s|m|h|d|w)$" (toString $interval)) -}}{{- fail (printf "alerting.tierRoutes.%s.repeatInterval must look like 1h or 30m" $tier) -}}{{- end -}}
+{{- if eq $tierRoutes "" -}}{{- $tierRoutes = "    routes:\n" -}}{{- end -}}
+{{- $tierRoutes = printf "%s      - receiver: slack-%s-%s\n        matchers:\n          - name: tier\n            value: %s\n        repeatInterval: %s\n        continue: false\n" $tierRoutes $short $.Values.env $tier $interval -}}
+{{- end -}}
 {{- $perWorkload := and .Values.catalogue.enabled (not (empty .Values.catalogue.workloads)) -}}
 {{- $groupByWorkload := "" -}}
 {{- $workloadText := "" -}}
@@ -35,5 +44,6 @@
   | replace "${WORKLOAD_TEXT}" $workloadText
   | replace "${NAME_SUFFIX}" $suffix
   | replace "${ROUTE_MATCHERS}\n" $matchers
+  | replace "${TIER_ROUTES}\n" $tierRoutes
   | replace "${INHIBIT_RULES}\n" $inhibitRules
 }}

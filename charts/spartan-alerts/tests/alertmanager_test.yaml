@@ -149,7 +149,7 @@ tests:
     asserts:
       - equal:
           path: spec.receivers[0].slackConfigs[0].title
-          value: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          value: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ if .CommonLabels.tier }}[{{ .CommonLabels.tier }}] {{ end }}{{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
       - equal:
           path: spec.receivers[0].slackConfigs[0].titleLink
           value: 'https://grafana.example/alerting/list?search={{ .CommonLabels.alertname | urlquery }}'
@@ -194,6 +194,62 @@ tests:
           path: spec.receivers[0].slackConfigs[0].text
           pattern: 'workload=\{\{ \.Labels\.workload \}\}'
         documentIndex: 0
+  - it: "should show the tier in both titles only through a guard on the label"
+    asserts:
+      - matchRegex:
+          path: spec.receivers[0].slackConfigs[0].title
+          pattern: '\] \{\{ if \.CommonLabels\.tier \}\}\[\{\{ \.CommonLabels\.tier \}\}\] \{\{ end \}\}\{\{ \.CommonLabels\.alertname \}\}'
+        documentIndex: 1
+  - it: "should render no nested routes without tierRoutes"
+    asserts:
+      - notExists:
+          path: spec.route.routes
+        documentIndex: 0
+      - notExists:
+          path: spec.route.routes
+        documentIndex: 1
+  - it: "should render one nested route per tier with the same receiver in both documents"
+    set:
+      env: dev
+      alerting.tierRoutes.P1.repeatInterval: 1h
+      alerting.tierRoutes.P2.repeatInterval: 2h
+    asserts:
+      - equal:
+          path: spec.route.routes
+          value:
+            - receiver: slack-service-dev
+              matchers:
+                - name: tier
+                  value: P1
+              repeatInterval: 1h
+              continue: false
+            - receiver: slack-service-dev
+              matchers:
+                - name: tier
+                  value: P2
+              repeatInterval: 2h
+              continue: false
+        documentIndex: 0
+      - equal:
+          path: spec.route.routes[1].repeatInterval
+          value: 2h
+        documentIndex: 1
+      - equal:
+          path: spec.receivers[0].name
+          value: slack-service-dev
+        documentIndex: 1
+  - it: "should reject an unknown tier"
+    set:
+      alerting.tierRoutes.P4.repeatInterval: 1h
+    asserts:
+      - failedTemplate:
+          errorPattern: 'unknown tier "P4"'
+  - it: "should reject a malformed repeatInterval"
+    set:
+      alerting.tierRoutes.P1.repeatInterval: soon
+    asserts:
+      - failedTemplate:
+          errorPattern: 'repeatInterval must look like'
   - it: "should keep grouping and Slack text unchanged without workloads"
     set:
       catalogue.enabled: true

@@ -2,6 +2,19 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.6.0 (2026-11-26)
+
+### Features
+
+* Show the alert tier after the status in the Slack title, for example `[FIRING:1] [P2] ApiDown (critical)`. Alerts without a `tier` label keep the old title.
+* Add `alerting.tierRoutes` for a per-tier repeat interval on the same receiver. Empty by default, so routing is unchanged.
+* Consumer rules with a `severity` label and no `tier` label get one: critical is P2, anything else is P3. An explicit tier is kept.
+
+### Migration
+
+* The Slack title changes for every alert that carries a `tier` label, including all catalogue alerts.
+* Consumer alerts that had a `severity` and no `tier` now carry a `tier` label, so their alert identity changes and firing alerts resolve and refire once on upgrade.
+
 ## 0.5.1 (2026-11-26)
 
 ### Features

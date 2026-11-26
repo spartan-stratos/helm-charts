@@ -6,6 +6,8 @@ workloadCluster: ""
 grafanaUrl: ""
 nameSuffix: ""
 routeMatchers: []
+alerting:
+  tierRoutes: {}
 slack:
   secretName: alert-slack
   channel: ""
