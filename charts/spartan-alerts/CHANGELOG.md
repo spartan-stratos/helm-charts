@@ -2,6 +2,16 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.6.1 (2026-11-27)
+
+### Bug Fixes
+
+* `NoReadyPods` now fires when a workload has no pods at all. The Running series is absent at zero pods, so the old expression never evaluated.
+
+### Migration
+
+* The alert can now fire for workloads that are scaled to zero on purpose. If the metrics source itself is down, it fires too.
+
 ## 0.6.0 (2026-11-26)
 
 ### Features
