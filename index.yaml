@@ -430,6 +430,16 @@ entries:
     version: 0.1.0
   lgtm-tenant-client:
   - apiVersion: v2
+    appVersion: 0.1.2
+    created: "2026-11-26T05:07:55.52277915Z"
+    description: Shared tenant telemetry client for an LGTM stack receiver
+    digest: b3d35e7e238ea13567843fd0d2869d6bdd93e97230512a906ae5fca816a23a8d
+    name: lgtm-tenant-client
+    type: application
+    urls:
+    - https://github.com/spartan-stratos/helm-charts/releases/download/lgtm-tenant-client-0.1.2/lgtm-tenant-client-0.1.2.tgz
+    version: 0.1.2
+  - apiVersion: v2
     appVersion: 0.1.0
     created: "2026-11-23T09:54:27.060012318Z"
     description: Shared tenant telemetry client for an LGTM stack receiver
@@ -1083,4 +1093,4 @@ entries:
     urls:
     - https://github.com/spartan-stratos/helm-charts/releases/download/strimzi-user-operator-0.1.0/strimzi-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-11-26T04:43:14.900445429Z"
+generated: "2026-11-26T05:07:55.522977309Z"
