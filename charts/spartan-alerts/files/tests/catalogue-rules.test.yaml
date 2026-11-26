@@ -621,7 +621,34 @@ tests:
   alert_rule_test:
   - eval_time: 20m
     alertname: TestNoReadyPods
-    exp_alerts: []
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: no-ready-pods
+      exp_annotations:
+        summary: Test has no running pods
+        description: No pod has been Running for 5 minutes. Check kubectl -n default get pods and describe the newest pod
+          for the scheduling or image error.
+- name: Namespace has other pod-phase series but none Running for the app
+  interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{namespace="default",pod="app-1",phase="Pending"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: TestNoReadyPods
+    exp_alerts:
+    - exp_labels:
+        namespace: default
+        severity: critical
+        tier: P2
+        catalogue_id: no-ready-pods
+      exp_annotations:
+        summary: Test has no running pods
+        description: No pod has been Running for 5 minutes. Check kubectl -n default get pods and describe the newest pod
+          for the scheduling or image error.
 - name: Evicted app and failed hook are excluded
   interval: 1m
   input_series:

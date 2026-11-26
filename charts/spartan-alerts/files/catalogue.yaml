@@ -120,7 +120,7 @@ rules:
   threshold: 0
   for: 5m
   expr: |-
-    (sum(kube_pod_status_phase{namespace="${NAMESPACE}",${POD_SELECTOR},phase="Running"}) or vector(0)) == ${THRESHOLD}
+    (sum(kube_pod_status_phase{namespace="${NAMESPACE}",${POD_SELECTOR},phase="Running"}) or (vector(0) and on() count(kube_pod_status_phase{namespace="${NAMESPACE}"}))) == ${THRESHOLD}
   summary: "${SERVICE_SHORT} has no running pods"
   description: "No pod has been Running for 5 minutes. Check kubectl -n ${NAMESPACE} get pods and describe the newest pod for the scheduling or image error."
 - alert: MemoryNearLimit
