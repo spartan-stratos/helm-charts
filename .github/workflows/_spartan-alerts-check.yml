@@ -23,11 +23,15 @@ on:
       tests-file:
         default: ''
         type: string
+      runs-on:
+        description: Runner label or labels as a JSON string. Linux amd64 or arm64.
+        default: '"ubuntu-latest"'
+        type: string
 permissions:
   contents: read
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4

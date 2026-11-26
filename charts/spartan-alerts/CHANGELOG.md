@@ -2,6 +2,13 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.5.1 (2026-11-26)
+
+### Features
+
+* Add optional `runs-on` input to the reusable consumer CI check, so a caller can run it on its own runner.
+* The check tools install on Linux arm64 as well as amd64, into the runner's temp directory, with no `sudo`.
+
 ## 0.5.0 (2026-11-25)
 
 ### Features
