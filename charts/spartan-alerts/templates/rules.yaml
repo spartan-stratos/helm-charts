@@ -21,6 +21,9 @@
 {{- if not (hasKey $labels "namespace") -}}
 {{- $_ := set $labels "namespace" $ns -}}
 {{- end -}}
+{{- if and (hasKey $labels "severity") (not (hasKey $labels "tier")) -}}
+{{- $_ := set $labels "tier" (ternary "P2" "P3" (eq (toString (index $labels "severity")) "critical")) -}}
+{{- end -}}
 {{- $_ := set $rule "labels" $labels -}}
 {{- end -}}
 {{- $rules = append $rules $rule -}}

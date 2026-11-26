@@ -24,6 +24,7 @@ ${INHIBIT_RULES}
         matchType: "=~"
         value: warning|critical
 ${ROUTE_MATCHERS}
+${TIER_ROUTES}
   receivers:
     - name: slack-${SERVICE_SHORT}-${ENV}
       slackConfigs:
@@ -32,7 +33,7 @@ ${ROUTE_MATCHERS}
             key: webhook-url
           channel: '#${ALERT_SLACK_CHANNEL}'
           sendResolved: true
-          title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ if .CommonLabels.tier }}[{{ .CommonLabels.tier }}] {{ end }}{{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
           titleLink: '${GRAFANA_URL}/alerting/list?search={{ .CommonLabels.alertname | urlquery }}'
           text: |-
             {{ range .Alerts }}*{{ .Annotations.summary }}*{{ if .Annotations.message }}*{{ .Annotations.message }}*{{ end }}
@@ -64,6 +65,7 @@ spec:
         matchType: "=~"
         value: warning|critical
 ${ROUTE_MATCHERS}
+${TIER_ROUTES}
   receivers:
     - name: slack-${SERVICE_SHORT}-${ENV}
       slackConfigs:
@@ -72,7 +74,7 @@ ${ROUTE_MATCHERS}
             key: webhook-url
           channel: '#${ALERT_SLACK_CHANNEL}'
           sendResolved: true
-          title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ if .CommonLabels.tier }}[{{ .CommonLabels.tier }}] {{ end }}{{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
           titleLink: '${GRAFANA_URL}/alerting/list?search={{ .CommonLabels.alertname | urlquery }}'
           text: |-
             {{ range .Alerts }}*{{ .Annotations.summary }}*{{ if .Annotations.message }}*{{ .Annotations.message }}*{{ end }}

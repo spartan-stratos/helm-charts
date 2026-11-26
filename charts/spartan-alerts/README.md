@@ -43,12 +43,20 @@ All objects use the release namespace. Without external secret synchronization, 
 | `externalSecrets.region` | `""` | Secrets Manager region; required when enabled. |
 | `externalSecrets.serviceAccount` | `alert-secrets` | ServiceAccount used by the SecretStore for JWT authentication. |
 | `externalSecrets.roleArn` | `""` | IAM role ARN annotated on the ServiceAccount; required when enabled. |
+| `alerting.tierRoutes` | `{}` | Per-tier repeat intervals, for example `{P1: {repeatInterval: 1h}, P2: {repeatInterval: 1h}}`. Keys are P1, P2 or P3; `repeatInterval` is required and looks like `1h` or `30m`. Empty renders nothing extra. |
 | `groups` | `[]` | PrometheusRule groups rendered in order with supported tokens expanded. Empty renders no PrometheusRule. |
 
 The chart's namespace route matches on a static `namespace` label, so every alerting rule needs one.
 For each rule with an `alert` key and no `namespace` label, the chart sets it to the release namespace; an explicit value is kept.
 Recording rules do not receive a namespace label. Rule content is never passed through Helm templating, so `{{ $labels.x }}` stays literal.
 Keep metric selectors scoped to the intended workload when sharing Prometheus.
+A rule with a `severity` label and no `tier` label gets one: critical is P2, anything else is P3. An explicit `tier` is kept.
+
+### Priority tiers
+
+The Slack title shows the tier after the status, for example `[FIRING:1] [P2] ApiDown (critical)`. An alert without a `tier` label keeps the old title.
+All tiers post to the same channel. Every tier repeats every 4h unless `alerting.tierRoutes` sets its own interval.
+Each configured tier adds one nested route under the top route of both AlertmanagerConfigs. It matches the `tier` label, uses the same receiver and does not continue, so an alert posts once.
 
 ### Platform values and group tokens
 
