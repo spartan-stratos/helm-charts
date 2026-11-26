@@ -366,6 +366,8 @@ The placeholder is deliberate: select the release commit after publication rathe
 Paths are relative to the caller checkout. `values-files` and `service-names` accept newline-separated lists using YAML block scalars.
 `helm-charts-ref`, `values-files`, and `namespace` are required. `release-name` defaults to `alerts`.
 `service-names` and `tests-file` are optional. Omit `tests-file` if no consumer promtool tests exist.
+`runs-on` is optional and defaults to `ubuntu-latest`. Pass a JSON string to run on another Linux amd64 or arm64 runner, for example `runs-on: '["self-hosted","linux"]'`.
+The job needs `bash`, `curl`, `tar`, `sha256sum`, `git` and `python3` with `venv`. It downloads pinned `helm`, `yq` and `promtool` builds into the runner's temp directory and needs no `sudo`.
 The caller org's Actions policy must allow this workflow.
 For generated values, generate and upload a separate artifact per environment in your own job:
 
