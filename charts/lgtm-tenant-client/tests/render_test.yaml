@@ -105,6 +105,15 @@ tests:
               - name: OTEL_EXPORTER_OTLP_HEADERS
                 valueFrom:
                   secretKeyRef: { name: otlp-basic-auth, key: otlp-headers }
+            java:
+              image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.31.1
+  - it: renders no java block when javaImage is empty
+    template: templates/instrumentation.yaml
+    set:
+      javaImage: ""
+    asserts:
+      - notExists:
+          path: spec.java
   - it: supports an instrumentation name override
     template: templates/instrumentation.yaml
     set:

@@ -6,3 +6,5 @@ roleArn: ""
 secretName: ""
 receiverUrl: ""
 instrumentationName: ""
+# Java auto-instrumentation agent image; the platform's own Instrumentations pin this version. Set to "" to use the operator default.
+javaImage: "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.31.1"
