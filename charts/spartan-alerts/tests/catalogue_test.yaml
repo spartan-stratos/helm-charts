@@ -56,6 +56,11 @@ tests:
   - matchRegex:
       path: spec.groups[0].rules[2].expr
       pattern: 'job_name=~"hook-.\+"'
+- it: NoReadyPods fires when the Running series is absent
+  asserts:
+  - matchRegex:
+      path: spec.groups[0].rules[3].expr
+      pattern: '^\(sum\(kube_pod_status_phase\{.*phase="Running"\}\) or \(vector\(0\) and on\(\) count\(kube_pod_status_phase\{namespace="alerts-test"\}\)\)\) == 0$'
 - it: rejects an empty severity override
   set:
     catalogue.overrides.Http5xx.severity: ""
@@ -407,9 +412,9 @@ tests:
   - matchRegex:
       path: spec.groups[0].rules[2].expr
       pattern: unless on\(pod\) kube_pod_status_reason
-  - notMatchRegex:
+  - matchRegex:
       path: spec.groups[0].rules[3].expr
-      pattern: vector
+      pattern: vector\(0\) and on\(\) count
   - matchRegex:
       path: spec.groups[0].rules[9].expr
       pattern: '>= 2'

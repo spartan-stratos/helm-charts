@@ -2,6 +2,18 @@
 
 All notable changes to this chart will be documented in this file.
 
+## 0.6.1 (2026-11-27)
+
+### Bug Fixes
+
+* `NoReadyPods` now fires when the namespace still reports pod-phase series but none are Running for the workload. Before, an absent Running series meant the alert never evaluated.
+* Missing telemetry still does not page: with no `kube_pod_status_phase` series in the namespace, the alert stays silent.
+
+### Migration
+
+* A namespace scaled fully to zero has no series and still does not fire.
+* A workload with all pods gone can now fire while other pods in the namespace keep reporting, including a workload scaled to zero on purpose.
+
 ## 0.6.0 (2026-11-26)
 
 ### Features
