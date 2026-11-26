@@ -112,7 +112,7 @@ spec:
 {{- $cv := $.Values.components.promLabelProxy }}
 {{- if $cv.enabled }}
 {{- $name := printf "prom-label-proxy-%s" $tenant.id }}
-{{- $c := dict "presets" list "placement" (list "") }}
+{{- $c := dict "presets" list "placement" list "edgePlacement" (list "") }}
 {{- $values := dict "fullnameOverride" $name "config" (dict "upstream" "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090" "label" "tenant" "extraArgs" (list (printf "--label-value=%s" $tenant.id) "--enable-label-apis=true" "--error-on-replace=true")) }}
 {{- include "lgtm-stack.merge" (list $values (fromYaml (include "lgtm-stack.values" (list $ "promLabelProxy" $c)))) }}
 ---
@@ -232,7 +232,7 @@ spec:
         {{- end }}
         {{- if eq $key "tenantRules" }}
         tenants: {{- toYaml $.Values.tenants | nindent 10 }}
-        placement: {{- toYaml $.Values.placement | nindent 10 }}
+        placement: {{- include "lgtm-stack.effectivePlacement" (list $ "edgePlacement") | nindent 10 }}
         components:
           promLabelProxy:
             enabled: {{ $.Values.components.promLabelProxy.enabled }}

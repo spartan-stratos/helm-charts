@@ -75,12 +75,18 @@ cluster:
   # Cluster label on every metric and log line (Prometheus externalLabels, Alloy, Slack messages). Required
   name: ""
 
-# Pins every pod of the stack, e.g. to a dedicated node:
-#   nodeSelector: { workload: lgtm }
-#   tolerations: [{ key: workload, operator: Equal, value: lgtm, effect: NoSchedule }]
+# Pins every pod of the stack to a dedicated node (the stateless ones follow edgePlacement when set), e.g.
+#   nodeSelector: { workload: lgtm }, tolerations: [{ key: workload, operator: Equal, value: lgtm, effect: NoSchedule }]
 # Set nodeSelector as well as the toleration, or a Pending pod can make a node autoscaler launch a node for it.
 # With a nodeSelector, Alloy's Service routes OTLP across nodes (internalTrafficPolicy: Cluster).
 placement:
+  nodeSelector: {}
+  tolerations: []
+
+# Replaces placement (whole, not per field) for the stateless pods: alloy-gateway, the operators, kube-state-metrics,
+# prom-label-proxy and Thanos rulers. Set, it also adds its tolerations to the node-exporter and Alloy DaemonSets and
+# gives alloy-gateway a PodDisruptionBudget and a zone spread. Empty: everything follows placement.
+edgePlacement:
   nodeSelector: {}
   tolerations: []
 
