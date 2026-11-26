@@ -13,3 +13,7 @@ spec:
         secretKeyRef:
           name: otlp-basic-auth
           key: otlp-headers
+{{- with .Values.javaImage }}
+  java:
+    image: {{ . | quote }}
+{{- end }}
