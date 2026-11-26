@@ -1,0 +1,147 @@
+suite: "Edge placement"
+
+templates:
+  - "templates/applications.yaml"
+  - "templates/addon.yaml"
+
+set:
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+  tenants: [{ id: example, namespaces: [example], port: 4320, htpasswdSecret: { name: example-auth, key: htpasswd } }]
+  placement:
+    nodeSelector: { workload: lgtm }
+    tolerations: [{ key: workload, operator: Equal, value: lgtm, effect: NoSchedule }]
+
+tests:
+  - it: unset edgePlacement keeps every stateless pod on placement
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.controller.nodeSelector
+          value: { workload: lgtm }
+      - notExists:
+          path: spec.source.helm.valuesObject.controller.podDisruptionBudget
+      - notExists:
+          path: spec.source.helm.valuesObject.controller.topologySpreadConstraints
+  - it: unset edgePlacement keeps the operator and label proxy on placement
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.prometheusOperator.nodeSelector
+          value: { workload: lgtm }
+      - equal:
+          path: spec.source.helm.valuesObject.kube-state-metrics.nodeSelector
+          value: { workload: lgtm }
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus-node-exporter.tolerations
+          value: [{ key: workload, operator: Equal, value: lgtm, effect: NoSchedule }]
+  - it: edgePlacement moves the stateless pods and leaves Prometheus and Alertmanager
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-kube-prometheus-stack
+    set:
+      edgePlacement:
+        nodeSelector: { workload: edge }
+        tolerations: [{ key: workload, operator: Equal, value: edge, effect: NoSchedule }]
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.prometheusOperator.nodeSelector
+          value: { workload: edge }
+      - equal:
+          path: spec.source.helm.valuesObject.prometheusOperator.admissionWebhooks.patch.nodeSelector
+          value: { workload: edge }
+      - equal:
+          path: spec.source.helm.valuesObject.kube-state-metrics.nodeSelector
+          value: { workload: edge }
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus.prometheusSpec.nodeSelector
+          value: { workload: lgtm }
+      - equal:
+          path: spec.source.helm.valuesObject.alertmanager.alertmanagerSpec.nodeSelector
+          value: { workload: lgtm }
+      - equal:
+          path: spec.source.helm.valuesObject.prometheus-node-exporter.tolerations
+          value:
+            - { key: workload, operator: Equal, value: lgtm, effect: NoSchedule }
+            - { key: workload, operator: Equal, value: edge, effect: NoSchedule }
+  - it: edgePlacement moves alloy-gateway and adds a PodDisruptionBudget and zone spread
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-alloy-gateway
+    set:
+      edgePlacement:
+        nodeSelector: { workload: edge }
+        tolerations: [{ key: workload, operator: Equal, value: edge, effect: NoSchedule }]
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.controller.nodeSelector
+          value: { workload: edge }
+      - equal:
+          path: spec.source.helm.valuesObject.controller.podDisruptionBudget
+          value: { enabled: true, maxUnavailable: 1 }
+      - equal:
+          path: spec.source.helm.valuesObject.controller.topologySpreadConstraints[0].topologyKey
+          value: topology.kubernetes.io/zone
+      - equal:
+          path: spec.source.helm.valuesObject.controller.topologySpreadConstraints[0].whenUnsatisfiable
+          value: ScheduleAnyway
+  - it: edgePlacement moves the OpenTelemetry operator and the per-tenant label proxy
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-opentelemetry-operator
+    set:
+      edgePlacement:
+        nodeSelector: { workload: edge }
+        tolerations: [{ key: workload, operator: Equal, value: edge, effect: NoSchedule }]
+    asserts:
+      - matchRegex:
+          path: spec.source.helm.values
+          pattern: 'workload: edge'
+      - notMatchRegex:
+          path: spec.source.helm.values
+          pattern: 'workload: lgtm'
+  - it: edgePlacement moves the label proxy
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-prom-label-proxy-example
+    set:
+      edgePlacement:
+        nodeSelector: { workload: edge }
+        tolerations: [{ key: workload, operator: Equal, value: edge, effect: NoSchedule }]
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.nodeSelector
+          value: { workload: edge }
+  - it: edgePlacement reaches the tenant ruler addon
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-tenant-rules
+    set:
+      edgePlacement:
+        nodeSelector: { workload: edge }
+        tolerations: [{ key: workload, operator: Equal, value: edge, effect: NoSchedule }]
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.placement.nodeSelector
+          value: { workload: edge }
+  - it: unset edgePlacement keeps the tenant ruler addon on placement
+    template: templates/applications.yaml
+    documentSelector:
+      path: metadata.name
+      value: lgtm-tenant-rules
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.placement.nodeSelector
+          value: { workload: lgtm }

@@ -102,10 +102,12 @@ kubePrometheusStack:
   wave: 30
   presets: [kube-prometheus-stack.yaml]
   placement:
-    - prometheusOperator
-    - prometheusOperator.admissionWebhooks.patch
     - prometheus.prometheusSpec
     - alertmanager.alertmanagerSpec
+  # Stateless: follow edgePlacement
+  edgePlacement:
+    - prometheusOperator
+    - prometheusOperator.admissionWebhooks.patch
     - kube-state-metrics
   # node-exporter is absent: it is a DaemonSet reading its own node, so it takes only tolerations (generated below)
   # The admission Jobs patch the webhook caBundle after sync
@@ -151,12 +153,14 @@ alloyGateway:
   app: alloy-gateway
   wave: 53
   presets: [alloy-gateway.yaml]
-  placement: [controller]
+  placement: []
+  edgePlacement: [controller]
 opentelemetryOperator:
   app: opentelemetry-operator
   wave: 61
   presets: [opentelemetry-operator.yaml]
-  placement: [""]
+  placement: []
+  edgePlacement: [""]
   # The chart generates the webhook cert on every render; as a plain resource (hook annotations nulled below) ArgoCD
   # creates it once and keeps it with the matching caBundle. The nulls survive only in helm.values: in valuesObject
   # they are dropped, the hooks stay, and every sync makes a new cert that no longer matches the caBundle.
@@ -302,7 +306,7 @@ singleBinary:
   extraVolumeMounts: {{ toYaml $mounts | nindent 4 }}
   extraContainers: {{ toYaml $containers | nindent 4 }}
 {{- else if eq $key "kubePrometheusStack" }}
-{{- with $v.placement.tolerations }}
+{{- with (include "lgtm-stack.daemonSetTolerations" $ | fromYamlArray) }}
 prometheus-node-exporter:
   tolerations: {{- toYaml . | nindent 4 }}
 {{- end }}
@@ -474,8 +478,24 @@ admissionWebhooks:
   secretAnnotations:
     helm.sh/hook: null
     helm.sh/hook-delete-policy: null
+{{- else if eq $key "alloyGateway" }}
+{{- if include "lgtm-stack.edgeSet" $ }}
+controller:
+  # The pair keeps one replica per zone where it can and lets a node drain take only one replica at a time
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: alloy
+          app.kubernetes.io/instance: alloy-gateway
+{{- end }}
 {{- else if eq $key "alloy" }}
-{{- with $v.placement.tolerations }}
+{{- with (include "lgtm-stack.daemonSetTolerations" $ | fromYamlArray) }}
 controller:
   tolerations: {{- toYaml . | nindent 4 }}
 {{- end }}
@@ -485,6 +505,26 @@ service:
   internalTrafficPolicy: Cluster
 {{- end }}
 {{- end }}
+{{- end -}}
+
+{{/* Placement for (list $ "placement"|"edgePlacement"): edgePlacement applies when it sets a nodeSelector or tolerations, else placement */}}
+{{- define "lgtm-stack.effectivePlacement" -}}
+{{- $ := index . 0 -}}
+{{- $p := $.Values.placement -}}
+{{- if and (eq (index . 1) "edgePlacement") (include "lgtm-stack.edgeSet" $) -}}
+{{- $p = $.Values.edgePlacement -}}
+{{- end -}}
+{{- dict "nodeSelector" ($p.nodeSelector | default dict) "tolerations" ($p.tolerations | default list) | toYaml -}}
+{{- end -}}
+
+{{/* Non-empty when edgePlacement sets a nodeSelector or tolerations */}}
+{{- define "lgtm-stack.edgeSet" -}}
+{{- if or .Values.edgePlacement.nodeSelector .Values.edgePlacement.tolerations -}}true{{- end -}}
+{{- end -}}
+
+{{/* Tolerations for DaemonSets, which must also run on edge nodes: placement's plus edgePlacement's */}}
+{{- define "lgtm-stack.daemonSetTolerations" -}}
+{{- toJson (concat (.Values.placement.tolerations | default list) (.Values.edgePlacement.tolerations | default list)) -}}
 {{- end -}}
 
 {{/* Final Helm values for a component: presets, then placement, then generated settings, then components.<key>.values */}}
@@ -505,12 +545,15 @@ service:
 {{- if not $file -}}{{- fail (printf "unknown preset %s" .) -}}{{- end -}}
 {{- include "lgtm-stack.merge" (list $out (fromYaml $file)) -}}
 {{- end -}}
+{{- range $field, $paths := dict "placement" $c.placement "edgePlacement" $c.edgePlacement -}}
+{{- $p := include "lgtm-stack.effectivePlacement" (list $ $field) | fromYaml -}}
 {{- $placement := dict -}}
-{{- with $.Values.placement.nodeSelector -}}{{- $_ := set $placement "nodeSelector" . -}}{{- end -}}
-{{- with $.Values.placement.tolerations -}}{{- $_ := set $placement "tolerations" . -}}{{- end -}}
+{{- with $p.nodeSelector -}}{{- $_ := set $placement "nodeSelector" . -}}{{- end -}}
+{{- with $p.tolerations -}}{{- $_ := set $placement "tolerations" . -}}{{- end -}}
 {{- if $placement -}}
-{{- range $c.placement -}}
+{{- range $paths -}}
 {{- include "lgtm-stack.merge" (list $out (fromYaml (include "lgtm-stack.atPath" (list . $placement)))) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- include "lgtm-stack.merge" (list $out (fromYaml (include "lgtm-stack.generated" (list $ $key)) | default dict)) -}}

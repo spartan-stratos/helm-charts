@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.20.0 (2026-11-26)
+
+### Features
+
+* Add `edgePlacement` (nodeSelector and tolerations) for the stateless pods: alloy-gateway, prometheus operator and its admission patch job, kube-state-metrics, OpenTelemetry operator, per-tenant prom-label-proxy and Thanos ruler. Prometheus, Alertmanager, Grafana, Loki and Tempo keep `placement`. Empty renders unchanged.
+* When `edgePlacement` is set, its tolerations are also added to the node-exporter and Alloy DaemonSets, and alloy-gateway gets a PodDisruptionBudget (maxUnavailable 1) and a zone topology spread (maxSkew 1, ScheduleAnyway).
+
 ## 0.19.1 (2026-11-26)
 
 ### Bug Fixes
