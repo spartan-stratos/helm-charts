@@ -1,4 +1,4 @@
-{{- if ne .Values.mode "applications" }}
+{{- if and (eq .Values.mode "addon") (eq .Values.addon "gateway") }}
 {{- $_ := include "lgtm-stack.gatewayLanes" . }}
 {{- end }}
 {{- if eq .Values.mode "applications" }}

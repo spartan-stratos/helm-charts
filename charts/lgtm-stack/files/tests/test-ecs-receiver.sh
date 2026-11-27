@@ -46,10 +46,52 @@ prom_image=docker.io/prom/prometheus:v3.15.0
 driver_image=docker.io/library/python:3.13.2-slim
 stage=render
 helm template ecs-runtime "$chart" -f "$here/ecs-receiver-values.yaml" > "$tmp/rendered.yaml"
-python3 - "$tmp" <<'PY'
-import base64, copy, hashlib, pathlib, re, sys, yaml
+python3 - "$tmp" "$chart" "$here/ecs-receiver-values.yaml" <<'PY'
+import base64, copy, hashlib, pathlib, re, subprocess, sys, yaml
 directory = pathlib.Path(sys.argv[1])
 documents = list(yaml.safe_load_all((directory / 'rendered.yaml').read_text()))
+# Re-render actual Argo child values; these deliberately omit gateway isolation settings.
+chart = pathlib.Path(sys.argv[2])
+fixture = pathlib.Path(sys.argv[3])
+def helm_values(values):
+    return subprocess.run(['helm', 'template', 'ecs-child-proof', str(chart), '-f', '-'],
+                          input=yaml.safe_dump(values), text=True, capture_output=True, timeout=60)
+parent = subprocess.run(['helm', 'template', 'ecs-child-parent', str(chart), '-f', str(fixture),
+                         '--set', 'logRules.enabled=true', '--set', 'components.loki.values.loki.auth_enabled=true',
+                         '--set', 'gateway.ingress.enabled=true',
+                         '--set', 'gateway.ingress.host=otlp.example.com'], text=True, capture_output=True, timeout=60)
+assert parent.returncode == 0, parent.stderr
+children = {d['spec']['source']['helm']['valuesObject']['addon']: d['spec']['source']['helm']['valuesObject']
+            for d in yaml.safe_load_all(parent.stdout) if d and
+            d.get('spec', {}).get('source', {}).get('helm', {}).get('valuesObject', {}).get('mode') == 'addon'}
+child_failures = []
+for addon, kind, name in [('tenantRules', 'ThanosRuler', 'legacy-ruler'),
+                          ('logRules', 'ConfigMap', 'loki-rules-platform')]:
+    values = children[addon]
+    assert 'tenantIsolation' not in values
+    assert any(t.get('receivers', [{}])[0].get('mode') == 'ecs' for t in values['tenants'])
+    child = helm_values(values)
+    if child.returncode != 0:
+        child_failures.append((addon, child.stderr))
+        continue
+    resources = [d for d in yaml.safe_load_all(child.stdout) if d]
+    assert any(d['kind'] == kind and d['metadata']['name'] == name for d in resources), addon
+assert not child_failures, child_failures
+gateway_values = children['gateway']
+gateway_child = helm_values(gateway_values)
+assert gateway_child.returncode == 0, gateway_child.stderr
+assert any(d and d['kind'] == 'Ingress' for d in yaml.safe_load_all(gateway_child.stdout))
+for invalid, error in [('isolation', 'tenantIsolation'), ('mode', 'receiver mode')]:
+    values = copy.deepcopy(gateway_values)
+    values['gateway'] = {'ingress': {'enabled': False}}
+    values['components'] = {'alloyGateway': {'enabled': False}}
+    if invalid == 'isolation':
+        values['tenantIsolation']['enabled'] = False
+    else:
+        values['tenants'][0]['receivers'][0]['mode'] = 'invalid'
+    child = helm_values(values)
+    assert child.returncode != 0 and error in child.stderr, invalid
+print('Generated mixed child renders passed: tenantRules/logRules; disabled gateway rejects isolation/mode')
 prom_application, = [d for d in documents if d and d.get('spec', {}).get('source', {}).get('chart') == 'kube-prometheus-stack']
 prom = {'global': {'scrape_interval': '1s'}, 'scrape_configs': [], 'otlp': {
     'translation_strategy': 'UnderscoreEscapingWithSuffixes',
