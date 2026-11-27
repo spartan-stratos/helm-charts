@@ -50,13 +50,7 @@
 {{- if or (not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" ($receiver.name | default ""))) (gt (len ($receiver.name | default "")) 63) }}{{ fail "receiver name must be a DNS-1123 label of at most 63 characters" }}{{ end }}
 {{- if hasKey $names $receiver.name }}{{ fail "receiver names must be unique per tenant" }}{{ end }}
 {{- $_ := set $names $receiver.name true }}
-{{- $mode := include "lgtm-stack.receiverMode" (list $ $receiver) }}
-{{- if eq $mode "kubernetes" }}
-{{- if empty $receiver.namespaces }}{{ fail "receiver namespaces must be non-empty" }}{{ end }}
-{{- range $receiver.namespaces }}
-{{- if not (has . ($tenant.namespaces | default list)) }}{{ fail "receiver namespaces must be a subset of tenant namespaces" }}{{ end }}
-{{- end }}
-{{- end }}
+{{- include "lgtm-stack.gateway.validateApplicationReceiver" (dict "root" $ "tenant" $tenant "receiver" $receiver) }}
 {{- end }}
 {{- end }}
 {{- end }}

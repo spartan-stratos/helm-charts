@@ -6,11 +6,13 @@ here=$(cd "$(dirname "$0")" && pwd)
 chart=$(cd "$here/../.." && pwd)
 stage=dependencies
 fail() { printf 'ECS receiver runtime failed: %s\n' "$*" >&2; exit 1; }
-for tool in docker helm python3; do command -v "$tool" >/dev/null || fail "missing $tool"; done
+preflight_only=false
+if [[ ${1:-} == --preflight-only ]]; then preflight_only=true; shift; fi
+(( $# == 0 )) || fail 'usage: test-ecs-receiver.sh [--preflight-only]'
+for tool in helm python3; do command -v "$tool" >/dev/null || fail "missing $tool"; done
 python3 -c 'import yaml' || fail 'host Python requires PyYAML'
-docker_endpoint=${DOCKER_HOST:-$(docker context inspect --format '{{(index .Endpoints "docker").Host}}')}
-[[ $docker_endpoint == unix://* ]] || fail 'a local Docker Unix socket is required'
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/ecs-receiver.XXXXXXXX")
+docker_ready=false
 nonce=$(basename "$tmp")
 driver=$nonce-driver
 alloy=$nonce-alloy
@@ -21,12 +23,14 @@ cleanup() {
   if (( run_exit != 0 )); then
     printf 'ECS receiver runtime failure stage: %s\n' "$stage" >&2
     for container in "$driver" "$alloy" "$prom"; do
+      $docker_ready || break
       if [[ $(docker inspect --format '{{index .Config.Labels "ecs-receiver-test"}}' "$container" 2>/dev/null || true) == "$nonce" ]]; then
         docker logs --tail 40 "$container" >&2 || true
       fi
     done
   fi
   for container in "$alloy" "$prom" "$driver"; do
+    $docker_ready || break
     if [[ $(docker inspect --format '{{index .Config.Labels "ecs-receiver-test"}}' "$container" 2>/dev/null || true) == "$nonce" ]]; then
       docker rm -fv "$container" >/dev/null || run_exit=1
     fi
@@ -40,21 +44,55 @@ trap 'exit 143' TERM
 alloy_image=docker.io/grafana/alloy:v1.20.0
 prom_image=docker.io/prom/prometheus:v3.15.0
 driver_image=docker.io/library/python:3.13.2-slim
-stage=images
-for image in "$alloy_image" "$prom_image" "$driver_image"; do
-  if ! docker image inspect "$image" >/dev/null 2>&1; then
-    python3 - "$image" <<'PY'
-import subprocess, sys
-subprocess.run(['docker', 'pull', sys.argv[1]], check=True, timeout=180)
-PY
-  fi
-done
 stage=render
 helm template ecs-runtime "$chart" -f "$here/ecs-receiver-values.yaml" > "$tmp/rendered.yaml"
 python3 - "$tmp" <<'PY'
-import base64, hashlib, pathlib, re, sys, yaml
+import base64, copy, hashlib, pathlib, re, sys, yaml
 directory = pathlib.Path(sys.argv[1])
 documents = list(yaml.safe_load_all((directory / 'rendered.yaml').read_text()))
+prom_application, = [d for d in documents if d and d.get('spec', {}).get('source', {}).get('chart') == 'kube-prometheus-stack']
+prom = {'global': {'scrape_interval': '1s'}, 'scrape_configs': [], 'otlp': {
+    'translation_strategy': 'UnderscoreEscapingWithSuffixes',
+    'promote_resource_attributes': ['service.name', 'service.namespace', 'deployment.environment.name',
+                                    'k8s.namespace.name', 'k8s.pod.name', 'team', 'tenant']}}
+def validate_prometheus(application):
+    spec = application['spec']['source']['helm']['valuesObject']['prometheus']['prometheusSpec']
+    assert type(spec.get('enableOTLPReceiver')) is bool and spec['enableOTLPReceiver'] is True, 'OTLP receiver must be enabled'
+    otlp = spec.get('otlp')
+    assert type(otlp) is dict, 'missing rendered Prometheus OTLP settings'
+    strategy = otlp.get('translationStrategy')
+    assert type(strategy) is str and strategy == prom['otlp']['translation_strategy'], 'OTLP translation differs from harness'
+    promoted = otlp.get('promoteResourceAttributes')
+    assert type(promoted) is list and all(type(item) is str for item in promoted), 'OTLP promoted attributes must be a string list'
+    assert promoted == prom['otlp']['promote_resource_attributes'], 'OTLP promoted attributes differ from harness'
+    tsdb = spec.get('tsdb', {})
+    assert type(tsdb) is dict, 'rendered TSDB settings must be an object'
+    window = tsdb.get('outOfOrderTimeWindow', '0s')
+    assert type(window) is str and window == '0s', 'harness requires default zero out-of-order window'
+validate_prometheus(prom_application)
+# Mutate the actual rendered Application, not a parallel mock of the preset.
+mutations = [
+    ('disabled OTLP', ('enableOTLPReceiver',), False),
+    ('string OTLP flag', ('enableOTLPReceiver',), 'true'),
+    ('missing OTLP settings', ('otlp',), None),
+    ('different translation', ('otlp', 'translationStrategy'), 'NoTranslation'),
+    ('non-list attributes', ('otlp', 'promoteResourceAttributes'), 'tenant'),
+    ('different attributes', ('otlp', 'promoteResourceAttributes'), ['tenant']),
+    ('non-string attribute', ('otlp', 'promoteResourceAttributes'), [7]),
+    ('nonzero ordering window', ('tsdb',), {'outOfOrderTimeWindow': '1s'}),
+]
+for label, path, value in mutations:
+    changed = copy.deepcopy(prom_application)
+    parent = changed['spec']['source']['helm']['valuesObject']['prometheus']['prometheusSpec']
+    for key in path[:-1]:
+        parent = parent[key]
+    parent[path[-1]] = value
+    try:
+        validate_prometheus(changed)
+    except AssertionError:
+        continue
+    raise AssertionError(f'Prometheus preflight accepted {label}')
+print(f'Prometheus rendered preflight passed; {len(mutations)} mismatch controls rejected')
 gateway, = [d for d in documents if d and d.get('metadata', {}).get('name') == 'lgtm-alloy-gateway']
 original = gateway['spec']['source']['helm']['valuesObject']['alloy']['configMap']['content']
 text = original
@@ -83,10 +121,6 @@ for content in (original, text):
     assert len(captured) == 6 and all(len(re.findall(headers, block)) == 1 for block in captured)
 assert original_headers == rewritten_headers
 (directory / 'config.alloy').write_text(text)
-prom = {'global': {'scrape_interval': '1s'}, 'scrape_configs': [], 'otlp': {
-    'translation_strategy': 'UnderscoreEscapingWithSuffixes',
-    'promote_resource_attributes': ['service.name', 'service.namespace', 'deployment.environment.name',
-                                    'k8s.namespace.name', 'k8s.pod.name', 'team', 'tenant']}}
 (directory / 'prometheus.yaml').write_text(yaml.safe_dump(prom))
 for index, lane in enumerate(('alpha', 'beta', 'legacy')):
     digest = base64.b64encode(hashlib.sha1(f'public-{lane}'.encode()).digest()).decode()
@@ -95,6 +129,21 @@ for item in directory.iterdir():
     item.chmod(0o644)
 (directory / 'results').mkdir()
 PY
+if $preflight_only; then stage=preflight-complete; exit 0; fi
+stage=docker-dependencies
+command -v docker >/dev/null || fail 'missing docker'
+docker_endpoint=${DOCKER_HOST:-$(docker context inspect --format '{{(index .Endpoints "docker").Host}}')}
+[[ $docker_endpoint == unix://* ]] || fail 'a local Docker Unix socket is required'
+docker_ready=true
+stage=images
+for image in "$alloy_image" "$prom_image" "$driver_image"; do
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    python3 - "$image" <<'PY'
+import subprocess, sys
+subprocess.run(['docker', 'pull', sys.argv[1]], check=True, timeout=180)
+PY
+  fi
+done
 common=(--label "ecs-receiver-test=$nonce" --user "$(id -u):$(id -g)" --cap-drop ALL
   --security-opt no-new-privileges --read-only --tmpfs '/tmp:rw,mode=1777')
 stage='driver-start'

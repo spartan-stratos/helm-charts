@@ -58,8 +58,7 @@ so the main-org provider cannot load tenant files.
 
 ## Install
 
-The project's ArgoCD repo wraps the chart, so Dependabot's `helm` ecosystem opens a PR for every new version. The
-scaffold is `templates/lgtm-stack/` in spartan-sre-wiki.
+The project's ArgoCD repo wraps the chart, so Dependabot's `helm` ecosystem opens a PR for every new version.
 
 ```yaml
 # lgtm-stack/Chart.yaml
@@ -287,6 +286,40 @@ Enable backend tenant authentication as described below before setting `tenantIs
 An ECS-only tenant may omit `namespaces`. A mixed tenant lists only its real Kubernetes namespaces.
 No Kubernetes workload namespace, dashboard sidecar or namespace ruler is fabricated for an ECS lane.
 This capability alone does not provision ECS instrumentation, dashboards, alert rules or Slack routing.
+
+#### ECS sender and hub boundary
+
+```mermaid
+flowchart LR
+  App["ECS application"] --> Collector["Task-local collector"]
+  App --> FireLens["FireLens log route"]
+  FireLens -->|tested custom log route| Collector
+  Collector -->|authenticated OTLP over HTTPS| Hub["Shared Kubernetes hub"]
+  Hub --> Prometheus["Prometheus"]
+  Hub --> Loki["Loki"]
+  Hub --> Tempo["Tempo"]
+```
+
+Helm configures only the Kubernetes-hosted hub. The sender's ECS infrastructure owns task definitions, pinned collector/Java components,
+metadata, task/execution roles, credential delivery, FireLens and rollout. This chart creates no ECS task/service, ECS IAM role,
+IRSA binding or synthetic Kubernetes workload namespace for an ECS sender.
+The [default AWS ADOT ECS recipe](https://aws-otel.github.io/docs/setup/ecs/) handles traces and metrics.
+Application logs need a tested custom collector/log route; the diagram shows the intended boundary, not an implemented sender.
+The [OpenTelemetry agent](https://opentelemetry.io/docs/collector/deploy/agent/) and
+[gateway](https://opentelemetry.io/docs/collector/deploy/gateway/) roles remain separate.
+Use a stable `service.name` and the real task ARN for task-instance identity. Pin sender component versions and verify all required signals before rollout.
+
+Gateway rendering uses chart-prefixed named templates with explicit context:
+
+| File | Responsibility |
+|---|---|
+| `presets/alloy-gateway.yaml` | Thin Kubernetes Deployment values and config entry include |
+| `templates/_gateway.tpl` | Validation, lane normalization and explicit profile dispatch |
+| `templates/_gateway-kubernetes.tpl` | Kubernetes namespace policy and metric export |
+| `templates/_gateway-ecs.tpl` | ECS identity/attribute policy and metric export |
+| `templates/_gateway-transport.tpl` | Shared authentication, OTLP receiver and Loki/Tempo transport fragments |
+
+Profiles retain rejection of incompatible identity claims. Shared transport keeps fixed tenant headers and does not select a platform policy.
 
 ```yaml
 tenantIsolation:
@@ -645,8 +678,7 @@ observability/
 
 ArgoCD detects the folder type, so kustomize or plain YAML work too, as long as the output is the same ConfigMaps and
 PrometheusRules. The Helm chart below needs no list of files, and a rule file stays a plain Prometheus rule file, so
-`promtool check rules rules/*.yaml` and `promtool test rules` run on it directly. The scaffold is
-`templates/lgtm-stack/argocd/observability/` in spartan-sre-wiki.
+`promtool check rules rules/*.yaml` and `promtool test rules` run on it directly.
 
 ```yaml
 # observability/Chart.yaml
@@ -822,6 +854,9 @@ bash charts/lgtm-stack/files/tests/test-ecs-receiver.sh
 
 The ECS runtime test needs a local Docker daemon exposed through a Unix socket, Helm and Python 3 with PyYAML (CI pins 6.0.3).
 It runs pinned Alloy, Prometheus and a standard-library Python fixture driver in isolated containers, without live credentials or published host ports.
+CI keeps Helm lint/render/unit checks unconditional. Heavy ECS runtime checks run for explicit ECS/shared gateway, backend and test dependencies.
+Changes only to the dedicated Kubernetes profile, documentation or unrelated charts skip that runtime check.
+Failed or missing change detection runs it and still fails CI. A local runtime run does not prove deployed telemetry, Tempo gRPC or RED generation.
 
 To change a preset, edit `presets/` and bump the chart version. A new shared dashboard is one JSON file in
 `files/dashboards/<folder>/`. To bump an upstream chart, change
