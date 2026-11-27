@@ -1,0 +1,35 @@
+argocd:
+  project: example
+  destination: { name: example-cluster }
+cluster: { name: example-cluster }
+tenantIsolation: { enabled: true }
+tenants:
+  - id: alpha
+    receivers:
+      - name: ecs
+        mode: ecs
+        environment: dev
+        port: 14320
+        path: /alpha
+        htpasswdSecret: { name: alpha-otlp, key: htpasswd }
+        ecs:
+          accountId: "123456789012"
+          clusterArn: arn:aws:ecs:us-west-2:123456789012:cluster/example-cluster
+          serviceNames: [example-api, example-worker]
+  - id: beta
+    receivers:
+      - name: ecs
+        mode: ecs
+        environment: dev
+        port: 14321
+        path: /beta
+        htpasswdSecret: { name: beta-otlp, key: htpasswd }
+        ecs:
+          accountId: "210987654321"
+          clusterArn: arn:aws:ecs:us-west-2:210987654321:cluster/other-cluster
+          serviceNames: [other-api, other-worker]
+  - id: legacy
+    namespaces: [example-legacy]
+    port: 14322
+    path: /legacy
+    htpasswdSecret: { name: legacy-otlp, key: htpasswd }

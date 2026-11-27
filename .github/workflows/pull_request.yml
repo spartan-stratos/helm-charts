@@ -3,6 +3,27 @@ name: Helm Check
 on: pull_request
 
 jobs:
+  lgtm-ecs-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.3.1
+      - name: Install runtime test parser
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ecs-receiver-venv"
+          "$RUNNER_TEMP/ecs-receiver-venv/bin/python" -m pip install PyYAML==6.0.3
+          echo "$RUNNER_TEMP/ecs-receiver-venv/bin" >> "$GITHUB_PATH"
+      - name: Verify ECS receiver runtime isolation
+        run: bash charts/lgtm-stack/files/tests/test-ecs-receiver.sh
+
   spartan-alerts-artifact-producer:
     runs-on: ubuntu-latest
     permissions:

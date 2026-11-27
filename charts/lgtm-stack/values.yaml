@@ -57,10 +57,8 @@ logRules:
   limits:
     maxRuleGroupsPerTenant: 10
     maxRulesPerRuleGroup: 10
-# See README.md Tenant gateway receivers for credential and namespace isolation configuration.
-# Tenants may set grafana: { viewers: [<group>], editors: [<group>] } for optional Keycloak org mapping.
-# Adding viewers or editors groups enables mapping and folders; set orgId after the job creates them.
-# An orgId enables that tenant's dashboards; a provider for a missing org makes Grafana exit 1.
+# See README.md Tenant gateway receivers for Kubernetes/ECS identity and credential isolation.
+# Configure tenant Grafana groups before orgId; a missing-org provider makes Grafana exit 1.
 tenants: []
 # Keep tenant logs and traces disabled until their backends enforce tenant authentication.
 tenantIsolation:

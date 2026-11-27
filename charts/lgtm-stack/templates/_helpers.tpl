@@ -58,16 +58,70 @@ A null reaches the upstream chart as null, so it still deletes that chart's defa
 {{- end -}}
 {{- end -}}
 
+{{- define "lgtm-stack.receiverMode" -}}
+{{- $root := index . 0 -}}
+{{- $receiver := index . 1 -}}
+{{- $mode := "kubernetes" -}}
+{{- if hasKey $receiver "mode" -}}
+{{- if not (kindIs "string" $receiver.mode) -}}{{ fail "receiver mode must be kubernetes or ecs" }}{{- end -}}
+{{- if not (has $receiver.mode (list "kubernetes" "ecs")) -}}{{ fail "receiver mode must be kubernetes or ecs" }}{{- end -}}
+{{- $mode = $receiver.mode -}}
+{{- end -}}
+{{- if eq $mode "kubernetes" -}}
+{{- if or (hasKey $receiver "ecs") (hasKey $receiver "environment") -}}{{ fail "Kubernetes receivers must not set ecs or environment" }}{{- end -}}
+{{- else -}}
+{{- range $key := list "namespaces" "stampNamespace" -}}
+{{- if hasKey $receiver $key -}}{{ fail (printf "ECS receivers must not set %s" $key) }}{{- end -}}
+{{- end -}}
+{{- if not (and (kindIs "bool" $root.Values.tenantIsolation.enabled) (eq $root.Values.tenantIsolation.enabled true)) -}}{{ fail "ECS receivers require tenantIsolation.enabled true" }}{{- end -}}
+{{- if not (kindIs "string" $receiver.environment) -}}{{ fail "ECS receiver environment must be dev or prod" }}{{- end -}}
+{{- if not (has $receiver.environment (list "dev" "prod")) -}}{{ fail "ECS receiver environment must be dev or prod" }}{{- end -}}
+{{- $secret := $receiver.htpasswdSecret -}}
+{{- if not (kindIs "map" $secret) -}}{{ fail "ECS receiver htpasswdSecret must be an object with name and key" }}{{- end -}}
+{{- if not (and (kindIs "string" $secret.name) (kindIs "string" $secret.key)) -}}{{ fail "ECS receiver htpasswdSecret requires string name and key" }}{{- end -}}
+{{- if or (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$" $secret.name)) (gt (len $secret.name) 253) (not (regexMatch "^[A-Za-z0-9._-]+$" $secret.key)) (gt (len $secret.key) 253) -}}{{ fail "ECS receiver htpasswdSecret requires valid nonempty name and key" }}{{- end -}}
+{{- $ecs := $receiver.ecs -}}
+{{- if not (kindIs "map" $ecs) -}}{{ fail "receiver ecs must be an object" }}{{- end -}}
+{{- range $key, $_ := $ecs -}}
+{{- if not (has $key (list "accountId" "clusterArn" "serviceNames")) -}}{{ fail (printf "unknown ecs identity key %s" $key) }}{{- end -}}
+{{- end -}}
+{{- if not (kindIs "string" $ecs.accountId) -}}{{ fail "ecs.accountId must be a twelve-digit string" }}{{- end -}}
+{{- if not (regexMatch "^[0-9]{12}$" $ecs.accountId) -}}{{ fail "ecs.accountId must be a twelve-digit string" }}{{- end -}}
+{{- if not (kindIs "string" $ecs.clusterArn) -}}{{ fail "ecs.clusterArn must be an ECS cluster ARN" }}{{- end -}}
+{{- if or (gt (len $ecs.clusterArn) 512) (not (regexMatch "^arn:aws(-cn|-us-gov)?:ecs:[a-z]{2}(-[a-z]+)+-[0-9]+:[0-9]{12}:cluster/[A-Za-z0-9_-]{1,255}$" $ecs.clusterArn)) -}}{{ fail "ecs.clusterArn must be a bounded literal ECS cluster ARN" }}{{- end -}}
+{{- if ne (index (splitList ":" $ecs.clusterArn) 4) $ecs.accountId -}}{{ fail "ecs.clusterArn account must equal ecs.accountId" }}{{- end -}}
+{{- if not (kindIs "slice" $ecs.serviceNames) -}}{{ fail "ecs.serviceNames must be a list of one to sixteen unique literal names" }}{{- end -}}
+{{- if or (lt (len $ecs.serviceNames) 1) (gt (len $ecs.serviceNames) 16) -}}{{ fail "ecs.serviceNames must contain one to sixteen names" }}{{- end -}}
+{{- $services := dict -}}
+{{- range $ecs.serviceNames -}}
+{{- if not (kindIs "string" .) -}}{{ fail "ecs.serviceNames must contain only literal strings" }}{{- end -}}
+{{- if not (regexMatch "^[A-Za-z0-9_-]{1,255}$" .) -}}{{ fail "ecs.serviceNames must contain bounded literal ECS service names" }}{{- end -}}
+{{- if hasKey $services . -}}{{ fail "ecs.serviceNames must not contain duplicates" }}{{- end -}}
+{{- $_ := set $services . true -}}
+{{- end -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
 {{/* Flatten receivers so legacy tenants retain their lane index and rendered names. */}}
 {{- define "lgtm-stack.gatewayLanes" -}}
+{{- $root := . -}}
 {{- $lanes := list -}}
 {{- range .Values.tenants -}}
 {{- $tenant := . -}}
+{{- range $key := list "mode" "environment" "ecs" -}}
+{{- if hasKey $tenant $key -}}{{ fail (printf "legacy tenant-level %s is unsupported; use nested receivers" $key) }}{{- end -}}
+{{- end -}}
 {{- if hasKey . "receivers" -}}
 {{- range .receivers -}}
+{{- $mode := include "lgtm-stack.receiverMode" (list $root .) -}}
 {{- $ingress := true -}}
 {{- if hasKey . "ingress" -}}{{- $ingress = .ingress -}}{{- end -}}
+{{- if eq $mode "ecs" -}}
+{{- $lanes = append $lanes (dict "id" $tenant.id "name" .name "port" .port "path" (.path | default (printf "/%s/%s" $tenant.id .name)) "ingress" $ingress "mode" $mode "environment" .environment "ecs" .ecs "htpasswdSecret" .htpasswdSecret) -}}
+{{- else -}}
 {{- $lanes = append $lanes (dict "id" $tenant.id "name" .name "port" .port "path" (.path | default (printf "/%s/%s" $tenant.id .name)) "ingress" $ingress "namespaces" .namespaces "stampNamespace" (.stampNamespace | default "") "htpasswdSecret" (.htpasswdSecret | default dict)) -}}
+{{- end -}}
 {{- end -}}
 {{- else -}}
 {{- $lanes = append $lanes (dict "id" .id "name" .id "port" .port "path" (printf "/%s" .id) "ingress" true "namespaces" .namespaces "htpasswdSecret" (.htpasswdSecret | default dict)) -}}

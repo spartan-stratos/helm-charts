@@ -25,7 +25,7 @@ change sets its id. A tenant without an id gets no dashboard sidecar, providers 
 Never delete the org or reset the Grafana database while its id is set. For recovery, unset `orgId`
 then sync so Grafana starts without the missing-org provider.
 
-Each configured tenant gets a sidecar watching its `namespaces`, two providers in its org and folder
+Each tenant configured with namespaces and a Grafana org id gets a sidecar watching its `namespaces`, two providers in its org and folder
 with uid equal to the tenant id, and an unlabelled home ConfigMap delivered through Grafana's `extraObjects`.
 The protected `<tenant>-home` dashboard prevents deletion of the parent folder. Git dashboards are read-only;
 copy them into the tenant folder to edit them.
@@ -68,7 +68,7 @@ name: lgtm-stack-<cluster>
 version: 1.0.0
 dependencies:
   - name: lgtm-stack
-    version: 0.11.0
+    version: 0.21.0
     repository: https://spartan-stratos.github.io/helm-charts
 ```
 
@@ -193,10 +193,10 @@ Grafana, the gateway, Alloy and prom-label-proxy are not fenced. Egress is uncha
 This is a no-op unless the cluster CNI enforces NetworkPolicy. Check kubelet probe reachability when enforcement is turned on.
 
 Rollback: set `networkPolicy.enabled: false`, sync, and verify the `lgtm-network-policy` child Application and its four NetworkPolicies are pruned.
-Before turning the gateway's log or trace forwarding on for a tenant, check that each SDK's logs and spans carry the resource `k8s.namespace.name`; otherwise they are dropped.
+Before enabling a Kubernetes receiver's log or trace forwarding, check that each SDK's logs and spans carry the resource `k8s.namespace.name`; otherwise they are dropped. ECS receivers use the separate identity contract below.
 
 Tenant receiver lists must contain at least one receiver, and receiver paths must start with `/`.
-Gateway logs and traces without a resource namespace are dropped; namespace-less metrics remain accepted for ruler namespace injection.
+Kubernetes receiver logs and traces without a resource namespace are dropped; namespace-less metrics remain accepted for ruler namespace injection.
 
 ### Secrets
 
@@ -249,25 +249,27 @@ gateway:
     host: otlp.example.com
 ```
 
-Each receiver has its own port, auth file and namespace filter, while all receivers write the same tenant id.
+Each receiver has its own port, auth file and identity filter, while all receivers write the same tenant id.
 Receiver names must be unique within a tenant and DNS-1123 labels of at most 63 characters.
-Each receiver requires a non-empty namespace list drawn from the tenant's namespaces.
-The tenant-level namespace union still controls rulers, the label proxy and Grafana organizations.
+Kubernetes receivers require a non-empty namespace list drawn from the tenant's namespaces.
+The tenant-level namespace union bounds Kubernetes receiver allowlists and controls Kubernetes rulers and dashboard collection.
+The label proxy enforces the tenant label only; it does not restrict queries to that namespace union.
 
 | Receiver key | Meaning |
 |---|---|
+| `mode` (optional string) | Defaults to `kubernetes`. Explicit `ecs` selects the account/cluster/service contract below. |
 | `stampNamespace` (optional string) | After the receiver's filter, overwrite `k8s.namespace.name` (and the metric datapoint `namespace`, and a log or span `namespace` attribute where the sender set one) with this value on every signal. The filter still checks the sender's original namespace against `namespaces`. Requires non-empty `namespaces`. Use it so a dev receiver on a shared tenant writes `<ns>-dev` and can never write the prod namespace. Unset renders unchanged. |
 
 Receiver paths default to `/<id>/<name>`; `ingress` defaults to true. Paths must be unique across all lanes,
 and ingress paths cannot contain another ingress path at a `/` boundary. With `ingress: false`, send directly to
 `http://alloy-gateway.monitoring.svc.cluster.local:<port>/<id>/<name>/v1/{metrics,logs,traces}`
 (use the configured path when overridden). Public receivers use the ingress host and the same signal suffixes.
-Namespace-less metrics still pass the filters; separate receivers do not close that existing gap. Logs and spans without a resource `k8s.namespace.name` are dropped.
+For Kubernetes receivers, namespace-less metrics still pass the filters; separate receivers do not close that existing gap. Logs and spans without a resource `k8s.namespace.name` are dropped.
 
 The platform must label each tenant namespace `lgtm-stack/tenant=<id>` BEFORE its rules sync.
 An unlabelled namespace's rules are evaluated by both the main Prometheus and the tenant ruler.
 
-With `tenantIsolation.enabled: false`, tenant gateway receivers forward only metrics; logs and traces are dropped.
+With `tenantIsolation.enabled: false`, Kubernetes receivers forward only metrics; logs and traces are dropped. ECS receivers require tenant isolation and fail rendering when it is disabled.
 No tenant log or trace processors or exporters are generated. With `components.promLabelProxy.enabled: true`,
 the tenant-org Job creates the Prometheus datasource, which queries through the tenant's label-enforcing proxy.
 With `components.promLabelProxy.enabled: false`, no tenant Prometheus datasource is created.
@@ -277,6 +279,73 @@ Its admin Secret name and keys follow the effective Grafana `admin.existingSecre
 
 Metrics scraped inside the platform cluster carry no tenant label, so tenant rules cannot see them; tenant telemetry must arrive through the gateway.
 Recording rules are not supported on tenant rulers; alerts must use self-contained expressions.
+
+#### ECS receiver identity and attribute policy
+
+ECS receivers require chart 0.21.0 or later and are opt-in under `tenants[].receivers`; the legacy tenant-level receiver form remains Kubernetes-only.
+Enable backend tenant authentication as described below before setting `tenantIsolation.enabled: true`.
+An ECS-only tenant may omit `namespaces`. A mixed tenant lists only its real Kubernetes namespaces.
+No Kubernetes workload namespace, dashboard sidecar or namespace ruler is fabricated for an ECS lane.
+This capability alone does not provision ECS instrumentation, dashboards, alert rules or Slack routing.
+
+```yaml
+tenantIsolation:
+  enabled: true
+tenants:
+  - id: example-ecs
+    receivers:
+      - name: dev
+        mode: ecs
+        environment: dev
+        port: 4322
+        htpasswdSecret: { name: example-dev-otlp, key: htpasswd }
+        ecs:
+          accountId: "123456789012"
+          clusterArn: arn:aws:ecs:us-east-1:123456789012:cluster/example-dev
+          serviceNames: [example-api, example-worker]
+```
+
+`environment` must be `dev` or `prod`. `ecs` accepts exactly `accountId`, `clusterArn` and `serviceNames`.
+The account is a twelve-digit string; the exact cluster ARN must name that account.
+Cluster and service names use letters, digits, underscores or hyphens, with 1..255 characters.
+The cluster ARN is at most 512 characters. `serviceNames` contains 1..16 unique literal names, without wildcards.
+ECS lanes reject `namespaces` and `stampNamespace`, even when empty; Kubernetes lanes reject `ecs` and `environment`.
+Each ECS lane requires a BasicAuth `htpasswdSecret` with nonempty name/key. Create its Secret before rolling the shared gateway.
+BasicAuth authenticates tenancy; matching self-reported cloud attributes is not AWS identity attestation.
+
+Every metric, log and span must carry string resource attributes matching the configured `cloud.account.id`,
+`aws.ecs.cluster.arn` and an allowed `service.name`. It also needs a real long `aws.ecs.task.arn` for the same cluster:
+`arn:aws:ecs:us-east-1:123456789012:task/example-dev/0123456789abcdef0123456789abcdef`.
+The task id is exactly 32 lowercase hexadecimal characters; legacy short task ARNs fail closed.
+The gateway derives `service.instance.id` from this task ARN, keeping simultaneous task metrics distinct.
+Conflicting canonical identity, instance, tenant or environment claims, and canonical Kubernetes namespace claims, are rejected at resource and signal scope.
+Missing or matching tenancy/environment claims are stamped as receiver-owned `tenant`, `env`,
+`deployment.environment` and `deployment.environment.name`. The ECS filters and transforms propagate errors instead of forwarding malformed payloads.
+
+Resource, log-record, span, datapoint and instrumentation-scope attribute maps larger than 64 entries are rejected before normalization.
+Instrumentation-scope attributes are cleared. `keep_keys` discards undocumented custom attributes and normalized aliases from the resource and log-record/span/datapoint maps only.
+This is not payload privacy scrubbing: log bodies, nested span events/links and metric exemplars are not scrubbed by this attribute policy.
+After normalization, only these nine resource keys remain:
+`cloud.account.id`, `aws.ecs.cluster.arn`, `aws.ecs.task.arn`, `service.name`, `service.instance.id`,
+`tenant`, `env`, `deployment.environment`, `deployment.environment.name`.
+Log-record and metric datapoint attributes retain the following 20 common business dimensions plus the four stamped tenancy/environment keys, at most 24 keys.
+Span attributes also retain `url.path`, at most 25 keys, so Tempo's existing health-check and scrape exclusions can inspect the original path.
+
+| Group | Retained signal keys |
+|---|---|
+| HTTP | `http.request.method`, `http.response.status_code`, `http.route`, `url.scheme`, `server.address`, `server.port` |
+| Protocol/errors | `network.protocol.name`, `network.protocol.version`, `error.type` |
+| JVM | `jvm.memory.type`, `jvm.memory.pool.name`, `jvm.gc.name`, `jvm.thread.state`, `jvm.buffer.pool.name` |
+| Database/pool | `db.system.name`, `db.operation.name`, `db.client.connection.pool.name`, `pool.name`, `state`, `type` |
+
+ECS metric exporters use one queue consumer to preserve accepted queue order when forwarding requests.
+Senders remain responsible for each series' timestamp chronology; the queue does not sort samples or guarantee monotonic timestamps from arbitrary inputs.
+Kubernetes exporters retain their existing queue defaults.
+
+CI exercises this policy against Alloy 1.20.0 and Prometheus 3.15.0, including mixed good/bad batches and backend label translation.
+The metric runtime gate injects bounded forwarding latency and checks serialized ECS export with zero Prometheus rejections.
+The runtime harness captures logs and traces at fake OTLP sinks; it does not exercise actual Tempo gRPC transport or span-metrics generation.
+Before downgrading a consumer to a version without ECS support, remove its ECS lanes first; retain stored telemetry and credential versions.
 
 When tenant rulers are enabled and at least one tenant has namespaces, one ServiceMonitor scrapes their metrics with a `ruler` label.
 Shared-channel alerts report each unavailable tenant ruler after 5m, plus rule evaluation and alert delivery failures sustained for 10m.
@@ -326,7 +395,7 @@ keep it as break-glass.
 
 ## Onboarding a tenant
 
-A tenant is a project. Every env namespace of the project writes metrics, logs and traces under one tenant id through the gateway, and its alert rules run only in the tenant ruler.
+The steps below describe Kubernetes onboarding; ECS lanes use the separate receiver contract above. A tenant is a project. Every env namespace writes metrics, logs and traces under one tenant id through the gateway, and its alert rules run only in the tenant ruler.
 
 Adding the first tenant group turns org mapping on for the whole Grafana; expect logins to fail until the tenant-orgs job finishes plus about 2 minutes. A missing mapped org refuses everyone, so apply tenant groups only after the orgs exist (the job creates them).
 
@@ -342,7 +411,7 @@ Adding the first tenant group turns org mapping on for the whole Grafana; expect
    - Use the shared [lgtm-tenant-client](../lgtm-tenant-client/README.md) chart. A service must not carry its own copy of the ServiceAccount, SecretStore, ExternalSecret or Instrumentation plumbing.
    - In-cluster Alloy and the file-tail sidecar write under the platform tenant by default. Their data does not appear in tenant datasources. Tenant-scoped data goes through the tenant receiver over OTLP. A file-tail sidecar ships logs to port `3100` at `/loki/api/v1/push`. When Loki auth is enabled, direct pushes need an `X-Scope-OrgID` header. Set it for the sidecar with the spartan chart value `observability.logs.fileSidecar.tenantId`. Set `OTEL_LOGS_EXPORTER=none` for file-tail logging. Prod sends OTLP logs through its receiver and runs no sidecar.
    - OTLP logs through the gateway, and sidecar logs relayed through an Alloy `loki.source.api`, carry the namespace as structured metadata (`k8s_namespace_name`), not as a stream label; only `service_name` is a stream label there. A sidecar pushing straight to Loki sets `namespace` as a stream label itself via `external_labels`. Use the query for the ingestion path below.
-   - Since chart 0.9.0, the gateway drops logs and spans without a namespace attribute. It does not drop metrics. A series without a namespace label cannot be isolated by the label proxy or tenant ruler.
+   - Since chart 0.9.0, Kubernetes receivers drop logs and spans without a namespace attribute but still accept and stamp tenant on namespace-less metrics. The label proxy isolates these series by tenant; namespace-enforced ruler queries do not match them.
 5. Rules and alert routes: one `spartan-alerts` release per env namespace. The tenant ruler adds `namespace=<rule namespace>` to every selector, so a rule needs no namespace matcher. Alerts with no matching AlertmanagerConfig route to the unrouted channel.
    - Slack routes match severity `warning|critical` only. The root null route drops `info`. An alert matching no route goes to `UNROUTED`. Delivery proof is exactly one `SyntheticTest` warning alert, never re-posted.
 
@@ -748,7 +817,11 @@ helm unittest charts/lgtm-stack
 helm template x charts/lgtm-stack -f charts/lgtm-stack/ci/test-values.yaml
 charts/lgtm-stack/files/tests/test-rules.sh   # promtool rule tests, plain and rendered bundles; needs helm, yq and promtool
 charts/lgtm-stack/files/tests/test-dashboards.sh   # dashboard JSON, uids and datasource uids; needs jq
+bash charts/lgtm-stack/files/tests/test-ecs-receiver.sh
 ```
+
+The ECS runtime test needs a local Docker daemon exposed through a Unix socket, Helm and Python 3 with PyYAML (CI pins 6.0.3).
+It runs pinned Alloy, Prometheus and a standard-library Python fixture driver in isolated containers, without live credentials or published host ports.
 
 To change a preset, edit `presets/` and bump the chart version. A new shared dashboard is one JSON file in
 `files/dashboards/<folder>/`. To bump an upstream chart, change

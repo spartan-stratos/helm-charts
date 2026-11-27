@@ -31,6 +31,7 @@ alloy:
     create: true
     content: |
 {{- range $index, $tenant := (include "lgtm-stack.gatewayLanes" . | fromYamlArray) }}
+{{- $ecsMode := eq ($tenant.mode | default "kubernetes") "ecs" }}
       otelcol.auth.basic "tenant_{{ $index }}" {
         htpasswd {
           file = "/etc/alloy/tenants/{{ $index }}/htpasswd"
@@ -55,6 +56,61 @@ alloy:
 {{- end }}
         }
       }
+{{- if $ecsMode }}
+{{- $fixed := dict "tenant" $tenant.id "env" $tenant.environment "deployment.environment" $tenant.environment "deployment.environment.name" $tenant.environment }}
+{{- $identity := dict "cloud.account.id" "cloud.account.id" "aws.ecs.cluster.arn" "aws.ecs.cluster.arn" "aws.ecs.task.arn" "aws.ecs.task.arn" "service.name" "service.name" "service.instance.id" "aws.ecs.task.arn" }}
+{{- $drop := list }}
+{{- range $key := list "cloud.account.id" "aws.ecs.cluster.arn" "aws.ecs.task.arn" "service.name" }}
+{{- $drop = append $drop (printf "not IsString(resource.attributes[%s])" ($key | toJson)) }}
+{{- end }}
+{{- range $key, $value := dict "cloud.account.id" $tenant.ecs.accountId "aws.ecs.cluster.arn" $tenant.ecs.clusterArn }}
+{{- $drop = append $drop (printf "resource.attributes[%s] != %s" ($key | toJson) ($value | toJson)) }}
+{{- end }}
+{{- $services := list }}
+{{- range $tenant.ecs.serviceNames }}
+{{- $services = append $services (printf "resource.attributes[\"service.name\"] == %s" (. | toJson)) }}
+{{- end }}
+{{- $drop = append $drop (printf "not (%s)" (join " or " $services)) }}
+{{- $taskPattern := printf "^%s/[0-9a-f]{32}$" (replace ":cluster/" ":task/" $tenant.ecs.clusterArn) }}
+{{- $drop = append $drop (printf "not IsMatch(resource.attributes[\"aws.ecs.task.arn\"], %s)" ($taskPattern | toJson)) }}
+{{- range $key := list "namespace" "k8s.namespace.name" }}
+{{- $drop = append $drop (printf "resource.attributes[%s] != nil" ($key | toJson)) }}
+{{- end }}
+{{- range $key, $value := $fixed }}
+{{- $drop = append $drop (printf "resource.attributes[%s] != nil and (not IsString(resource.attributes[%s]) or resource.attributes[%s] != %s)" ($key | toJson) ($key | toJson) ($key | toJson) ($value | toJson)) }}
+{{- end }}
+{{- $drop = concat $drop (list "resource.attributes[\"service.instance.id\"] != nil and (not IsString(resource.attributes[\"service.instance.id\"]) or resource.attributes[\"service.instance.id\"] != resource.attributes[\"aws.ecs.task.arn\"])" "Len(resource.attributes) > 64" "Len(instrumentation_scope.attributes) > 64") }}
+{{- $resourceDrop := $drop }}
+{{- range $key := list "namespace" "k8s.namespace.name" }}
+{{- $drop = append $drop (printf "attributes[%s] != nil" ($key | toJson)) }}
+{{- end }}
+{{- range $key, $value := $fixed }}
+{{- $drop = append $drop (printf "attributes[%s] != nil and (not IsString(attributes[%s]) or attributes[%s] != %s)" ($key | toJson) ($key | toJson) ($key | toJson) ($value | toJson)) }}
+{{- end }}
+{{- range $key, $resourceKey := $identity }}
+{{- $drop = append $drop (printf "attributes[%s] != nil and (not IsString(attributes[%s]) or attributes[%s] != resource.attributes[%s])" ($key | toJson) ($key | toJson) ($key | toJson) ($resourceKey | toJson)) }}
+{{- end }}
+{{- $drop = append $drop "Len(attributes) > 64" }}
+      // BasicAuth identifies the tenant; ECS attributes are matching constraints, not AWS attestation.
+      otelcol.processor.filter "tenant_{{ $index }}" {
+        error_mode = "propagate"
+        metrics {
+          metric = [{{ range $i, $condition := $resourceDrop }}{{ if $i }}, {{ end }}{{ $condition | quote }}{{ end }}]
+          datapoint = [{{ range $i, $condition := $drop }}{{ if $i }}, {{ end }}{{ $condition | quote }}{{ end }}]
+        }
+        logs {
+          log_record = [{{ range $i, $condition := $drop }}{{ if $i }}, {{ end }}{{ $condition | quote }}{{ end }}]
+        }
+        traces {
+          span = [{{ range $i, $condition := $drop }}{{ if $i }}, {{ end }}{{ $condition | quote }}{{ end }}]
+        }
+        output {
+          logs = [otelcol.processor.attributes.tenant_{{ $index }}.input]
+          metrics = [otelcol.processor.attributes.tenant_{{ $index }}.input]
+          traces = [otelcol.processor.attributes.tenant_{{ $index }}.input]
+        }
+      }
+{{- else }}
       // A credential may only write its own namespaces: drop any telemetry naming another namespace, in the resource or in
       // the datapoint, log or span attributes, so one tenant cannot forge series that another tenant's or the platform's
       // rules select by namespace.
@@ -81,6 +137,7 @@ alloy:
 {{- end }}
         }
       }
+{{- end }}
       otelcol.processor.attributes "tenant_{{ $index }}" {
         action {
           key = "tenant"
@@ -99,6 +156,30 @@ alloy:
       }
       // Prometheus promotes resource attributes, so stamp the resource too.
       otelcol.processor.transform "tenant_{{ $index }}" {
+{{- if $ecsMode }}
+        error_mode = "propagate"
+{{- $resourceStatements := list "keep_keys(attributes, [\"cloud.account.id\", \"aws.ecs.cluster.arn\", \"aws.ecs.task.arn\", \"service.name\"])" "set(attributes[\"service.instance.id\"], attributes[\"aws.ecs.task.arn\"])" }}
+{{- $businessKeys := list "http.request.method" "http.response.status_code" "http.route" "url.scheme" "server.address" "server.port" "network.protocol.name" "network.protocol.version" "error.type" "jvm.memory.type" "jvm.memory.pool.name" "jvm.gc.name" "jvm.thread.state" "jvm.buffer.pool.name" "db.system.name" "db.operation.name" "db.client.connection.pool.name" "pool.name" "state" "type" }}
+{{- $signalStatements := list "keep_keys(instrumentation_scope.attributes, [])" }}
+{{- range $key, $value := dict "tenant" $tenant.id "env" $tenant.environment "deployment.environment" $tenant.environment "deployment.environment.name" $tenant.environment }}
+{{- $statement := printf "set(attributes[%s], %s)" ($key | toJson) ($value | toJson) }}
+{{- $resourceStatements = append $resourceStatements $statement }}
+{{- $signalStatements = append $signalStatements $statement }}
+{{- end }}
+{{- range $block, $context := dict "log_statements" "log" "metric_statements" "datapoint" "trace_statements" "span" }}
+{{- $contextKeys := $businessKeys }}
+{{- if eq $context "span" }}{{- $contextKeys = concat $businessKeys (list "url.path") }}{{- end }}
+{{- $contextStatements := concat (list (printf "keep_keys(attributes, %s)" ($contextKeys | toJson))) $signalStatements }}
+        {{ $block }} {
+          context = "resource"
+          statements = [{{ range $i, $statement := $resourceStatements }}{{ if $i }}, {{ end }}{{ $statement | quote }}{{ end }}]
+        }
+        {{ $block }} {
+          context = {{ $context | quote }}
+          statements = [{{ range $i, $statement := $contextStatements }}{{ if $i }}, {{ end }}{{ $statement | quote }}{{ end }}]
+        }
+{{- end }}
+{{- else }}
 {{- if $tenant.stampNamespace }}
         // Overwrite after the filter, which already checked the original namespace: a sender cannot pick the stored one.
 {{- if $.Values.tenantIsolation.enabled }}
@@ -151,6 +232,7 @@ alloy:
           statements = [{{ printf "set(attributes[\"tenant\"], %s)" ($tenant.id | toJson) | quote }}]
         }
 {{- end }}
+{{- end }}
         output {
 {{- if $.Values.tenantIsolation.enabled }}
           logs = [otelcol.exporter.otlphttp.loki_{{ $index }}.input]
@@ -170,6 +252,11 @@ alloy:
       }
 {{- end }}
       otelcol.exporter.otlphttp "prometheus_{{ $index }}" {
+{{- if $ecsMode }}
+        sending_queue {
+          num_consumers = 1
+        }
+{{- end }}
         client {
           endpoint = "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/otlp"
           headers = { "X-Scope-OrgID" = {{ $tenant.id | quote }} }

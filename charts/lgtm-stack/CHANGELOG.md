@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.21.0 (2026-11-27)
+
+### Features
+
+* Add opt-in authenticated ECS receivers with account, cluster, service and long task ARN validation across metrics, logs and traces. Kubernetes receivers remain the default and render unchanged.
+* Bound and normalize ECS resource, log-record/span/datapoint and instrumentation-scope attributes, preserve per-task metric identity, and stamp receiver-owned tenant/environment labels. Retain 20 common business dimensions plus trace-only `url.path` for Tempo's existing health-span exclusion; the attribute policy is not body/event/link/exemplar privacy scrubbing.
+* Serialize each ECS metric export queue with one consumer to preserve its accepted request order. Senders still own per-series timestamp chronology; Kubernetes queue defaults are unchanged.
+* Add pinned Alloy and Prometheus runtime checks to CI. This capability does not provision ECS instrumentation, dashboards or alert routing; remove ECS lanes before downgrading a consumer.
+
 ## 0.20.0 (2026-11-26)
 
 ### Features
