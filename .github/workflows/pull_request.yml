@@ -3,6 +3,52 @@ name: Helm Check
 on: pull_request
 
 jobs:
+  ecs-runtime-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.classify.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test ECS runtime classification and gateway template structure
+        run: python3 -m unittest discover -s .github/scripts/lgtm-stack -p 'test_*.py'
+      - name: Classify ECS runtime dependencies
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scripts/lgtm-stack/ecs-runtime-changes.py --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT"
+
+  lgtm-ecs-runtime:
+    needs: ecs-runtime-changes
+    if: >-
+      ${{ always() && !cancelled() &&
+          (needs.ecs-runtime-changes.result != 'success' || needs.ecs-runtime-changes.outputs.run != 'false') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.3.1
+      - name: Install runtime test parser
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ecs-receiver-venv"
+          "$RUNNER_TEMP/ecs-receiver-venv/bin/python" -m pip install PyYAML==6.0.3
+          echo "$RUNNER_TEMP/ecs-receiver-venv/bin" >> "$GITHUB_PATH"
+      - name: Verify ECS receiver runtime isolation
+        run: bash charts/lgtm-stack/files/tests/test-ecs-receiver.sh
+
   spartan-alerts-artifact-producer:
     runs-on: ubuntu-latest
     permissions:

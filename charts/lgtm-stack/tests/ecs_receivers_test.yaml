@@ -1,0 +1,176 @@
+suite: ECS receiver contract
+templates: [templates/applications.yaml]
+set:
+  argocd.project: example
+  argocd.destination.name: example-cluster
+  cluster.name: example-cluster
+  tenantIsolation.enabled: true
+  tenants:
+    - &tenant
+      id: example
+      receivers:
+        - &receiver
+          name: dev
+          mode: ecs
+          environment: dev
+          port: 4320
+          htpasswdSecret: {name: example-otlp, key: htpasswd}
+          ecs: &ecs
+            accountId: "111122223333"
+            clusterArn: arn:aws:ecs:us-west-2:111122223333:cluster/example
+            serviceNames: [api, worker]
+tests:
+  - it: accepts an ECS-only tenant without Kubernetes namespaces
+    asserts:
+      - containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-alloy-gateway, any: true}
+      - containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-prom-label-proxy-example, any: true}
+      - containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-tenant-rules}
+        not: true
+  - it: accepts mixed ECS and Kubernetes lanes using only the Kubernetes lane's namespaces
+    set:
+      tenants: [{<<: *tenant, namespaces: [ns-dev], receivers: [*receiver, {name: kubernetes, port: 4321, namespaces: [ns-dev], htpasswdSecret: {name: kubernetes-otlp, key: htpasswd}}]}]
+    asserts:
+      - containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-alloy-gateway, any: true}
+      - containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-tenant-rules, any: true}
+  - it: retains Kubernetes namespace subset checks in a mixed tenant
+    set: {tenants: [{<<: *tenant, namespaces: [ns-dev], receivers: [*receiver, {name: kubernetes, port: 4321, namespaces: [other], htpasswdSecret: {name: kubernetes-otlp, key: htpasswd}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'receiver namespaces must be a subset of tenant namespaces'}}]
+  - it: accepts the explicit Kubernetes mode without ECS fields
+    set: {tenants: [{id: example, namespaces: [ns-dev], receivers: [{name: dev, mode: kubernetes, port: 4320, namespaces: [ns-dev], htpasswdSecret: {name: example-otlp, key: htpasswd}}]}]}
+    asserts: [{containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-alloy-gateway, any: true}}]
+  - it: accepts prod as an ECS environment value without deploying resources
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, environment: prod}]}]}
+    asserts: [{containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-alloy-gateway, any: true}}]
+  - it: retains the omitted-mode legacy Kubernetes receiver and its port
+    set:
+      tenants: [{id: example, port: 4320, namespaces: [ns-dev], htpasswdSecret: {name: example-otlp, key: htpasswd}}]
+    documentSelector: {path: metadata.name, value: lgtm-alloy-gateway}
+    asserts:
+      - equal: {path: spec.source.helm.valuesObject.alloy.extraPorts, value: [{name: tenant-0, port: 4320, targetPort: 4320, protocol: TCP}]}
+      - matchRegex: {path: spec.source.helm.valuesObject.alloy.configMap.content, pattern: 'k8s.namespace.name'}
+  - it: accepts the maximum sixteen service names
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: [s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12, s13, s14, s15, s16]}}]}]}
+    asserts: [{containsDocument: {kind: Application, apiVersion: argoproj.io/v1alpha1, name: lgtm-alloy-gateway, any: true}}]
+  - it: rejects an unknown receiver mode
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, mode: external}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)mode'}}]
+  - it: rejects a non-string receiver mode
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, mode: true}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)mode'}}]
+  - it: rejects an explicitly null receiver mode
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, mode: null}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)mode'}}]
+  - it: requires an explicit ECS environment
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, environment: null}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)environment'}}]
+  - it: rejects unsupported ECS environments
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, environment: staging}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)environment'}}]
+  - it: rejects a non-string ECS environment
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, environment: true}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)environment'}}]
+  - it: requires the ECS identity object
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: null}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)ecs.*(object|map|required)'}}]
+  - it: rejects a non-object ECS identity
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: invalid}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)ecs.*(object|map)'}}]
+  - it: rejects unknown ECS identity keys
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, account: "111122223333"}}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)(unknown|unsupported|keys)'}}]
+  - it: requires the ECS account ID
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, accountId: null}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'accountId'}}]
+  - it: rejects a numeric account ID instead of a string
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, accountId: 111122223333}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'accountId'}}]
+  - it: rejects account IDs with the wrong length
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, accountId: "11112222333"}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'accountId'}}]
+  - it: rejects non-digit account IDs
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, accountId: abcdefghijkl}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'accountId'}}]
+  - it: requires the ECS cluster ARN
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, clusterArn: null}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'clusterArn'}}]
+  - it: rejects a non-string cluster ARN
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, clusterArn: [example]}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'clusterArn'}}]
+  - it: rejects an account mismatch in the cluster ARN
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, clusterArn: 'arn:aws:ecs:us-west-2:999988887777:cluster/example'}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'clusterArn|accountId'}}]
+  - it: rejects a task ARN supplied as a cluster ARN
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, clusterArn: 'arn:aws:ecs:us-west-2:111122223333:task/example/0123456789abcdef0123456789abcdef'}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'clusterArn'}}]
+  - it: rejects cluster names containing regex operators
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, clusterArn: 'arn:aws:ecs:us-west-2:111122223333:cluster/example.*'}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'clusterArn'}}]
+  - it: rejects cluster names exceeding the ECS limit
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, clusterArn: 'arn:aws:ecs:us-west-2:111122223333:cluster/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'clusterArn'}}]
+  - it: rejects a cluster ARN containing a literal injection
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, clusterArn: "arn:aws:ecs:us-west-2:111122223333:cluster/example\"\noutput {}"}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'clusterArn'}}]
+  - it: requires the service allowlist
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: null}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects an empty service allowlist
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: []}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects a scalar service allowlist
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: api}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects non-string service names
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: [api, 7]}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects duplicate service names
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: [api, api]}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects more than sixteen service names
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: [s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12, s13, s14, s15, s16, s17]}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects service-name wildcards
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: ['api.*']}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects empty service names
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: ['']}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects overlong service names
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects service names containing quotes and control characters
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, ecs: {<<: *ecs, serviceNames: ["api\"\noutput {}"]}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'serviceNames'}}]
+  - it: rejects explicitly empty ECS receiver namespaces
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, namespaces: []}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)(ecs.*namespaces|namespaces.*ecs)'}}]
+  - it: rejects ECS receiver namespace stamping even when empty
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, stampNamespace: ''}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)(ecs.*stampNamespace|stampNamespace.*ecs)'}}]
+  - it: requires ECS tenant isolation
+    set: {tenantIsolation.enabled: false}
+    asserts: [{failedTemplate: {errorPattern: 'tenantIsolation'}}]
+  - it: requires an ECS authentication Secret name
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, htpasswdSecret: {key: htpasswd, name: null}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'htpasswdSecret|BasicAuth|basic.auth'}}]
+  - it: requires an ECS authentication Secret key
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, htpasswdSecret: {name: example-otlp, key: null}}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'htpasswdSecret|BasicAuth|basic.auth'}}]
+  - it: rejects a non-object ECS authentication Secret
+    set: {tenants: [{<<: *tenant, receivers: [{<<: *receiver, htpasswdSecret: invalid}]}]}
+    asserts: [{failedTemplate: {errorPattern: 'htpasswdSecret|BasicAuth|basic.auth'}}]
+  - it: rejects ECS fields on a Kubernetes receiver
+    set: {tenants: [{<<: *tenant, namespaces: [ns-dev], receivers: [{<<: *receiver, mode: kubernetes, namespaces: [ns-dev]}]}]}
+    asserts: [{failedTemplate: {errorPattern: '(?i)(kubernetes|ecs|environment)'}}]
+  - it: rejects environment fields on a Kubernetes receiver without ECS fields
+    set:
+      tenants: [{id: example, namespaces: [ns-dev], receivers: [{name: dev, mode: kubernetes, environment: dev, port: 4320, namespaces: [ns-dev], htpasswdSecret: {name: example-otlp, key: htpasswd}}]}]
+    asserts: [{failedTemplate: {errorPattern: '(?i)(kubernetes|environment)'}}]
+  - it: rejects ECS mode on the legacy tenant-level receiver
+    set:
+      tenants: [{id: example, mode: ecs, port: 4320, environment: dev, ecs: {accountId: '111122223333', clusterArn: 'arn:aws:ecs:us-west-2:111122223333:cluster/example', serviceNames: [api]}, htpasswdSecret: {name: example-otlp, key: htpasswd}}]
+    asserts: [{failedTemplate: {errorPattern: '(?i)legacy.*(mode|ecs|environment)'}}]
+  - it: rejects legacy tenant-level ECS fields without a mode
+    set:
+      tenants: [{id: example, port: 4320, ecs: {accountId: '111122223333'}, htpasswdSecret: {name: example-otlp, key: htpasswd}}]
+    asserts: [{failedTemplate: {errorPattern: '(?i)legacy.*ecs'}}]

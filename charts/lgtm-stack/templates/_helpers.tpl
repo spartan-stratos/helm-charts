@@ -58,23 +58,6 @@ A null reaches the upstream chart as null, so it still deletes that chart's defa
 {{- end -}}
 {{- end -}}
 
-{{/* Flatten receivers so legacy tenants retain their lane index and rendered names. */}}
-{{- define "lgtm-stack.gatewayLanes" -}}
-{{- $lanes := list -}}
-{{- range .Values.tenants -}}
-{{- $tenant := . -}}
-{{- if hasKey . "receivers" -}}
-{{- range .receivers -}}
-{{- $ingress := true -}}
-{{- if hasKey . "ingress" -}}{{- $ingress = .ingress -}}{{- end -}}
-{{- $lanes = append $lanes (dict "id" $tenant.id "name" .name "port" .port "path" (.path | default (printf "/%s/%s" $tenant.id .name)) "ingress" $ingress "namespaces" .namespaces "stampNamespace" (.stampNamespace | default "") "htpasswdSecret" (.htpasswdSecret | default dict)) -}}
-{{- end -}}
-{{- else -}}
-{{- $lanes = append $lanes (dict "id" .id "name" .id "port" .port "path" (printf "/%s" .id) "ingress" true "namespaces" .namespaces "htpasswdSecret" (.htpasswdSecret | default dict)) -}}
-{{- end -}}
-{{- end -}}
-{{- toYaml $lanes -}}
-{{- end -}}
 
 {{/* Nested map from a dotted path: (list "a.b" $leaf) -> {a: {b: $leaf}}; "" returns $leaf */}}
 {{- define "lgtm-stack.atPath" -}}
